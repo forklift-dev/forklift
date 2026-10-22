@@ -56,6 +56,8 @@ updated: 2026-10-22
   из пакета nodegit (`vendor/` ≈ 500 МБ). Исключения — в `files` в `electron-builder.yml`; в рантайме нужны только
   `lib/` и `build/Release/nodegit.node` (так же упаковывает GitKraken).
 - 2026-10-22: на Linux проверка целостности ASAR (fuse) не применяется Electron'ом — работает только на macOS/Windows.
+- 2026-10-22: в T-014 найден баг: конфликтные файлы не попадали в панель изменений (libgit2 даёт только бит
+  `CONFLICTED`). Исправлено, тест добавлен в `service.test.ts`.
 - Рендерер не минифицирован (по умолчанию electron-vite); не критично, можно включить `build.minify`.
 
 ## Промт

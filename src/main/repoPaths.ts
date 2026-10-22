@@ -1,5 +1,18 @@
 import { realpath } from 'node:fs/promises';
-import { isAbsolute, resolve, sep } from 'node:path';
+import { isAbsolute, posix, resolve, sep, win32 } from 'node:path';
+
+/**
+ * Validates a repo-relative path without touching the disk (it may name a deleted file) and
+ * returns it in git's forward-slash form. Rejects absolute paths and anything climbing out.
+ */
+export function normalizeRepoRelative(path: string): string {
+  if (isAbsolute(path) || win32.isAbsolute(path)) throw new Error('Path must be relative to the repository');
+  const normalized = posix.normalize(path.replaceAll('\\', '/'));
+  if (normalized === '..' || normalized.startsWith('../') || normalized === '.' || normalized === '') {
+    throw new Error('Path is outside the repository');
+  }
+  return normalized;
+}
 
 /**
  * Resolves a renderer-supplied, repo-relative path and refuses anything that escapes the

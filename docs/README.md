@@ -46,7 +46,7 @@
 | [T-011](tasks/stage-1-processes/T-011-shell-env.md) | Окружение login-shell (PATH на macOS/Linux) | review |
 | [T-012](tasks/stage-1-processes/T-012-git-cli.md) | Адаптер git CLI поверх ProcessRunner | review |
 | [T-013](tasks/stage-1-processes/T-013-editor-terminal.md) | Открытие во внешнем редакторе и терминале | review |
-| [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | todo |
+| [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | review |
 
 ### Этап 2 — Базовые git-операции (черновик, ждёт списка функций)
 

@@ -29,7 +29,7 @@ updated: 2026-10-22
 - [x] Минимальная версия 2.30.0: проверка при старте, `app.gitCli` в состоянии, предупреждение на стартовом экране
 - [x] Тесты на настоящем git (`src/main/git/cli.test.ts`, 13) и разбор строк (`lines.test.ts`, 4); общий тестовый помощник `directRunner` (`src/main/process/testing.ts`)
 - [x] Живая проверка `GitCli` через настоящий ProcessRunner/utilityProcess
-- [ ] Используется в T-014 (difftool/mergetool) — критерий готовности
+- [x] Используется в T-014 (difftool/mergetool) — критерий готовности
 
 ## Критерии готовности
 

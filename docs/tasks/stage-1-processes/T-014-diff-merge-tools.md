@@ -2,7 +2,7 @@
 id: T-014
 title: Внешние diff/merge tools
 stage: 1 — Процессы и внешние программы
-status: todo
+status: review
 depends_on: [T-012]
 updated: 2026-10-22
 ---
@@ -22,11 +22,17 @@ vimdiff, opendiff/FileMerge, WinMerge, P4Merge…) и пользовательс
 
 ## Этапы
 
-- [ ] Diff: `git difftool --no-prompt [--tool=<tool>] [<rev>] -- <path>` через `ProcessRunner.launch({ wait: true })` + git-окружение из T-012
-- [ ] Merge: `git mergetool --no-prompt [--tool=<tool>] -- <path>`; после выхода — `loadRepo` для обновления состояния
-- [ ] Определить, настроен ли инструмент (`git config diff.tool` / `merge.tool`); если нет — понятная подсказка, как настроить
-- [ ] IPC-команды `file:externalDiff`, `file:externalMerge`; в UI — для изменённых и конфликтных файлов
-- [ ] Не блокировать UI на время работы инструмента; повторный запуск для того же файла — запретить, пока открыт первый
+- [x] Diff: `git difftool --no-prompt --tool=<tool> [--cached] -- <path>` через `GitCli` (T-012); `GIT_LITERAL_PATHSPECS=1`
+- [x] Merge: `git mergetool --no-prompt --tool=<tool> -- <path>`; после закрытия — `loadRepo` (и при ошибке тоже)
+- [x] Выбор: настроенный (`diff.guitool`, `diff.tool`, `merge.guitool`, `merge.tool`) → первый доступный графический из
+      `--tool-help` (meld, kdiff3, Beyond Compare… VS Code последним; терминальные исключены) → свой `forklift-vscode` для старого git → ошибка с подсказкой
+- [x] IPC `file:externalDiff(path, staged)`, `file:externalMerge(path)`; в UI — кнопки Diff/Merge в строке файла (по наведению)
+- [x] UI не блокируется (вызов вне busy-состояния); повторное открытие того же файла отклоняется
+- [x] Тесты (16): разбор `--tool-help`, выбор инструмента, нормализация путей; интеграция с git — diff рабочей копии/индекса
+      файла `f*.txt` (glob не раскрывается), разрешение конфликта, повторное открытие, машина без инструментов
+- [x] Живая проверка через кнопки UI: 9/9; без настроек на машине владельца выбирается встроенный `vscode`
+- [ ] Ручная проверка владельцем с настоящим VS Code (Diff и Merge)
+- [ ] macOS (opendiff/FileMerge) и Windows (WinMerge, Beyond Compare) — T-003
 
 ## Критерии готовности
 
@@ -37,6 +43,13 @@ vimdiff, opendiff/FileMerge, WinMerge, P4Merge…) и пользовательс
 
 - `mergetool` создаёт `*.orig` (если не `mergetool.keepBackup=false`) — не показывать их как новые файлы
   без согласования с владельцем.
+- 2026-10-22: **найден баг из T-001** — конфликтные файлы не показывались в панели изменений: libgit2 помечает
+  конфликт только битом `CONFLICTED`, без битов индекса/рабочей копии, и файл выпадал из обеих групп. Исправлено
+  в `src/main/git/service.ts`, добавлен тест.
+- 2026-10-22: git ≥ 2.4x сам помечает графические инструменты в `--tool-help` («requires a graphical session») и
+  имеет встроенный `vscode`; для старых версий — список известных GUI-инструментов и свой `forklift-vscode`.
+- 2026-10-22: терминальные инструменты (vimdiff, nvimdiff, emerge) исключены — без терминала они зависнут.
+- `.orig`-файлы `mergetool` не скрываем: это настройка пользователя `mergetool.keepBackup`.
 - Решение «конфликт разрешён» принимает git (`mergetool.<tool>.trustExitCode`), не мы.
 
 ## Промт

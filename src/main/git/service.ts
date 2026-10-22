@@ -136,8 +136,10 @@ async function readChanges(repo: Repository): Promise<FileChange[]> {
 
 function toFileChange(file: StatusFile): FileChange {
   const bits = file.statusBit();
-  const staged = (bits & INDEX_MASK) !== 0;
-  const unstaged = (bits & WORKTREE_MASK) !== 0;
+  const conflicted = (bits & STATUS.CONFLICTED) !== 0;
+  // libgit2 reports a conflict with the CONFLICTED bit alone; it needs the user's action, so it is unstaged.
+  const staged = !conflicted && (bits & INDEX_MASK) !== 0;
+  const unstaged = conflicted || (bits & WORKTREE_MASK) !== 0;
   const change: FileChange = { path: file.path(), kind: changeKind(bits), staged, unstaged };
 
   if (bits & STATUS.INDEX_RENAMED) change.origPath = file.headToIndex().oldFile().path();

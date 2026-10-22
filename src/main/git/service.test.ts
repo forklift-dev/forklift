@@ -90,4 +90,20 @@ describe('GitService', () => {
     expect(byPath['new.txt']).toMatchObject({ kind: 'renamed', origPath: 'old.txt', staged: true });
     expect(byPath['untracked.txt']).toMatchObject({ kind: 'untracked', staged: false, unstaged: true });
   });
+
+  it('reports merge conflicts as unstaged changes', async () => {
+    writeFileSync(join(root, 'c.txt'), 'base\n');
+    sh(root, 'add', '.');
+    sh(root, 'commit', '-m', 'base');
+    sh(root, 'checkout', '-b', 'theirs');
+    writeFileSync(join(root, 'c.txt'), 'theirs\n');
+    sh(root, 'commit', '-am', 'theirs');
+    sh(root, 'checkout', 'main');
+    writeFileSync(join(root, 'c.txt'), 'ours\n');
+    sh(root, 'commit', '-am', 'ours');
+    expect(() => sh(root, 'merge', 'theirs')).toThrow(); // exits 1 on conflict
+
+    const { changes } = await service.read(root);
+    expect(changes).toEqual([{ path: 'c.txt', kind: 'conflicted', staged: false, unstaged: true }]);
+  });
 });

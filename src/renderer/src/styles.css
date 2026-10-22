@@ -218,9 +218,28 @@ button:disabled {
   overflow: hidden;
 }
 
+.change-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.change-action {
+  flex: none;
+  padding: 0 6px;
+  font-size: 11px;
+  visibility: hidden;
+}
+
+.change-row:hover .change-action,
+.change-action:focus-visible {
+  visibility: visible;
+}
+
 .change-item {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 2px 4px;
   border: none;
   border-radius: 4px;

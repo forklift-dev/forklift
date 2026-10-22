@@ -24,7 +24,7 @@ main process ─ src/main
   store/          Redux Toolkit: единственный источник правды
   git/service.ts  чтение репозитория через nodegit
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
-  external/       внешний редактор и терминал (выбор по ОС/рабочему столу, запуск через ProcessRunner)
+  external/       внешний редактор, терминал, diff/merge tools (выбор по ОС/рабочему столу/git config)
   replication.ts  копия состояния в окна через MessagePort
   ipc/            типизированная таблица команд → ipcMain.handle
   process/       ProcessRunner — клиент utilityProcess, очистка env

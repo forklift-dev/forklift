@@ -34,6 +34,12 @@ export function App() {
       }
     });
 
+  // External tool windows can stay open for minutes; they must not put the UI into a busy state.
+  const runInBackground = (action: () => Promise<unknown>) => {
+    setActionError(null);
+    action().catch((error: unknown) => setActionError(error instanceof Error ? error.message : String(error)));
+  };
+
   const openRepo = () =>
     run(async () => {
       const path = await invoke('repo:pick');
@@ -57,7 +63,12 @@ export function App() {
       {repo.data ? (
         <main className="workspace">
           <CommitList commits={repo.data.commits} />
-          <ChangesPanel changes={repo.data.changes} onOpenFile={(path) => run(() => invoke('file:openInEditor', path))} />
+          <ChangesPanel
+            changes={repo.data.changes}
+            onOpenFile={(path) => run(() => invoke('file:openInEditor', path))}
+            onDiffFile={(path, staged) => runInBackground(() => invoke('file:externalDiff', path, staged))}
+            onMergeFile={(path) => runInBackground(() => invoke('file:externalMerge', path))}
+          />
         </main>
       ) : (
         <main className="empty">
