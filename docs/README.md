@@ -37,6 +37,7 @@
 | [T-002](tasks/stage-0-foundation/T-002-nodegit-electron-build.md) | Сборка nodegit из исходников под Electron 45 | done |
 | [T-003](tasks/stage-0-foundation/T-003-ci-matrix.md) | CI: сборка и тесты на 6 платформах | todo |
 | [T-004](tasks/stage-0-foundation/T-004-signing-notarization.md) | Подпись и нотаризация дистрибутивов | draft |
+| [T-005](tasks/stage-0-foundation/T-005-e2e-harness.md) | Сквозные проверки в репозитории | todo |
 
 ### Этап 1 — Процессы и внешние программы
 
@@ -63,3 +64,86 @@
 | [T-025](tasks/stage-2-git-core/T-025-conflict-editor.md) | Встроенное разрешение конфликтов | todo |
 | [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | todo |
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | todo |
+| [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | todo |
+
+### Этап 3 — История и операции над коммитами
+
+| ID | Задача | Статус |
+|---|---|---|
+| [T-030](tasks/stage-3-history/T-030-graph-search.md) | Поиск и фильтрация в истории | todo |
+| [T-031](tasks/stage-3-history/T-031-file-history-blame.md) | История файла и blame | todo |
+| [T-032](tasks/stage-3-history/T-032-commit-ops.md) | Cherry-pick, revert, reset, checkout коммита | todo |
+| [T-033](tasks/stage-3-history/T-033-merge-rebase.md) | Merge и rebase веток | todo |
+| [T-034](tasks/stage-3-history/T-034-interactive-rebase.md) | Интерактивный rebase | todo |
+| [T-035](tasks/stage-3-history/T-035-stash.md) | Stash | todo |
+| [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | todo |
+
+### Этап 4 — Репозитории
+
+| ID | Задача | Статус |
+|---|---|---|
+| [T-040](tasks/stage-4-repositories/T-040-clone-init.md) | Clone и init | todo |
+| [T-041](tasks/stage-4-repositories/T-041-tabs-repos.md) | Вкладки, недавние и поиск репозиториев | todo |
+| [T-042](tasks/stage-4-repositories/T-042-remotes.md) | Удалённые репозитории и auto-fetch | todo |
+| [T-043](tasks/stage-4-repositories/T-043-submodules.md) | Подмодули | todo |
+| [T-044](tasks/stage-4-repositories/T-044-worktrees.md) | Worktrees | todo |
+| [T-045](tasks/stage-4-repositories/T-045-lfs.md) | Git LFS | todo |
+| [T-046](tasks/stage-4-repositories/T-046-gitflow.md) | Gitflow | todo |
+| [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | todo |
+
+### Этап 5 — Настройки и удобство
+
+| ID | Задача | Статус |
+|---|---|---|
+| [T-050](tasks/stage-5-settings/T-050-settings.md) | Хранилище настроек и окно Preferences | todo |
+| [T-051](tasks/stage-5-settings/T-051-themes.md) | Темы | todo |
+| [T-052](tasks/stage-5-settings/T-052-keybindings-palette.md) | Сочетания клавиш, палитра команд, нечёткий поиск | todo |
+| [T-053](tasks/stage-5-settings/T-053-profiles-keys.md) | Профили, SSH- и GPG-ключи | todo |
+| [T-054](tasks/stage-5-settings/T-054-notifications-log.md) | Уведомления и журнал операций | todo |
+| [T-055](tasks/stage-5-settings/T-055-avatars.md) | Аватары авторов | todo |
+| [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
+
+### Этап 6 — Интеграции с хостингами (после проверки владельцем)
+
+Решение владельца (2026-10-23): отдельным этапом позже; для проверки нужны его аккаунты/токены.
+
+| ID | Задача | Статус |
+|---|---|---|
+| [T-060](tasks/stage-6-integrations/T-060-github.md) | GitHub: вход, репозитории, pull requests, issues | draft |
+| [T-061](tasks/stage-6-integrations/T-061-gitlab.md) | GitLab: вход, репозитории, merge requests, issues | draft |
+| [T-062](tasks/stage-6-integrations/T-062-bitbucket.md) | Bitbucket: вход, репозитории, pull requests | draft |
+| [T-063](tasks/stage-6-integrations/T-063-azure-devops.md) | Azure DevOps: вход, репозитории, pull requests, work items | draft |
+| [T-064](tasks/stage-6-integrations/T-064-issue-trackers.md) | Трекеры задач: Jira, Trello | draft |
+
+### Сознательно не делаем
+
+Решение владельца (2026-10-23): облачные функции GitKraken, требующие их сервера, — **исключены**:
+Workspaces, Cloud Patches, Launchpad, AI-функции, Team, онбординг-туториал GitKraken, интеграция с `gk` CLI.
+
+## Ночная (автономная) работа
+
+Цель (2026-10-23): приложение умеет всё, что умеет GitKraken как git-клиент (без облачных функций).
+
+### Правила
+
+1. Задачи берутся по порядку ниже; если зависимость не готова или задача `blocked` — следующая независимая.
+2. Решение, которое должен принять владелец, **не принимается**: статус `blocked`, вопрос в «Нюансах», дальше.
+3. Каждая задача: тесты (юнит/интеграционные на временных репозиториях), сквозной набор в `tests/e2e`,
+   `typecheck` + `lint` + `test` + `test:e2e` зелёные; документация задачи и строка в этом индексе; **коммит**
+   (локально, без push).
+4. Задача слишком большая — разбить на подзадачи (T-0XXa/b) с отдельными файлами и коммитами.
+5. Не трогать запущенный владельцем экземпляр приложения: у сквозных проверок свой профиль и HOME.
+6. Не ослаблять безопасность (sandbox, CSP, fuses, проверка аргументов IPC) ради удобства реализации.
+7. Регрессия: перед коммитом — полный `test` и `test:e2e`; найденные чужие баги — исправить с тестом и записью в задаче.
+
+### Порядок
+
+1. T-005 сквозные проверки в репозитории
+2. T-022 граф коммитов → T-026 автообновление → T-023 ветки и теги (автоматический stash)
+3. T-035 stash → T-025 разрешение конфликтов → T-032 cherry-pick/revert/reset → T-033 merge и rebase
+4. T-024 fetch/pull/push + askpass → T-042 remotes и auto-fetch → T-034 интерактивный rebase → T-036 undo/redo
+5. T-030 поиск → T-031 история файла и blame → T-028 Hunk View
+6. T-027 встроенный терминал → T-050 настройки → T-040 clone/init → T-041 вкладки и репозитории
+7. T-051 темы → T-052 клавиши и палитра команд → T-053 профили и ключи → T-054 уведомления и журнал → T-055 аватары
+8. T-043 подмодули → T-044 worktrees → T-045 LFS → T-046 Gitflow → T-047 хуки
+9. T-003 CI (GitHub Actions; workflow пишется, запуск — после выбора владельцем)
