@@ -103,3 +103,52 @@ describe.skipIf(process.platform === 'win32')('ExternalTools', () => {
     await expect(tools({}).openTerminal(root)).rejects.toThrow('TERMINAL');
   });
 });
+
+describe.skipIf(process.platform === 'win32')('ExternalTools with settings', () => {
+  const recorder = (out: string) => `#!/bin/sh\nprintf '%s\\n' "$PWD" "$@" > "${out}"\n`;
+  const recorded = async (file: string) => {
+    for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 20));
+    return readFileSync(file, 'utf8').trimEnd().split('\n');
+  };
+  const tools = (env: Record<string, string> = {}) =>
+    new ExternalTools({ runner: directRunner({ PATH: join(root, 'bin'), ...env }), platform: 'linux', openPath: async () => '' });
+
+  it('runs a custom editor command with placeholders substituted per argument', async () => {
+    writeScript(join(root, 'bin'), 'my editor', recorder(join(root, 'editor.out')));
+    const setting = { mode: 'custom' as const, command: 'my editor', args: ['--line={line}', '{file}', '--dir', '{dir}', '$(touch pwned)'] };
+    await tools().openInEditor('/repo/a b.ts', 4, root, setting);
+    expect(await recorded(join(root, 'editor.out'))).toEqual([root, '--line=4', '/repo/a b.ts', '--dir', root, '$(touch pwned)']);
+    expect(existsSync(join(root, 'pwned'))).toBe(false);
+  });
+
+  it('uses a chosen preset even when another editor comes first', async () => {
+    writeScript(join(root, 'bin'), 'code', recorder(join(root, 'code.out')));
+    writeScript(join(root, 'bin'), 'zed', recorder(join(root, 'zed.out')));
+    await tools().openInEditor('/repo/a.ts', 2, root, { mode: 'preset', id: 'zed' });
+    expect(await recorded(join(root, 'zed.out'))).toEqual([root, '/repo/a.ts:2']);
+    expect(existsSync(join(root, 'code.out'))).toBe(false);
+  });
+
+  it('picks a terminal preset over $TERMINAL and passes its directory flag', async () => {
+    writeScript(join(root, 'bin'), 'kitty', recorder(join(root, 'kitty.out')));
+    writeScript(join(root, 'bin'), 'myterm', recorder(join(root, 'myterm.out')));
+    await tools({ TERMINAL: 'myterm' }).openTerminal(root, { mode: 'preset', id: 'kitty' });
+    expect(await recorded(join(root, 'kitty.out'))).toEqual([root, '--directory', root]);
+  });
+
+  it('explains missing or unknown programs and where to change them', async () => {
+    await expect(tools().openInEditor('/a', 1, root, { mode: 'preset', id: 'zed' })).rejects.toThrow(/"zed" is not installed.*Preferences/);
+    await expect(tools().openInEditor('/a', 1, root, { mode: 'preset', id: 'notepad' })).rejects.toThrow(/not supported/);
+    await expect(tools().openTerminal(root, { mode: 'custom', command: 'nope', args: [] })).rejects.toThrow(/Terminal command "nope" was not found/);
+  });
+
+  it('reports which presets are installed', async () => {
+    writeScript(join(root, 'bin'), 'zed', '');
+    writeScript(join(root, 'bin'), 'kitty', '');
+    const detected = await tools({ TERMINAL: 'myterm' }).detect();
+    expect(detected.editors.find((e) => e.id === 'zed')).toEqual({ id: 'zed', path: join(root, 'bin', 'zed') });
+    expect(detected.editors.find((e) => e.id === 'code')).toEqual({ id: 'code', path: null });
+    expect(detected.terminals.find((t) => t.id === 'kitty')?.path).toBe(join(root, 'bin', 'kitty'));
+    expect(detected.terminals.some((t) => t.id === 'myterm')).toBe(false);
+  });
+});

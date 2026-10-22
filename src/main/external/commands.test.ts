@@ -32,7 +32,7 @@ describe('terminalCandidates', () => {
   });
 
   it('uses the platform terminals on macOS and Windows', () => {
-    expect(terminalCandidates('darwin', {})).toEqual([{ command: 'open', args: ['-a', 'Terminal', '{dir}'] }]);
+    expect(terminalCandidates('darwin', {})).toEqual([{ id: 'Terminal', command: 'open', args: ['-a', 'Terminal', '{dir}'] }]);
     expect(terminalCandidates('win32', {}).map((c) => c.command)).toEqual(['wt.exe', 'cmd.exe']);
   });
 });

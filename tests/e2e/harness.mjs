@@ -88,13 +88,12 @@ async function electronBinary() {
 }
 
 /**
- * Launches the app with its own HOME and XDG_CONFIG_HOME: the single-instance lock and settings
+ * Launches the app with its own HOME and XDG_CONFIG_HOME (pass `home` again to restart with the same profile): the single-instance lock and settings
  * never touch a copy the developer has running. `env` entries override, `undefined` removes.
  * `baseEnv: 'minimal'` starts from DISPLAY only (a desktop-menu launch); default inherits process.env.
  */
-export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, args = [], windowSize = '1400,900' } = {}) {
+export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, args = [], windowSize = '1400,900', home = tempDir('forklift-home-') } = {}) {
   if (inspect && binary) throw new Error('the main-process inspector is fused off in packaged builds');
-  const home = tempDir('forklift-home-');
   const display = { DISPLAY: process.env.DISPLAY, XAUTHORITY: process.env.XAUTHORITY };
   const merged = {
     ...(baseEnv === 'minimal' ? display : process.env),
@@ -257,8 +256,8 @@ export class CdpSession {
 
   /** Clicks the centre of the element an expression yields, with real mouse events (Monaco ignores el.click()). */
   async click(expression) {
-    const box = await this.evaluate(`(() => { const el = (${expression}); if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-    if (!box) throw new Error(`not found: ${expression}`);
+    const box = await this.evaluate(`(() => { const el = (${expression}); if (!(el instanceof Element)) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    if (!box || !Number.isFinite(box.x)) throw new Error(`not found: ${expression}`);
     await this.clickAt(box.x, box.y);
   }
 
@@ -267,8 +266,22 @@ export class CdpSession {
     return this.send('Input.insertText', { text });
   }
 
+  /** Focuses an input, selects its content and types `text` over it (an empty string clears it). */
+  async fill(expression, text) {
+    const found = await this.evaluate(`(() => { const el = (${expression}); if (!el) return false; el.focus(); el.select?.(); return true; })()`);
+    if (!found) throw new Error(`not found: ${expression}`);
+    if (text) await this.insertText(text);
+    else await this.press('Delete', { keyCode: 46 });
+  }
+
+  /** Picks an option of a <select> the way a user would (React sees a change event). */
+  async selectOption(expression, value) {
+    const ok = await this.evaluate(`(() => { const el = (${expression}); if (!el || ![...el.options].some(o => o.value === ${JSON.stringify(value)})) return false; el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    if (!ok) throw new Error(`no option ${value} in ${expression}`);
+  }
+
   async press(key, { code = key, keyCode, modifiers = 0 } = {}) {
-    const codes = { Escape: 27, Enter: 13, Tab: 9 };
+    const codes = { Escape: 27, Enter: 13, Tab: 9, Delete: 46 };
     const windowsVirtualKeyCode = keyCode ?? codes[key] ?? key.toUpperCase().charCodeAt(0);
     await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, modifiers });
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode, modifiers });
@@ -291,7 +304,7 @@ export class CdpSession {
 
 /** In the main process: runs `code` inside an async function with forkliftDebug's services in scope. */
 export function inMain(app, code) {
-  return app.main.evaluate(`(async () => { const { store, runner, gitCli, tools, diffTools, staging } = globalThis.forkliftDebug; ${code} })()`);
+  return app.main.evaluate(`(async () => { const { store, runner, gitCli, tools, diffTools, staging, settings, toolActions } = globalThis.forkliftDebug; ${code} })()`);
 }
 
 /** Lines of `ps -eo args` that equal `command` exactly (Linux/macOS). */

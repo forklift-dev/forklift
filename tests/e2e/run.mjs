@@ -30,8 +30,12 @@ if (process.platform === 'linux' && !process.env.E2E_HEADED && !process.env.E2E_
 }
 
 if (!binary && !args.includes('--no-build')) {
-  const build = spawnSync('npm', ['run', 'build', '--silent'], { cwd: projectDir, stdio: 'inherit', shell: process.platform === 'win32' });
-  if (build.status !== 0) process.exit(build.status ?? 1);
+  const build = spawnSync('npm', ['run', 'build', '--silent'], { cwd: projectDir, encoding: 'utf8', shell: process.platform === 'win32' });
+  if (build.status !== 0) {
+    console.error(build.stdout, build.stderr);
+    process.exit(build.status ?? 1);
+  }
+  console.log('Built with electron-vite.');
 }
 
 const available = readdirSync(suitesDir).filter((file) => file.endsWith('.mjs')).map((file) => file.slice(0, -4)).sort();

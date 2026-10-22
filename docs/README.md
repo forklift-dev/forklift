@@ -96,7 +96,7 @@
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-050](tasks/stage-5-settings/T-050-settings.md) | Настройки: хранилище, окно Preferences, внешние инструменты | todo |
+| [T-050](tasks/stage-5-settings/T-050-settings.md) | Настройки: хранилище, окно Preferences, внешние инструменты | review |
 | [T-051](tasks/stage-5-settings/T-051-themes.md) | Темы приложения и редактора | todo |
 | [T-052](tasks/stage-5-settings/T-052-keybindings-palette.md) | Сочетания клавиш, палитра команд, нечёткий поиск | todo |
 | [T-053](tasks/stage-5-settings/T-053-profiles-keys.md) | Профили, SSH- и GPG-ключи | todo |

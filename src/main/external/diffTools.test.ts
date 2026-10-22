@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GitCli } from '../git/cli';
 import { directRunner } from '../process/testing';
 import { normalizeRepoRelative } from '../repoPaths';
-import { chooseTool, DiffToolError, DiffTools, parseToolHelp } from './diffTools';
+import { chooseTool, DiffToolError, DiffTools, gitToolCommand, parseToolHelp } from './diffTools';
 
 // Real `git difftool --tool-help` output (git 2.53), trimmed.
 const TOOL_HELP = `'git difftool --tool=<tool>' may be set to one of the following:
@@ -51,6 +51,18 @@ describe('chooseTool', () => {
     expect(diff).toMatchObject({ name: 'forklift-vscode', source: 'vscode' });
     expect(diff?.configArgs).toEqual(['-c', 'difftool.forklift-vscode.cmd=code --wait --diff "$LOCAL" "$REMOTE"']);
     expect(chooseTool('merge', null, [], true)?.configArgs).toContain('mergetool.forklift-vscode.trustExitCode=false');
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('gitToolCommand', () => {
+  // git evaluates the command with sh, the variables set to the temporary files.
+  const evaluate = (cmd: string) =>
+    execFileSync('sh', ['-c', 'eval "$CMD"'], { env: { CMD: cmd, LOCAL: '/tmp/a b', REMOTE: '/tmp/$x' } }).toString().split('\n').slice(0, -1);
+
+  it('quotes arguments and keeps only the tool variables live', () => {
+    const args = ['--left=$LOCAL', '$REMOTE', '$(touch pwned)', '`id`', 'a"b\\c', '$HOME', '$LOCALX', "it's"];
+    expect(evaluate(gitToolCommand('printf', ['%s\\n', ...args]))).toEqual(['--left=/tmp/a b', '/tmp/$x', '$(touch pwned)', '`id`', 'a"b\\c', '$HOME', '$LOCALX', "it's"]);
+    expect(gitToolCommand('/opt/My Tool/bin/tool', ['$MERGED'])).toBe('"/opt/My Tool/bin/tool" "$MERGED"');
   });
 });
 
@@ -129,6 +141,45 @@ describe.skipIf(process.platform === 'win32')('DiffTools with git', () => {
     const first = tools.diff(root, 'other.txt', false);
     await expect(tools.diff(root, 'other.txt', false)).rejects.toThrow('already open');
     await first;
+  });
+
+  it('runs a custom command from settings with the files git prepares', async () => {
+    const out = join(root, '.git', 'custom.out');
+    const script = join(root, '.git', 'my diff');
+    writeFileSync(script, `#!/bin/sh\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${out}"\ncat "$2" >> "${out}"\n`, { mode: 0o755 });
+    writeFileSync(join(root, 'other.txt'), 'changed\n');
+
+    const tool = await tools.diff(root, 'other.txt', false, { mode: 'custom', command: script, args: ['--title=a b', '$REMOTE', '$(id)'], trustExitCode: false });
+    expect(tool).toMatchObject({ name: 'forklift-custom', source: 'settings' });
+    const lines = readFileSync(out, 'utf8').split('\n');
+    expect(lines[0]).toBe('--title=a b');
+    expect(lines[1]).toMatch(/other\.txt$/);
+    expect(lines[2]).toBe('$(id)');
+    expect(lines[3]).toBe('changed');
+  });
+
+  it('merges with a custom command; trustExitCode decides on failure', async () => {
+    await sh('checkout', '-b', 'theirs');
+    writeFileSync(join(root, 'other.txt'), 'theirs\n');
+    await sh('commit', '-am', 'theirs');
+    await sh('checkout', 'main');
+    writeFileSync(join(root, 'other.txt'), 'ours\n');
+    await sh('commit', '-am', 'ours');
+    await sh('merge', 'theirs');
+    await sh('config', 'mergetool.keepBackup', 'false');
+
+    await expect(tools.merge(root, 'other.txt', { mode: 'custom', command: 'false', args: [], trustExitCode: true })).rejects.toThrow();
+    expect((await sh('diff', '--name-only', '--diff-filter=U')).stdout.trim()).toBe('other.txt');
+    await tools.merge(root, 'other.txt', { mode: 'custom', command: 'cp', args: ['$REMOTE', '$MERGED'], trustExitCode: true });
+    expect(readFileSync(join(root, 'other.txt'), 'utf8')).toBe('theirs\n');
+    expect((await sh('diff', '--name-only', '--diff-filter=U')).stdout.trim()).toBe('');
+  });
+
+  it('uses a git tool named in settings over git config, and checks custom commands exist', async () => {
+    await sh('config', 'diff.tool', 'fake');
+    expect(await tools.pickTool(root, 'diff', { mode: 'tool', name: 'meld' })).toEqual({ name: 'meld', configArgs: [], source: 'settings' });
+    expect((await tools.pickTool(root, 'diff')).name).toBe('fake');
+    await expect(tools.pickTool(root, 'merge', { mode: 'custom', command: 'no-such-tool', args: [], trustExitCode: false })).rejects.toThrow(/Merge tool command "no-such-tool" was not found/);
   });
 
   it('explains how to configure a tool when none is usable', async () => {

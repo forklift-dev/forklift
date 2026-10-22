@@ -56,16 +56,22 @@ const GIT_ENV: Env = {
 export class GitCli {
   constructor(
     private readonly runner: Runner,
-    private readonly executable = 'git',
+    /** The git program; a function is asked on every call, so a changed setting applies at once. */
+    private readonly gitExecutable: string | (() => string) = 'git',
   ) {}
+
+  get executable(): string {
+    return typeof this.gitExecutable === 'function' ? this.gitExecutable() : this.gitExecutable;
+  }
 
   async exec(args: readonly string[], options: GitCliOptions): Promise<GitCliResult> {
     const stdoutLines = options.onStdoutLine && createLineSplitter(options.onStdoutLine);
     const stderrLines = options.onStderrLine && createLineSplitter(options.onStderrLine);
 
+    const executable = this.executable;
     let result;
     try {
-      result = await this.runner.run(this.executable, args, {
+      result = await this.runner.run(executable, args, {
         cwd: options.cwd,
         env: { ...GIT_ENV, ...(options.readOnly && { GIT_OPTIONAL_LOCKS: '0' }), ...options.env },
         input: options.input,
@@ -76,7 +82,7 @@ export class GitCli {
       });
     } catch (error) {
       if (error instanceof ProcessError) {
-        const message = error.code === 'ENOENT' ? `git executable "${this.executable}" was not found` : error.message;
+        const message = error.code === 'ENOENT' ? `git executable "${executable}" was not found` : error.message;
         throw new GitCliError(message, args, null, '', error.code);
       }
       throw error; // AbortError and the like pass through unchanged

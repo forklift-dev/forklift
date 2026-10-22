@@ -1,5 +1,6 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
+import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
 
 export interface Commands {
@@ -28,7 +29,24 @@ export interface Commands {
   'file:externalDiff': { args: [path: string, staged: boolean]; result: void };
   /** Resolves a conflicted file in the external merge tool; resolves when its window closes. */
   'file:externalMerge': { args: [path: string]; result: void };
+  /** Changes settings (validated in main); `repo` targets that open repository's overrides. */
+  'settings:update': { args: [patch: SettingsPatch]; result: void };
+  'settings:dismissProblems': { args: []; result: void };
+  /** Shows a file picker for a program; resolves to its path or null when cancelled. */
+  'settings:browseExecutable': { args: []; result: string | null };
+  /** Editors, terminals and git diff/merge tools found on this machine. */
+  'tools:detect': { args: []; result: DetectedTools };
+  /** Runs the chosen tool on sample files; resolves with a description once it is closed (diff/merge) or started. */
+  'tools:test': { args: [kind: ToolKind, repo: boolean]; result: string };
+  /** Writes the diff/merge tool chosen in Preferences to global or repository git config. */
+  'tools:writeGitConfig': { args: [kind: GitToolKind, scope: ConfigScope]; result: void };
+  /** user.name/user.email from global or repository git config (empty when unset). */
+  'git:identity': { args: [scope: ConfigScope]; result: GitIdentity };
+  'git:setIdentity': { args: [scope: ConfigScope, identity: GitIdentity]; result: void };
 }
+
+/** Which git config file an action reads or writes: the user's global one or the open repository's. */
+export type ConfigScope = 'global' | 'repository';
 
 export type CommandName = keyof Commands;
 export type CommandArgs<K extends CommandName> = Commands[K]['args'];
@@ -55,6 +73,14 @@ const commandChannelSet = {
   'file:openInEditor': true,
   'file:externalDiff': true,
   'file:externalMerge': true,
+  'settings:update': true,
+  'settings:dismissProblems': true,
+  'settings:browseExecutable': true,
+  'tools:detect': true,
+  'tools:test': true,
+  'tools:writeGitConfig': true,
+  'git:identity': true,
+  'git:setIdentity': true,
 } satisfies Record<CommandName, true>;
 
 export const COMMAND_CHANNELS = Object.keys(commandChannelSet) as CommandName[];

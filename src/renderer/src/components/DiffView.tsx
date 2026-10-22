@@ -1,8 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DiffTarget, FileDiff, FileVersion } from '../../../shared/diff';
 import type { LineAction, LineActionRequest, LineChange } from '../../../shared/staging';
 import { anchorLine, changeAt, hunkRequest, selectedLines, selectionRequest, type Side } from '../monaco/lineActions';
-import { languageForPath, monaco } from '../monaco/setup';
+import { invoke } from '../api';
+import { CODE_FONT, languageForPath, monaco } from '../monaco/setup';
+import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
 
 interface DiffPrefs {
@@ -10,25 +12,36 @@ interface DiffPrefs {
   ignoreWhitespace: boolean;
   wordWrap: boolean;
   hideUnchanged: boolean;
+  contextLines: number;
+  fontFamily: string;
+  fontSize: number;
+  tabSize: number;
 }
 
-const PREFS_KEY = 'forklift.diffPrefs';
-const DEFAULT_PREFS: DiffPrefs = { sideBySide: true, ignoreWhitespace: false, wordWrap: false, hideUnchanged: false };
-
-// View preferences are a per-window convenience; storage may be unavailable, so fall back silently.
-function loadPrefs(): DiffPrefs {
-  try {
-    return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
-  } catch {
-    return DEFAULT_PREFS;
-  }
+/** View preferences live in the app settings, so toggles here and in Preferences stay in sync. */
+function useDiffPrefs(): DiffPrefs {
+  const values = useAppState((s) => s.settings.values);
+  return useMemo(
+    () => ({
+      sideBySide: values['diff.layout'] === 'split',
+      ignoreWhitespace: values['diff.ignoreWhitespace'],
+      wordWrap: values['diff.wordWrap'],
+      hideUnchanged: values['diff.hideUnchanged'],
+      contextLines: values['diff.contextLines'],
+      fontFamily: values['editor.fontFamily'] || CODE_FONT,
+      fontSize: values['editor.fontSize'],
+      tabSize: values['editor.tabSize'],
+    }),
+    [values],
+  );
 }
 
-function savePrefs(prefs: DiffPrefs) {
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  } catch {}
-}
+const TOGGLES = {
+  sideBySide: (on: boolean) => ({ 'diff.layout': on ? 'split' : 'inline' }),
+  hideUnchanged: (on: boolean) => ({ 'diff.hideUnchanged': on }),
+  ignoreWhitespace: (on: boolean) => ({ 'diff.ignoreWhitespace': on }),
+  wordWrap: (on: boolean) => ({ 'diff.wordWrap': on }),
+};
 
 const formatSize = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -63,17 +76,14 @@ interface DiffViewProps {
 
 export function DiffView({ target, title, subtitle, reloadKey, actions, editing, onClose }: DiffViewProps) {
   const { data, error, loading } = useCommand('diff:file', [target], { reloadKey, keepPrevious: true });
-  const [prefs, setPrefs] = useState(loadPrefs);
+  const prefs = useDiffPrefs();
   const [changeCount, setChangeCount] = useState<number | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
 
-  const toggle = (key: keyof DiffPrefs) =>
-    setPrefs((previous) => {
-      const next = { ...previous, [key]: !previous[key] };
-      savePrefs(next);
-      return next;
-    });
+  const toggle = (key: keyof typeof TOGGLES) => {
+    invoke('settings:update', { values: TOGGLES[key](!prefs[key]) }).catch((failure: unknown) => setHint(failure instanceof Error ? failure.message : String(failure)));
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && !event.defaultPrevented && onClose();
@@ -203,6 +213,8 @@ interface MonacoDiffProps {
 function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: MonacoDiffProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hunksRef = useRef(hunks);
+  // New models take the current tab width; read through a ref so a model is not recreated when it changes.
+  const tabSizeRef = useRef(prefs.tabSize);
   const refreshGlyphsRef = useRef<() => void>(() => {});
 
   // Editor callbacks are registered once; they read the latest controls through the ref.
@@ -219,7 +231,6 @@ function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: Mona
       automaticLayout: true,
       scrollBeyondLastLine: false,
       minimap: { enabled: false },
-      fontSize: 12,
       glyphMargin: true,
       renderOverviewRuler: true,
       useInlineViewWhenSpaceIsLimited: false,
@@ -313,22 +324,32 @@ function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: Mona
     const editor = editorRef.current!;
     const language = languageForPath(path);
     const previous = editor.getModel();
-    editor.setModel({
-      original: monaco.editor.createModel(data.original.text ?? '', language),
-      modified: monaco.editor.createModel(data.modified.text ?? '', language),
-    });
+    const model = (text: string | null) => {
+      const created = monaco.editor.createModel(text ?? '', language);
+      created.updateOptions({ tabSize: tabSizeRef.current });
+      return created;
+    };
+    editor.setModel({ original: model(data.original.text), modified: model(data.modified.text) });
     previous?.original.dispose();
     previous?.modified.dispose();
     onChangeCount(null);
   }, [data, path, editorRef, onChangeCount]);
 
   useEffect(() => {
-    editorRef.current?.updateOptions({
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.updateOptions({
       renderSideBySide: prefs.sideBySide,
       ignoreTrimWhitespace: prefs.ignoreWhitespace,
       diffWordWrap: prefs.wordWrap ? 'on' : 'off',
-      hideUnchangedRegions: { enabled: prefs.hideUnchanged },
+      hideUnchangedRegions: { enabled: prefs.hideUnchanged, contextLineCount: prefs.contextLines },
+      fontFamily: prefs.fontFamily,
+      fontSize: prefs.fontSize,
     });
+    tabSizeRef.current = prefs.tabSize;
+    const model = editor.getModel();
+    model?.original.updateOptions({ tabSize: prefs.tabSize });
+    model?.modified.updateOptions({ tabSize: prefs.tabSize });
   }, [prefs, editorRef]);
 
   return <div className="diff-editor" ref={containerRef} />;

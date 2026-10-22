@@ -1,4 +1,5 @@
 // Application state owned by the main process and replicated to every renderer.
+import type { SettingsState } from './settings';
 
 export interface Commit {
   hash: string;
@@ -76,6 +77,7 @@ export interface AppInfo {
 export interface AppState {
   app: AppInfo;
   repo: RepoState;
+  settings: SettingsState;
 }
 
 export type SliceName = keyof AppState;

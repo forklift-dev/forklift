@@ -6,6 +6,8 @@ import type { Env } from '../../shared/process';
  * individual arguments only, never through a shell, so file names cannot inject commands.
  */
 export interface ToolCommand {
+  /** Preset id shown in Preferences; defaults to the command name. */
+  id?: string;
   command: string;
   args: string[];
   /** Windows: the program needs a console window of its own (cmd.exe as a terminal). */
@@ -51,13 +53,15 @@ const DESKTOP_TERMINALS: Array<[desktop: RegExp, terminals: string[]]> = [
   [/XFCE/i, ['xfce4-terminal']],
 ];
 
+export const presetId = (tool: ToolCommand) => tool.id ?? tool.command;
+
 export function linuxTerminalCommand(name: string): ToolCommand {
   return { command: name, args: LINUX_TERMINALS[basename(name)] ?? [] };
 }
 
-/** Terminal candidates in order of preference. */
-export function terminalCandidates(platform: NodeJS.Platform, env: Env): ToolCommand[] {
-  if (platform === 'darwin') return [{ command: 'open', args: ['-a', 'Terminal', '{dir}'] }];
+/** Terminals that can be picked by name, in order of preference. */
+export function terminalPresets(platform: NodeJS.Platform, env: Env): ToolCommand[] {
+  if (platform === 'darwin') return [{ id: 'Terminal', command: 'open', args: ['-a', 'Terminal', '{dir}'] }];
   if (platform === 'win32') {
     return [
       { command: 'wt.exe', args: ['-d', '{dir}'] },
@@ -69,12 +73,12 @@ export function terminalCandidates(platform: NodeJS.Platform, env: Env): ToolCom
   const desktop = env['XDG_CURRENT_DESKTOP'] ?? '';
   for (const [pattern, terminals] of DESKTOP_TERMINALS) if (pattern.test(desktop)) names.push(...terminals);
   names.push('x-terminal-emulator', ...Object.keys(LINUX_TERMINALS));
+  return [...new Set(names)].map((name) => (name === 'x-terminal-emulator' ? { command: name, args: [], alias: true } : linuxTerminalCommand(name)));
+}
 
-  const candidates: ToolCommand[] = [];
-  // $TERMINAL is the user's explicit choice; its flags are unknown, so it only gets the cwd.
-  if (env['TERMINAL']) candidates.push({ command: env['TERMINAL'], args: [] });
-  for (const name of new Set(names)) {
-    candidates.push(name === 'x-terminal-emulator' ? { command: name, args: [], alias: true } : linuxTerminalCommand(name));
-  }
-  return candidates;
+/** Terminal candidates for the automatic choice, in order of preference. */
+export function terminalCandidates(platform: NodeJS.Platform, env: Env): ToolCommand[] {
+  // On Linux $TERMINAL is the user's explicit choice; its flags are unknown, so it only gets the cwd.
+  const explicit = platform === 'linux' && env['TERMINAL'] ? [{ command: env['TERMINAL'], args: [] }] : [];
+  return [...explicit, ...terminalPresets(platform, env)];
 }

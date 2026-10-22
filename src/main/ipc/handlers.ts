@@ -1,13 +1,18 @@
-import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
+import { BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from 'electron';
 import type { DiffTarget } from '../../shared/diff';
+import type { ConfigScope } from '../../shared/ipc';
+import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
 import type { StagingService } from '../git/staging';
+import type { SettingsService } from '../settings/service';
+import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
 import type { AppStore } from '../store';
 import { loadRepo, repoClosed } from '../store/repoSlice';
+import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 
 export interface HandlerDeps {
@@ -16,6 +21,8 @@ export interface HandlerDeps {
   tools: ExternalTools;
   diffTools: DiffTools;
   staging: StagingService;
+  settings: SettingsService;
+  toolActions: ToolActions;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -88,13 +95,38 @@ function parseDiffTarget(value: unknown): DiffTarget {
   throw new TypeError('target.kind must be "commit" or "worktree"');
 }
 
+const TOOL_KINDS: readonly ToolKind[] = ['editor', 'terminal', 'diff', 'merge'];
+
+function parseToolKind(value: unknown): ToolKind {
+  if (!TOOL_KINDS.includes(value as ToolKind)) throw new TypeError('kind must be editor, terminal, diff or merge');
+  return value as ToolKind;
+}
+
+function parseGitToolKind(value: unknown): GitToolKind {
+  if (value !== 'diff' && value !== 'merge') throw new TypeError('kind must be diff or merge');
+  return value;
+}
+
+function parseScope(value: unknown): ConfigScope {
+  if (value !== 'global' && value !== 'repository') throw new TypeError('scope must be global or repository');
+  return value;
+}
+
+async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
+  const window = BrowserWindow.fromWebContents(sender);
+  const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
 function openRepoRoot(store: AppStore): string {
   const { path } = store.getState().repo;
   if (!path) throw new Error('No repository is open');
   return path;
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions }: HandlerDeps): CommandHandlers {
+  const effective = (root: string) => settings.effective(root);
+
   /** Runs an index/working-tree operation, then re-reads the repository whether or not it succeeded. */
   const thenRefresh = async <T>(root: string, operation: () => Promise<T>): Promise<T> => {
     try {
@@ -152,10 +184,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging }:
     },
 
     async 'repo:pick'({ sender }) {
-      const options: OpenDialogOptions = { title: 'Open repository', properties: ['openDirectory'] };
-      const window = BrowserWindow.fromWebContents(sender);
-      const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
-      return result.canceled ? null : (result.filePaths[0] ?? null);
+      return showOpenDialog(sender, { title: 'Open repository', properties: ['openDirectory'] });
     },
 
     async 'repo:open'(_ctx, path) {
@@ -173,31 +202,69 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging }:
     },
 
     async 'repo:openTerminal'() {
-      await tools.openTerminal(openRepoRoot(store));
+      const root = openRepoRoot(store);
+      await tools.openTerminal(root, effective(root)['tools.terminal']);
     },
 
     async 'file:openInEditor'(_ctx, path, line) {
       assertString(path, 'path');
       if (line !== undefined && (!Number.isInteger(line) || line < 1)) throw new TypeError('line must be a positive integer');
       const root = openRepoRoot(store);
-      await tools.openInEditor(await resolveInsideRepo(root, path), line, root);
+      await tools.openInEditor(await resolveInsideRepo(root, path), line, root, effective(root)['tools.editor']);
     },
 
     async 'file:externalDiff'(_ctx, path, staged) {
       assertString(path, 'path');
       if (typeof staged !== 'boolean') throw new TypeError('staged must be a boolean');
-      await diffTools.diff(openRepoRoot(store), normalizeRepoRelative(path), staged);
+      const root = openRepoRoot(store);
+      await diffTools.diff(root, normalizeRepoRelative(path), staged, effective(root)['tools.diff']);
     },
 
     async 'file:externalMerge'(_ctx, path) {
       assertString(path, 'path');
       const root = openRepoRoot(store);
       try {
-        await diffTools.merge(root, normalizeRepoRelative(path));
+        await diffTools.merge(root, normalizeRepoRelative(path), effective(root)['tools.merge']);
       } finally {
         // Whether or not git accepted the resolution, the working tree and index changed.
         if (store.getState().repo.path === root) await store.dispatch(loadRepo(root));
       }
+    },
+
+    async 'settings:update'(_ctx, patch) {
+      await settings.update(patch);
+    },
+
+    async 'settings:dismissProblems'() {
+      store.dispatch(settingsProblemsDismissed());
+    },
+
+    async 'settings:browseExecutable'({ sender }) {
+      return showOpenDialog(sender, { title: 'Choose program', properties: ['openFile', 'dontAddToRecent'] });
+    },
+
+    async 'tools:detect'() {
+      return toolActions.detect(store.getState().repo.path);
+    },
+
+    async 'tools:test'(_ctx, kind, repo) {
+      if (typeof repo !== 'boolean') throw new TypeError('repo must be a boolean');
+      return toolActions.test(parseToolKind(kind), repo ? openRepoRoot(store) : null);
+    },
+
+    async 'tools:writeGitConfig'(_ctx, kind, scope) {
+      const parsed = parseScope(scope);
+      await toolActions.writeGitConfig(parseGitToolKind(kind), parsed, parsed === 'repository' ? openRepoRoot(store) : null);
+    },
+
+    async 'git:identity'(_ctx, scope) {
+      const parsed = parseScope(scope);
+      return toolActions.identity(parsed, parsed === 'repository' ? openRepoRoot(store) : null);
+    },
+
+    async 'git:setIdentity'(_ctx, scope, identity) {
+      const parsed = parseScope(scope);
+      await toolActions.setIdentity(parsed, parsed === 'repository' ? openRepoRoot(store) : null, identity);
     },
   };
 }

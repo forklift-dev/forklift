@@ -12,6 +12,9 @@ import { ProcessRunner } from './process/runner';
 import { resolveShellEnv, shouldResolveShellEnv } from './process/shellEnv';
 import { handleAppProtocol, registerAppScheme } from './protocol';
 import { startReplication } from './replication';
+import { SettingsFile } from './settings/file';
+import { SettingsService } from './settings/service';
+import { ToolActions } from './settings/toolActions';
 import { createAppStore, gitCliDetected } from './store';
 import { createMainWindow } from './window';
 
@@ -39,11 +42,20 @@ async function start() {
   const store = createAppStore({ version: app.getVersion(), platform: process.platform }, { git });
   const replication = startReplication(store);
   const runner = new ProcessRunner();
-  const gitCli = new GitCli(runner);
+  const settings = new SettingsService({
+    store,
+    file: new SettingsFile(join(app.getPath('userData'), 'settings.json')),
+    runner,
+    isOpenRepo: (root) => store.getState().repo.path === root,
+  });
+  // Before the window exists, so its first state snapshot already has the user's settings.
+  await settings.load();
+  const gitCli = new GitCli(runner, () => settings.values['git.executable'] || 'git');
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);
   const staging = new StagingService(gitCli, git);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging }), replication);
+  const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions }), replication);
 
   app.on('will-quit', () => runner.dispose());
   if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {
@@ -54,18 +66,26 @@ async function start() {
     });
     runner.setBaseEnv(shellEnv.then((env) => env ?? process.env));
   }
-  void gitCli.version().then((version) =>
-    store.dispatch(
-      gitCliDetected({
-        version,
-        minimumVersion: MIN_GIT_VERSION,
-        meetsMinimum: version !== null && isVersionAtLeast(version, MIN_GIT_VERSION),
-      }),
-    ),
-  );
+  const detectGit = () =>
+    gitCli.version().then((version) =>
+      store.dispatch(
+        gitCliDetected({
+          version,
+          minimumVersion: MIN_GIT_VERSION,
+          meetsMinimum: version !== null && isVersionAtLeast(version, MIN_GIT_VERSION),
+        }),
+      ),
+    );
+  void detectGit();
+  let gitExecutable = settings.values['git.executable'];
+  store.subscribe(() => {
+    if (settings.values['git.executable'] === gitExecutable) return;
+    gitExecutable = settings.values['git.executable'];
+    void detectGit();
+  });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

@@ -1,6 +1,7 @@
 import { combineReducers, configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { AppInfo, AppState, GitCliInfo } from '../../shared/state';
 import { repoSlice } from './repoSlice';
+import { settingsSlice } from './settingsSlice';
 import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
@@ -19,6 +20,7 @@ export const { gitCliDetected } = appSlice.actions;
 const rootReducer = combineReducers({
   app: appSlice.reducer,
   repo: repoSlice.reducer,
+  settings: settingsSlice.reducer,
 });
 
 // Fails to compile if the reducer tree drifts from the replicated AppState contract.

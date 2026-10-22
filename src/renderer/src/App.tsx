@@ -1,6 +1,7 @@
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { GitCliInfo, RepoData } from '../../shared/state';
 import { invoke } from './api';
+import { Preferences } from './components/preferences/Preferences';
 import { RepoWorkspace } from './components/RepoWorkspace';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
@@ -25,6 +26,18 @@ export function App() {
   const gitCli = useAppState((s) => s.app.gitCli);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showPreferences, setShowPreferences] = useState(false);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === ',' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        setShowPreferences(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const reportError = (error: unknown) => setActionError(error instanceof Error ? error.message : String(error));
 
@@ -74,20 +87,25 @@ export function App() {
         onRefresh={() => run(() => invoke('repo:refresh'))}
         onClose={() => run(() => invoke('repo:close'))}
         onOpenTerminal={() => run(() => invoke('repo:openTerminal'))}
+        onPreferences={() => setShowPreferences(true)}
       />
       {error && <div className="error-banner">{error}</div>}
-      {data ? (
-        // Keyed by repository: selection and open diff belong to the repository they were made in.
-        <RepoWorkspace key={data.root} data={data} run={run} runInBackground={runInBackground} />
-      ) : (
-        <main className="empty">
-          <p>No repository open</p>
-          <button type="button" onClick={openRepo} disabled={busy}>
-            Open repository…
-          </button>
-          {gitCli && <GitCliStatus info={gitCli} />}
-        </main>
-      )}
+      {showPreferences && <Preferences repo={data} onClose={() => setShowPreferences(false)} />}
+      {/* Kept mounted under Preferences, so the selection and an open diff survive a visit there. */}
+      <div className="app-main" hidden={showPreferences}>
+        {data ? (
+          // Keyed by repository: selection and open diff belong to the repository they were made in.
+          <RepoWorkspace key={data.root} data={data} run={run} runInBackground={runInBackground} />
+        ) : (
+          <main className="empty">
+            <p>No repository open</p>
+            <button type="button" onClick={openRepo} disabled={busy}>
+              Open repository…
+            </button>
+            {gitCli && <GitCliStatus info={gitCli} />}
+          </main>
+        )}
+      </div>
     </div>
   );
 }

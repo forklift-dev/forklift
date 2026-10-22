@@ -11,8 +11,6 @@ import 'monaco-editor/editor/contrib/bracketMatching/browser/bracketMatching';
 import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import 'monaco-editor/editor/contrib/readOnlyMessage/browser/contribution';
 import 'monaco-editor/basic-languages/monaco.contribution';
-import 'monaco-codicons/codicon.css';
-import 'monaco-codicons/codicon-modifiers.css';
 // oxlint-disable-next-line import/default -- virtual module: Vite bundles the worker and exports its constructor
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 
@@ -23,6 +21,9 @@ const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 const applyTheme = () => monaco.editor.setTheme(darkQuery.matches ? 'vs-dark' : 'vs');
 applyTheme();
 darkQuery.addEventListener('change', applyTheme);
+
+/** Code font when the user has not chosen one; Monaco measures it, so CSS variables cannot be used here. */
+export const CODE_FONT = "ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace";
 
 /** Monaco language id for a file name, from the languages' registered extensions and file names. */
 export function languageForPath(path: string): string {

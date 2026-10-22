@@ -556,3 +556,258 @@ button.danger {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Main area under the toolbar; hidden (not unmounted) while Preferences is open */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-main[hidden] {
+  display: none;
+}
+
+input[type='text'],
+input[type='search'],
+input[type='email'],
+input[type='number'],
+input:not([type]),
+select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Preferences */
+.preferences {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+
+.preferences-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preferences-header h1 {
+  font-size: 15px;
+  margin: 0 8px 0 0;
+}
+
+.preferences-search {
+  margin-left: auto;
+  width: min(280px, 40vw);
+}
+
+.scope-switch {
+  display: flex;
+}
+
+.scope-switch button {
+  border-radius: 0;
+}
+
+.scope-switch button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.scope-switch button:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.scope-switch button[aria-selected='true'] {
+  background: var(--selection);
+  border-color: var(--accent);
+}
+
+.settings-problems {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.settings-problems ul {
+  flex: 1;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.preferences-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: 0;
+}
+
+.preferences-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.preferences-nav button {
+  text-align: left;
+  border: none;
+  background: none;
+}
+
+.preferences-nav button.active {
+  background: var(--selection);
+}
+
+.preferences-content {
+  overflow: auto;
+  padding: 12px 24px 32px;
+}
+
+.preferences-content h2 {
+  font-size: 14px;
+  margin: 4px 0 12px;
+}
+
+.scope-note {
+  color: var(--fg-muted);
+  margin: 0 0 12px;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: 8px 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-text label {
+  font-weight: 600;
+}
+
+.setting-text p {
+  margin: 4px 0 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.setting-scope.overridden {
+  color: var(--accent);
+}
+
+.setting-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.text-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.setting-control > .text-control,
+.tool-picker > .text-control {
+  width: 100%;
+}
+
+.text-control input {
+  width: min(420px, 100%);
+}
+
+.text-control input.number-input {
+  width: 90px;
+}
+
+.setting-error {
+  margin: 0;
+  color: var(--danger-fg);
+  white-space: pre-wrap;
+}
+
+.tool-status {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.tool-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.custom-command {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  max-width: 560px;
+}
+
+.custom-command > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.custom-command-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.checkbox-label,
+.custom-command > label.checkbox-label {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.identity-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.identity-form input {
+  width: 200px;
+}

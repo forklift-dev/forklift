@@ -1,6 +1,6 @@
 # Архитектура Forklift
 
-Обновлено: 2026-10-22
+Обновлено: 2026-10-23
 
 ## Стек
 
@@ -24,7 +24,8 @@ main process ─ src/main
   store/          Redux Toolkit: единственный источник правды
   git/service.ts  чтение репозитория через nodegit (+ git/diff.ts: детали коммита, версии файлов)
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
-  external/       внешний редактор, терминал, diff/merge tools (выбор по ОС/рабочему столу/git config)
+  external/       внешний редактор, терминал, diff/merge tools (выбор по настройкам, ОС/рабочему столу, git config)
+  settings/       settings.json (атомарная запись, миграции), проверка изменений, кнопки Test/git config
   replication.ts  копия состояния в окна через MessagePort
   ipc/            типизированная таблица команд → ipcMain.handle
   process/       ProcessRunner — клиент utilityProcess, очистка env
@@ -58,7 +59,10 @@ renderer ─ src/renderer
    OpenSSL линкуется статически на всех ОС. Подробности — T-002.
 6. **Проприетарный `node-spawn-server` GitKraken не используем.** Его задачу (не блокировать
    UI при запуске процессов) решает `utilityProcess` + свой протокол с отменой и таймаутами — T-010.
-7. **Сборка нативных модулей** — `scripts/rebuild-native.mjs` (postinstall). Каждая ОС и
+7. **Настройки — одна декларативная схема** (`src/shared/settings.ts`): типы, умолчания, проверка, экран
+   Preferences и переопределения по репозиторию выводятся из неё. Файл `userData/settings.json` пишет только main
+   (атомарно, только отличия от умолчаний); окно меняет настройки командой `settings:update` — T-050.
+8. **Сборка нативных модулей** — `scripts/rebuild-native.mjs` (postinstall). Каждая ОС и
    архитектура собирается на своей машине или CI-раннере; кросс-компиляция не поддерживается.
 
 ## Целевые платформы

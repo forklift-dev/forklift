@@ -7,9 +7,10 @@ interface ToolbarProps {
   onRefresh(): void;
   onClose(): void;
   onOpenTerminal(): void;
+  onPreferences(): void;
 }
 
-export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal }: ToolbarProps) {
+export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences }: ToolbarProps) {
   const branch = repo?.branch;
   return (
     <header className="toolbar">
@@ -39,6 +40,9 @@ export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal
         </button>
         <button type="button" onClick={onClose} disabled={busy || !repo}>
           Close
+        </button>
+        <button type="button" className="icon-button" onClick={onPreferences} title="Preferences (Ctrl+,)" aria-label="Preferences">
+          <span className="codicon codicon-settings-gear" aria-hidden="true" />
         </button>
       </div>
     </header>

@@ -1,19 +1,42 @@
+import type { GitToolInfo, GitToolKind, GitToolSetting } from '../../shared/settings';
 import type { GitCli } from '../git/cli';
 import type { Runner } from '../process/types';
 import { findExecutable } from './which';
 
-export type ToolKind = 'diff' | 'merge';
+export type ToolKind = GitToolKind;
 
 export interface ToolChoice {
   name: string;
   /** `-c key=value` pairs placed before the subcommand (used to define a tool on the fly). */
   configArgs: string[];
-  source: 'configured' | 'detected' | 'vscode';
+  /** configured: git config; detected/vscode: picked automatically; settings: Forklift's Preferences. */
+  source: 'configured' | 'detected' | 'vscode' | 'settings';
 }
 
-export interface AvailableTool {
-  name: string;
-  description: string;
+export type AvailableTool = GitToolInfo;
+
+const FROM_GIT_CONFIG: GitToolSetting = { mode: 'git-config' };
+/** Name under which a custom command from Preferences is defined for one git invocation. */
+export const CUSTOM_TOOL = 'forklift-custom';
+const TOOL_VARIABLES = /\$(LOCAL|REMOTE|BASE|MERGED)\b/g;
+
+const shellEscape = (text: string) => text.replace(/[\\"`$]/g, '\\$&');
+
+/**
+ * Builds the `difftool.<name>.cmd` string git runs through sh: every argument double-quoted with
+ * shell metacharacters escaped, except the $LOCAL/$REMOTE/$BASE/$MERGED variables git provides.
+ */
+export function gitToolCommand(command: string, args: readonly string[]): string {
+  const quote = (arg: string) => {
+    let quoted = '';
+    let last = 0;
+    for (const match of arg.matchAll(TOOL_VARIABLES)) {
+      quoted += shellEscape(arg.slice(last, match.index)) + match[0];
+      last = match.index + match[0].length;
+    }
+    return `"${quoted + shellEscape(arg.slice(last))}"`;
+  };
+  return [command, ...args].map(quote).join(' ');
 }
 
 export class DiffToolError extends Error {
@@ -96,32 +119,38 @@ export class DiffTools {
   ) {}
 
   /** Resolves when the tool window is closed. `staged` compares index with HEAD, else worktree with index. */
-  async diff(root: string, path: string, staged: boolean): Promise<void> {
-    await this.exclusive(`diff:${staged}:${root}:${path}`, async () => {
-      const tool = await this.pickTool(root, 'diff');
+  async diff(root: string, path: string, staged: boolean, setting: GitToolSetting = FROM_GIT_CONFIG): Promise<ToolChoice> {
+    return this.exclusive(`diff:${staged}:${root}:${path}`, async () => {
+      const tool = await this.pickTool(root, 'diff', setting);
       const args = [...tool.configArgs, 'difftool', '--no-prompt', `--tool=${tool.name}`, ...(staged ? ['--cached'] : []), '--', path];
       await this.git.exec(args, { cwd: root, readOnly: true, env: LITERAL_PATHS });
+      return tool;
     });
   }
 
   /** Resolves when the merge tool is closed; git decides whether the conflict counts as resolved. */
-  async merge(root: string, path: string): Promise<void> {
-    await this.exclusive(`merge:${root}:${path}`, async () => {
-      const tool = await this.pickTool(root, 'merge');
+  async merge(root: string, path: string, setting: GitToolSetting = FROM_GIT_CONFIG): Promise<ToolChoice> {
+    return this.exclusive(`merge:${root}:${path}`, async () => {
+      const tool = await this.pickTool(root, 'merge', setting);
       const args = [...tool.configArgs, 'mergetool', '--no-prompt', `--tool=${tool.name}`, '--', path];
       await this.git.exec(args, { cwd: root, env: LITERAL_PATHS });
+      return tool;
     });
   }
 
-  async pickTool(root: string, kind: ToolKind): Promise<ToolChoice> {
-    // diff.tool falls back to merge.tool in git itself; the GUI variants win when set.
-    const keys = kind === 'diff' ? ['diff.guitool', 'diff.tool', 'merge.guitool', 'merge.tool'] : ['merge.guitool', 'merge.tool'];
-    let configured: string | null = null;
-    for (const key of keys) {
-      const { stdout } = await this.git.exec(['config', '--get', key], { cwd: root, readOnly: true, allowedExitCodes: [1] });
-      if ((configured = stdout.trim() || null)) break;
+  async pickTool(root: string, kind: ToolKind, setting: GitToolSetting = FROM_GIT_CONFIG): Promise<ToolChoice> {
+    if (setting.mode === 'tool') return { name: setting.name, configArgs: [], source: 'settings' };
+    if (setting.mode === 'custom') {
+      if (!(await findExecutable(setting.command, await this.runner.environment()))) {
+        throw new DiffToolError(`${kind === 'diff' ? 'Diff' : 'Merge'} tool command "${setting.command}" was not found. Choose another one in Preferences → External tools.`);
+      }
+      const section = `${kind}tool.${CUSTOM_TOOL}`;
+      const configArgs = ['-c', `${section}.cmd=${gitToolCommand(setting.command, setting.args)}`];
+      if (kind === 'merge') configArgs.push('-c', `${section}.trustExitCode=${setting.trustExitCode}`);
+      return { name: CUSTOM_TOOL, configArgs, source: 'settings' };
     }
 
+    const configured = await this.configured(root, kind);
     const help = configured ? '' : (await this.git.exec([`${kind}tool`, '--tool-help'], { cwd: root, readOnly: true })).stdout;
     const hasVsCode = !configured && (await findExecutable('code', await this.runner.environment())) !== null;
     const choice = chooseTool(kind, configured, parseToolHelp(help), hasVsCode);
@@ -134,11 +163,27 @@ export class DiffTools {
     return choice;
   }
 
-  private async exclusive(key: string, action: () => Promise<void>): Promise<void> {
+  /** The tool git config names for `kind` (diff.tool falls back to merge.tool in git itself; GUI variants win). */
+  async configured(cwd: string, kind: ToolKind): Promise<string | null> {
+    const keys = kind === 'diff' ? ['diff.guitool', 'diff.tool', 'merge.guitool', 'merge.tool'] : ['merge.guitool', 'merge.tool'];
+    for (const key of keys) {
+      const { stdout } = await this.git.exec(['config', '--get', key], { cwd, readOnly: true, allowedExitCodes: [1] });
+      if (stdout.trim()) return stdout.trim();
+    }
+    return null;
+  }
+
+  /** Tools git can run on this machine (installed), terminal-only ones excluded. */
+  async available(cwd: string, kind: ToolKind): Promise<GitToolInfo[]> {
+    const { stdout } = await this.git.exec([`${kind}tool`, '--tool-help'], { cwd, readOnly: true });
+    return parseToolHelp(stdout).filter((tool) => !TERMINAL_TOOLS.has(tool.name));
+  }
+
+  private async exclusive<T>(key: string, action: () => Promise<T>): Promise<T> {
     if (this.open.has(key)) throw new DiffToolError('This file is already open in the external tool');
     this.open.add(key);
     try {
-      await action();
+      return await action();
     } finally {
       this.open.delete(key);
     }
