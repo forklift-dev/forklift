@@ -10,17 +10,24 @@ import { registerCommands } from './ipc/registry';
 import { sanitizeEnv } from './process/env';
 import { ProcessRunner } from './process/runner';
 import { resolveShellEnv, shouldResolveShellEnv } from './process/shellEnv';
+import { installAppMenu } from './menu';
 import { handleAppProtocol, registerAppScheme } from './protocol';
+import { pathFromArgv } from './repos/argv';
+import { LibraryFile } from './repos/libraryFile';
+import { RepoScanner } from './repos/scan';
+import { RepoSession } from './repos/session';
 import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected } from './store';
+import { createAppStore, gitCliDetected, noticeAdded } from './store';
 import { createMainWindow } from './window';
 
 registerAppScheme();
 
 let mainWindow: BrowserWindow | null = null;
+/** Opens a folder named by a later launch (`forklift <path>` while running); set once the app is ready. */
+let openFromSecondInstance: ((argv: string[], cwd: string) => void) | null = null;
 
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -33,6 +40,7 @@ function showMainWindow() {
 
 async function start() {
   await app.whenReady();
+  installAppMenu();
 
   handleAppProtocol(join(__dirname, '../renderer'));
   // The UI needs no camera, notifications, geolocation, etc.
@@ -46,7 +54,7 @@ async function start() {
     store,
     file: new SettingsFile(join(app.getPath('userData'), 'settings.json')),
     runner,
-    isOpenRepo: (root) => store.getState().repo.path === root,
+    isOpenRepo: (root) => Boolean(store.getState().repos.byId[root]),
   });
   // Before the window exists, so its first state snapshot already has the user's settings.
   await settings.load();
@@ -55,7 +63,19 @@ async function start() {
   const diffTools = new DiffTools(gitCli, runner);
   const staging = new StagingService(gitCli, git);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions }), replication);
+  const scanner = new RepoScanner();
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner }), replication);
+
+  // Remembered tabs first, then a folder named on the command line (opened as the active tab).
+  const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
+  await repoSession.load(settings.values['general.restoreTabs']);
+  const report = (message: string) => store.dispatch(noticeAdded(message));
+  const cliPath = pathFromArgv(process.argv, app.isPackaged, process.cwd());
+  if (cliPath) void repoSession.open(git, cliPath, report);
+  openFromSecondInstance = (argv, cwd) => {
+    const path = pathFromArgv(argv, app.isPackaged, cwd);
+    if (path) void repoSession.open(git, path, report);
+  };
 
   app.on('will-quit', () => runner.dispose());
   if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {
@@ -85,7 +105,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession } });
 
   showMainWindow();
   app.on('activate', showMainWindow);
@@ -94,7 +114,10 @@ async function start() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', showMainWindow);
+  app.on('second-instance', (_event, argv, cwd) => {
+    showMainWindow();
+    openFromSecondInstance?.(argv, cwd);
+  });
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });

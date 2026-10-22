@@ -1,7 +1,7 @@
 import { ipcMain, type MessagePortMain } from 'electron';
 import { REPLICA_READY_CHANNEL, type AppState, type ReplicaAck, type ReplicaMessage, type SliceName } from '../shared/state';
 import { isTrustedSender } from './origin';
-import type { AppStore } from './store';
+import { projectState, type AppStore } from './store';
 
 interface Replica {
   port: MessagePortMain;
@@ -24,7 +24,7 @@ export interface Replication {
 export function startReplication(store: AppStore): Replication {
   const replicas = new Map<number, Replica>();
   let updateIndex = 0;
-  let lastState = store.getState();
+  let lastState = projectState(store.getState());
 
   const send = (replica: Replica, message: ReplicaMessage) => {
     replica.sentIndex = message.updateIndex;
@@ -40,8 +40,7 @@ export function startReplication(store: AppStore): Replication {
   };
 
   store.subscribe(() => {
-    const state = store.getState();
-    if (state === lastState) return;
+    const state = projectState(store.getState());
 
     const slices: Partial<AppState> = {};
     for (const key of Object.keys(state) as SliceName[]) {
@@ -79,7 +78,7 @@ export function startReplication(store: AppStore): Replication {
       flushWaiters(replica);
     });
     port.start();
-    send(replica, { type: 'STATE', updateIndex, state: store.getState() });
+    send(replica, { type: 'STATE', updateIndex, state: projectState(store.getState()) });
 
     if (!reconnect) event.sender.once('destroyed', () => disconnect(id));
   });

@@ -49,7 +49,7 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
   const [query, setQuery] = useState('');
   const { confirm, dialog } = useConfirm();
   const repoRoot = scope === 'repository' && repo ? repo.root : null;
-  const detected = useCommand('tools:detect', [], { reloadKey: repo?.root ?? null, keepPrevious: true });
+  const detected = useCommand('tools:detect', [repo?.root ?? null], { keepPrevious: true });
 
   const rootRef = useRef<HTMLElement>(null);
   // Keyboard focus starts inside, so Escape reaches this screen first.
@@ -172,7 +172,7 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
           {repoRoot && <p className="scope-note">Settings below apply only to {repo?.root}; anything not set here follows the settings for all repositories.</p>}
           {shownSection === 'tools' && !searching && detected.error && <p className="setting-error">Could not detect installed tools: {detected.error}</p>}
           {rows(keys)}
-          {showIdentity && <GitIdentityEditor key={repoRoot ?? 'global'} scope={repoRoot ? 'repository' : 'global'} />}
+          {showIdentity && <GitIdentityEditor key={repoRoot ?? 'global'} repo={repoRoot} />}
           {searching && keys.length === 0 && !showIdentity && <p className="empty-note">No settings match “{query}”</p>}
         </div>
       </div>

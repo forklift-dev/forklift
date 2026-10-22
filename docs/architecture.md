@@ -26,7 +26,8 @@ main process ─ src/main
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
   external/       внешний редактор, терминал, diff/merge tools (выбор по настройкам, ОС/рабочему столу, git config)
   settings/       settings.json (атомарная запись, миграции), проверка изменений, кнопки Test/git config
-  replication.ts  копия состояния в окна через MessagePort
+  replication.ts  копия состояния (проекция: вкладки + активный репозиторий) в окна через MessagePort
+  repos/          вкладки: открытие, сессия и недавние (repositories.json), поиск репозиториев, argv
   ipc/            типизированная таблица команд → ipcMain.handle
   process/       ProcessRunner — клиент utilityProcess, очистка env
 
@@ -43,7 +44,8 @@ renderer ─ src/renderer
 ## Ключевые решения
 
 1. **Состояние живёт в main.** Окно получает полный снимок (`STATE`), затем изменения по
-   верхнеуровневым срезам (`UPDATE` + `updateIndex`) и подтверждает каждое. Ответ на команду
+   верхнеуровневым срезам (`UPDATE` + `updateIndex`) и подтверждает каждое. Окно видит проекцию
+   состояния (`projectState`): все вкладки, но данные только активного репозитория (T-041). Ответ на команду
    приходит только после подтверждения — после `await invoke(...)` окно гарантированно видит новое
    состояние. Идея из GitKraken; реализация своя и проще (без redux-saga).
 2. **Типизированный контракт IPC** в `src/shared/ipc.ts`: компилятор ловит пропущенные и лишние

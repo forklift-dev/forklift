@@ -126,7 +126,7 @@ function TestButton({ kind, repo }: { kind: ToolKind; repo: string | null }) {
   const test = async () => {
     setStatus({ text: kind === 'diff' || kind === 'merge' ? 'Waiting for the tool to be closed…' : 'Starting…', ok: true, running: true });
     try {
-      setStatus({ text: await invoke('tools:test', kind, repo !== null), ok: true, running: false });
+      setStatus({ text: await invoke('tools:test', kind, repo), ok: true, running: false });
     } catch (error) {
       setStatus({ text: errorText(error), ok: false, running: false });
     }
@@ -214,7 +214,6 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
   };
 
   const writeToGitConfig = async () => {
-    const scope = repo ? 'repository' : 'global';
     const where = repo ? "this repository's .git/config" : 'your global git config (~/.gitconfig)';
     const ok = await confirm({
       title: `Save the ${gitKind} tool to git config?`,
@@ -223,7 +222,7 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
     });
     if (!ok) return;
     try {
-      await invoke('tools:writeGitConfig', gitKind, scope);
+      await invoke('tools:writeGitConfig', gitKind, repo);
       setWritten(`Saved to ${repo ? 'repository' : 'global'} git config`);
     } catch (error) {
       setWritten(errorText(error));

@@ -1,7 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ConfigScope } from '../../shared/ipc';
 import type { DetectedTools, GitIdentity, GitToolKind, ToolKind } from '../../shared/settings';
 import { CUSTOM_TOOL, gitToolCommand, type DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
@@ -87,46 +86,44 @@ export class ToolActions {
     }
   }
 
-  /** Writes the diff/merge tool chosen in Preferences to git config, so git itself and other clients use it. */
-  async writeGitConfig(kind: GitToolKind, scope: ConfigScope, root: string | null): Promise<void> {
-    const setting = this.settings.effective(scope === 'repository' ? root : null)[kind === 'diff' ? 'tools.diff' : 'tools.merge'];
+  /**
+   * Writes the diff/merge tool chosen in Preferences to git config, so git itself and other clients use it:
+   * the repository's own config for `root`, the global one for null.
+   */
+  async writeGitConfig(kind: GitToolKind, root: string | null): Promise<void> {
+    const setting = this.settings.effective(root)[kind === 'diff' ? 'tools.diff' : 'tools.merge'];
     if (setting.mode === 'git-config') throw new Error('The tool already comes from git config; there is nothing to write');
-    const set = (key: string, value: string) => this.config(scope, root, [key, value]);
+    const set = (key: string, value: string) => this.config(root, [key, value]);
     if (setting.mode === 'tool') return set(`${kind}.tool`, setting.name);
     await set(`${kind}tool.${CUSTOM_TOOL}.cmd`, gitToolCommand(setting.command, setting.args));
     if (kind === 'merge') await set(`mergetool.${CUSTOM_TOOL}.trustExitCode`, String(setting.trustExitCode));
     await set(`${kind}.tool`, CUSTOM_TOOL);
   }
 
-  async identity(scope: ConfigScope, root: string | null): Promise<GitIdentity> {
+  /** Identity in the repository's own config (`root`) or the global one (null). */
+  async identity(root: string | null): Promise<GitIdentity> {
     const get = async (key: string) => {
-      const { stdout } = await this.git.exec(['config', scopeFlag(scope), '--get', key], { cwd: this.cwd(scope, root), readOnly: true, allowedExitCodes: [1] });
+      const { stdout } = await this.git.exec(['config', scopeFlag(root), '--get', key], { cwd: root ?? homedir(), readOnly: true, allowedExitCodes: [1] });
       return stdout.trim();
     };
     return { name: await get('user.name'), email: await get('user.email') };
   }
 
   /** Empty values remove the key (in repository scope that means "inherit the global identity"). */
-  async setIdentity(scope: ConfigScope, root: string | null, identity: unknown): Promise<void> {
+  async setIdentity(root: string | null, identity: unknown): Promise<void> {
     if (typeof identity !== 'object' || identity === null) throw new TypeError('identity must be an object');
     const { name, email } = identity as Record<string, unknown>;
     const values = { 'user.name': parseIdentityField(name, 'name'), 'user.email': parseIdentityField(email, 'email') };
     for (const [key, value] of Object.entries(values)) {
       // Exit code 5: unsetting a key that is not set.
-      if (value) await this.config(scope, root, [key, value]);
-      else await this.git.exec(['config', scopeFlag(scope), '--unset', key], { cwd: this.cwd(scope, root), allowedExitCodes: [5] });
+      if (value) await this.config(root, [key, value]);
+      else await this.git.exec(['config', scopeFlag(root), '--unset', key], { cwd: root ?? homedir(), allowedExitCodes: [5] });
     }
   }
 
-  private async config(scope: ConfigScope, root: string | null, args: string[]): Promise<void> {
-    await this.git.exec(['config', scopeFlag(scope), ...args], { cwd: this.cwd(scope, root) });
-  }
-
-  private cwd(scope: ConfigScope, root: string | null): string {
-    if (scope === 'global') return root ?? homedir();
-    if (!root) throw new Error('No repository is open');
-    return root;
+  private async config(root: string | null, args: string[]): Promise<void> {
+    await this.git.exec(['config', scopeFlag(root), ...args], { cwd: root ?? homedir() });
   }
 }
 
-const scopeFlag = (scope: ConfigScope) => (scope === 'global' ? '--global' : '--local');
+const scopeFlag = (root: string | null) => (root ? '--local' : '--global');

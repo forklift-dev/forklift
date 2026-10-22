@@ -8,4 +8,6 @@ export interface ForkliftBridge {
   /** Messages received before the first listener attaches are buffered and replayed to it. */
   onReplicaMessage(listener: (message: ReplicaMessage) => void): () => void;
   ackReplicaUpdate(updateIndex: number): void;
+  /** Filesystem path of a file or folder dropped on the window ('' when it has none). */
+  pathForFile(file: File): string;
 }

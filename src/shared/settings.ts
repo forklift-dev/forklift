@@ -24,6 +24,7 @@ export type GitToolKind = 'diff' | 'merge';
 export type ToolKind = AppToolKind | GitToolKind;
 
 export const SETTINGS_SECTIONS = {
+  general: 'General',
   git: 'Git',
   diff: 'Diff',
   editor: 'Editor',
@@ -48,6 +49,13 @@ export type SettingField =
   | (FieldBase & { type: 'gitTool'; default: GitToolSetting; tool: GitToolKind });
 
 export const SETTING_FIELDS = {
+  'general.restoreTabs': {
+    section: 'general',
+    type: 'boolean',
+    default: true,
+    label: 'Reopen repositories at startup',
+    description: 'Open the tabs that were open when Forklift was last closed.',
+  },
   'git.executable': {
     section: 'git',
     type: 'string',

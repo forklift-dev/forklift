@@ -55,7 +55,7 @@ export default async function ({ check }) {
   await sleep(700); // the fake tool stays "open" for 2 s
   const refreshEnabled = await page.evaluate(`!([...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Refresh').disabled)`);
   check('UI stays usable while the diff tool is open', refreshEnabled === true);
-  const again = await page.invoke('file:externalDiff', 'other.txt', false);
+  const again = await page.invoke('file:externalDiff', root, 'other.txt', false);
   check('second diff of the same file refused', /already open/.test(JSON.stringify(again)), JSON.stringify(again));
   for (let i = 0; i < 60 && !existsSync(diffOut); i++) await sleep(100);
   const diffText = existsSync(diffOut) ? readFileSync(diffOut, 'utf8') : 'no output';

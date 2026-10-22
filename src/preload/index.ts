@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ForkliftBridge } from '../shared/bridge';
 import { isCommandName } from '../shared/ipc';
 import { REPLICA_READY_CHANNEL, type ReplicaAck, type ReplicaMessage } from '../shared/state';
@@ -33,6 +33,11 @@ const bridge: ForkliftBridge = {
 
   ackReplicaUpdate(updateIndex) {
     port2.postMessage({ updateIndex } satisfies ReplicaAck);
+  },
+
+  // Electron no longer exposes File.path to pages; dropped folders are resolved here instead.
+  pathForFile(file) {
+    return file instanceof File ? webUtils.getPathForFile(file) : '';
   },
 };
 

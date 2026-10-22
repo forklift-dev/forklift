@@ -64,6 +64,8 @@ export interface DiffEditing {
 const ACTION_LABEL: Record<LineAction, string> = { stage: 'Stage', unstage: 'Unstage', discard: 'Discard' };
 
 interface DiffViewProps {
+  /** Tab id (repository root) the target belongs to. */
+  repo: string;
   target: DiffTarget;
   title: string;
   subtitle?: string;
@@ -74,8 +76,8 @@ interface DiffViewProps {
   onClose(): void;
 }
 
-export function DiffView({ target, title, subtitle, reloadKey, actions, editing, onClose }: DiffViewProps) {
-  const { data, error, loading } = useCommand('diff:file', [target], { reloadKey, keepPrevious: true });
+export function DiffView({ repo, target, title, subtitle, reloadKey, actions, editing, onClose }: DiffViewProps) {
+  const { data, error, loading } = useCommand('diff:file', [repo, target], { reloadKey, keepPrevious: true });
   const prefs = useDiffPrefs();
   const [changeCount, setChangeCount] = useState<number | null>(null);
   const [hint, setHint] = useState<string | null>(null);

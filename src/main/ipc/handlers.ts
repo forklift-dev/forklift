@@ -1,6 +1,6 @@
+import { isAbsolute } from 'node:path';
 import { BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from 'electron';
 import type { DiffTarget } from '../../shared/diff';
-import type { ConfigScope } from '../../shared/ipc';
 import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
 import type { DiffTools } from '../external/diffTools';
@@ -10,8 +10,11 @@ import type { StagingService } from '../git/staging';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
-import type { AppStore } from '../store';
-import { loadRepo, repoClosed } from '../store/repoSlice';
+import { noticesDismissed, type AppStore } from '../store';
+import type { RepoScanner } from '../repos/scan';
+import { openRepository } from '../repos/open';
+import { favoriteToggled, repoForgotten } from '../store/librarySlice';
+import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 
@@ -23,6 +26,7 @@ export interface HandlerDeps {
   staging: StagingService;
   settings: SettingsService;
   toolActions: ToolActions;
+  scanner: RepoScanner;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -107,9 +111,9 @@ function parseGitToolKind(value: unknown): GitToolKind {
   return value;
 }
 
-function parseScope(value: unknown): ConfigScope {
-  if (value !== 'global' && value !== 'repository') throw new TypeError('scope must be global or repository');
-  return value;
+function assertAbsolutePath(value: unknown, name: string): asserts value is string {
+  assertString(value, name);
+  if (value.length > 4096 || !isAbsolute(value)) throw new TypeError(`${name} must be an absolute path`);
 }
 
 async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
@@ -118,39 +122,43 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-function openRepoRoot(store: AppStore): string {
-  const { path } = store.getState().repo;
-  if (!path) throw new Error('No repository is open');
-  return path;
-}
-
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
+  const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
+
+  /** The tab named by the window; operations always say which repository they mean. */
+  const tab = (id: unknown): string => {
+    assertString(id, 'repo');
+    if (!isOpen(id)) throw new Error('This repository is not open');
+    return id;
+  };
+  const optionalTab = (id: unknown): string | null => (id === null ? null : tab(id));
+  const repoData = (id: string) => store.getState().repos.byId[id]?.data ?? null;
 
   /** Runs an index/working-tree operation, then re-reads the repository whether or not it succeeded. */
   const thenRefresh = async <T>(root: string, operation: () => Promise<T>): Promise<T> => {
     try {
       return await operation();
     } finally {
-      if (store.getState().repo.path === root) await store.dispatch(loadRepo(root));
+      if (isOpen(root)) await store.dispatch(loadRepo(root));
     }
   };
 
   return {
-    async 'index:stage'(_ctx, paths) {
-      const root = openRepoRoot(store);
+    async 'index:stage'(_ctx, repo, paths) {
+      const root = tab(repo);
       await thenRefresh(root, () => staging.stageFiles(root, parsePaths(paths)));
     },
 
-    async 'index:unstage'(_ctx, paths) {
-      const root = openRepoRoot(store);
-      const unborn = store.getState().repo.data?.branch.oid == null;
+    async 'index:unstage'(_ctx, repo, paths) {
+      const root = tab(repo);
+      const unborn = repoData(root)?.branch.oid == null;
       await thenRefresh(root, () => staging.unstageFiles(root, parsePaths(paths), unborn));
     },
 
-    async 'index:discard'(_ctx, paths) {
-      const root = openRepoRoot(store);
-      const changes = new Map(store.getState().repo.data?.changes.map((change) => [change.path, change]));
+    async 'index:discard'(_ctx, repo, paths) {
+      const root = tab(repo);
+      const changes = new Map(repoData(root)?.changes.map((change) => [change.path, change]));
       const tracked: string[] = [];
       const untracked: string[] = [];
       for (const path of parsePaths(paths)) {
@@ -162,73 +170,113 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       await thenRefresh(root, () => staging.discardFiles(root, tracked, untracked));
     },
 
-    async 'index:applyLines'(_ctx, request) {
-      const root = openRepoRoot(store);
+    async 'index:applyLines'(_ctx, repo, request) {
+      const root = tab(repo);
       await thenRefresh(root, () => staging.applyLines(root, parseLineActionRequest(request)));
     },
 
-    async 'commit:create'(_ctx, message, amend) {
+    async 'commit:create'(_ctx, repo, message, amend) {
+      const root = tab(repo);
       if (typeof message !== 'string' || message.trim() === '') throw new TypeError('Commit message is empty');
       if (typeof amend !== 'boolean') throw new TypeError('amend must be a boolean');
-      const root = openRepoRoot(store);
       return thenRefresh(root, () => staging.commit(root, message, amend));
     },
 
-    async 'commit:details'(_ctx, sha) {
+    async 'commit:details'(_ctx, repo, sha) {
+      const root = tab(repo);
       assertSha(sha);
-      return git.commitDetails(openRepoRoot(store), sha);
+      return git.commitDetails(root, sha);
     },
 
-    async 'diff:file'(_ctx, target) {
-      return git.fileDiff(openRepoRoot(store), parseDiffTarget(target));
+    async 'diff:file'(_ctx, repo, target) {
+      return git.fileDiff(tab(repo), parseDiffTarget(target));
     },
 
-    async 'repo:pick'({ sender }) {
-      return showOpenDialog(sender, { title: 'Open repository', properties: ['openDirectory'] });
+    async 'repo:pick'({ sender }, purpose) {
+      const title = purpose === 'scan' ? 'Choose a folder to search for repositories' : 'Open repository';
+      return showOpenDialog(sender, { title, properties: ['openDirectory'] });
     },
 
     async 'repo:open'(_ctx, path) {
-      assertString(path, 'path');
-      await store.dispatch(loadRepo(path)).unwrap();
+      assertAbsolutePath(path, 'path');
+      return openRepository(store, git, path);
     },
 
-    async 'repo:refresh'() {
-      const { path } = store.getState().repo;
-      if (path) await store.dispatch(loadRepo(path)).unwrap();
+    async 'repo:activate'(_ctx, repo) {
+      const root = tab(repo);
+      store.dispatch(tabActivated(root));
+      // Restored tabs are read the first time they are shown.
+      const state = store.getState().repos.byId[root]!;
+      if (!state.data && !state.loading && !state.error) await store.dispatch(loadRepo(root));
     },
 
-    async 'repo:close'() {
-      store.dispatch(repoClosed());
+    async 'repo:refresh'(_ctx, repo) {
+      await store.dispatch(loadRepo(tab(repo))).unwrap();
     },
 
-    async 'repo:openTerminal'() {
-      const root = openRepoRoot(store);
+    async 'repo:close'(_ctx, repo) {
+      store.dispatch(tabClosed(tab(repo)));
+      const active = store.getState().repos.view.activeId;
+      const next = active ? store.getState().repos.byId[active] : null;
+      if (active && next && !next.data && !next.loading && !next.error) await store.dispatch(loadRepo(active));
+    },
+
+    async 'repo:move'(_ctx, repo, index) {
+      if (!Number.isInteger(index) || index < 0) throw new TypeError('index must be a non-negative integer');
+      store.dispatch(tabMoved({ id: tab(repo), index }));
+    },
+
+    async 'repo:openTerminal'(_ctx, repo) {
+      const root = tab(repo);
       await tools.openTerminal(root, effective(root)['tools.terminal']);
     },
 
-    async 'file:openInEditor'(_ctx, path, line) {
+    async 'repos:scan'(_ctx, folder) {
+      assertAbsolutePath(folder, 'folder');
+      return scanner.scan(folder);
+    },
+
+    async 'repos:cancelScan'() {
+      scanner.cancel();
+    },
+
+    async 'repos:toggleFavorite'(_ctx, path) {
+      assertAbsolutePath(path, 'path');
+      store.dispatch(favoriteToggled(path));
+    },
+
+    async 'repos:forget'(_ctx, path) {
+      assertAbsolutePath(path, 'path');
+      store.dispatch(repoForgotten(path));
+    },
+
+    async 'file:openInEditor'(_ctx, repo, path, line) {
+      const root = tab(repo);
       assertString(path, 'path');
       if (line !== undefined && (!Number.isInteger(line) || line < 1)) throw new TypeError('line must be a positive integer');
-      const root = openRepoRoot(store);
       await tools.openInEditor(await resolveInsideRepo(root, path), line, root, effective(root)['tools.editor']);
     },
 
-    async 'file:externalDiff'(_ctx, path, staged) {
+    async 'file:externalDiff'(_ctx, repo, path, staged) {
+      const root = tab(repo);
       assertString(path, 'path');
       if (typeof staged !== 'boolean') throw new TypeError('staged must be a boolean');
-      const root = openRepoRoot(store);
       await diffTools.diff(root, normalizeRepoRelative(path), staged, effective(root)['tools.diff']);
     },
 
-    async 'file:externalMerge'(_ctx, path) {
+    async 'file:externalMerge'(_ctx, repo, path) {
+      const root = tab(repo);
       assertString(path, 'path');
-      const root = openRepoRoot(store);
       try {
         await diffTools.merge(root, normalizeRepoRelative(path), effective(root)['tools.merge']);
       } finally {
         // Whether or not git accepted the resolution, the working tree and index changed.
-        if (store.getState().repo.path === root) await store.dispatch(loadRepo(root));
+        if (isOpen(root)) await store.dispatch(loadRepo(root));
       }
+    },
+
+    async 'app:dismissNotices'() {
+      store.dispatch(noticesDismissed());
     },
 
     async 'settings:update'(_ctx, patch) {
@@ -243,28 +291,24 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       return showOpenDialog(sender, { title: 'Choose program', properties: ['openFile', 'dontAddToRecent'] });
     },
 
-    async 'tools:detect'() {
-      return toolActions.detect(store.getState().repo.path);
+    async 'tools:detect'(_ctx, repo) {
+      return toolActions.detect(optionalTab(repo));
     },
 
     async 'tools:test'(_ctx, kind, repo) {
-      if (typeof repo !== 'boolean') throw new TypeError('repo must be a boolean');
-      return toolActions.test(parseToolKind(kind), repo ? openRepoRoot(store) : null);
+      return toolActions.test(parseToolKind(kind), optionalTab(repo));
     },
 
-    async 'tools:writeGitConfig'(_ctx, kind, scope) {
-      const parsed = parseScope(scope);
-      await toolActions.writeGitConfig(parseGitToolKind(kind), parsed, parsed === 'repository' ? openRepoRoot(store) : null);
+    async 'tools:writeGitConfig'(_ctx, kind, repo) {
+      await toolActions.writeGitConfig(parseGitToolKind(kind), optionalTab(repo));
     },
 
-    async 'git:identity'(_ctx, scope) {
-      const parsed = parseScope(scope);
-      return toolActions.identity(parsed, parsed === 'repository' ? openRepoRoot(store) : null);
+    async 'git:identity'(_ctx, repo) {
+      return toolActions.identity(optionalTab(repo));
     },
 
-    async 'git:setIdentity'(_ctx, scope, identity) {
-      const parsed = parseScope(scope);
-      await toolActions.setIdentity(parsed, parsed === 'repository' ? openRepoRoot(store) : null, identity);
+    async 'git:setIdentity'(_ctx, repo, identity) {
+      await toolActions.setIdentity(optionalTab(repo), identity);
     },
   };
 }

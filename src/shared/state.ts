@@ -51,6 +51,7 @@ export interface RepoData {
   loadedAt: number;
 }
 
+/** One open repository (a tab). */
 export interface RepoState {
   path: string | null;
   loading: boolean;
@@ -72,13 +73,51 @@ export interface AppInfo {
   platform: string;
   /** Undefined until checked at startup. */
   gitCli?: GitCliInfo;
+  /** Problems outside any window action (e.g. a repository named on the command line could not be opened). */
+  notices: string[];
 }
 
+/** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */
+export interface TabInfo {
+  id: string;
+  name: string;
+  loading: boolean;
+  /** Why the repository could not be read (e.g. it was moved or deleted). */
+  error: string | null;
+}
+
+export interface TabsState {
+  tabs: TabInfo[];
+  activeId: string | null;
+}
+
+export interface RecentRepo {
+  path: string;
+  name: string;
+  /** Unix time in milliseconds. */
+  openedAt: number;
+}
+
+/** Recently opened and favorite repositories, for the Repositories screen. */
+export interface LibraryState {
+  recent: RecentRepo[];
+  favorites: string[];
+}
+
+/**
+ * What a window sees. Main keeps every open repository; the window gets the tab list and the full
+ * data of the active tab only, so switching tabs never copies other repositories' histories.
+ */
 export interface AppState {
   app: AppInfo;
-  repo: RepoState;
   settings: SettingsState;
+  tabs: TabsState;
+  /** The active tab's repository (an empty state without tabs). */
+  repo: RepoState;
+  library: LibraryState;
 }
+
+export const EMPTY_REPO_STATE: RepoState = { path: null, loading: false, error: null, data: null, pendingRequestId: null };
 
 export type SliceName = keyof AppState;
 

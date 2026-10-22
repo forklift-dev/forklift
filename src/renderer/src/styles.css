@@ -811,3 +811,214 @@ select {
 .identity-form input {
   width: 200px;
 }
+
+/* Tabs of open repositories */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  min-height: 34px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 0 6px 0 12px;
+  border-right: 1px solid var(--border);
+  color: var(--fg-muted);
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--bg-panel);
+}
+
+.tab.active {
+  background: var(--bg-panel);
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tab.has-error .tab-name {
+  text-decoration: line-through;
+}
+
+.tab.drop-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-icon {
+  flex: none;
+}
+
+.tab.has-error .tab-icon {
+  color: var(--danger-fg);
+}
+
+.tab-spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.tab-close {
+  flex: none;
+  visibility: hidden;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close,
+.tab-close:focus-visible {
+  visibility: visible;
+}
+
+.new-tab {
+  align-self: center;
+  margin: 0 6px;
+}
+
+.new-tab.active {
+  background: var(--selection);
+}
+
+/* Repositories screen */
+.repositories {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+
+.repositories-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.repositories-header h1 {
+  font-size: 15px;
+  margin: 0 16px 0 0;
+}
+
+.close-repositories {
+  margin-left: auto;
+}
+
+.repositories-body {
+  overflow: auto;
+  padding: 8px 24px 32px;
+}
+
+.repositories .hint {
+  color: var(--fg-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.repo-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  margin: 20px 0 6px;
+}
+
+.repo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 900px;
+}
+
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.repo-row:hover {
+  background: var(--bg-panel);
+}
+
+.repo-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 6px 4px;
+}
+
+.repo-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.repo-meta {
+  flex: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.star.on {
+  color: #e2b33c;
+}
+
+.repo-unavailable .empty-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.notices {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app.dropping::after {
+  content: 'Drop a folder to open it as a repository';
+  position: fixed;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: rgb(0 0 0 / 25%);
+  color: var(--fg);
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 50;
+}

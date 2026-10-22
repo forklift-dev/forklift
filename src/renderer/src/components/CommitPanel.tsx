@@ -2,13 +2,14 @@ import { useState, type KeyboardEvent } from 'react';
 import { invoke } from '../api';
 
 interface CommitPanelProps {
+  repo: string;
   stagedCount: number;
   /** HEAD commit, or null in a repository without commits (nothing to amend). */
   headSha: string | null;
   onCommit(message: string, amend: boolean): Promise<boolean>;
 }
 
-export function CommitPanel({ stagedCount, headSha, onCommit }: CommitPanelProps) {
+export function CommitPanel({ repo, stagedCount, headSha, onCommit }: CommitPanelProps) {
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
   const [amend, setAmend] = useState(false);
@@ -20,7 +21,7 @@ export function CommitPanel({ stagedCount, headSha, onCommit }: CommitPanelProps
     setAmend(checked);
     // Start from the message being amended unless the user already typed one.
     if (checked && headSha && !summary && !description) {
-      const { message } = await invoke('commit:details', headSha);
+      const { message } = await invoke('commit:details', repo, headSha);
       const [subject = '', ...body] = message.trimEnd().split('\n');
       setSummary(subject);
       setDescription(body.join('\n').trim());

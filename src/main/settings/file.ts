@@ -1,6 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { copyFile, readFile, rename } from 'node:fs/promises';
 import {
   defaultSettings,
   isSettingKey,
@@ -11,6 +9,7 @@ import {
   type SettingKey,
   type SettingsState,
 } from '../../shared/settings';
+import { AtomicFile } from '../atomicFile';
 
 export const SETTINGS_VERSION = 1;
 
@@ -85,10 +84,11 @@ export function encodeSettings(state: Pick<SettingsState, 'values' | 'repos'>): 
 
 /** Reads and writes settings.json; writes are atomic (temporary file + rename) and serialized. */
 export class SettingsFile {
-  private queue: Promise<void> = Promise.resolve();
-  private pending: string | null = null;
+  private readonly file: AtomicFile;
 
-  constructor(readonly path: string) {}
+  constructor(readonly path: string) {
+    this.file = new AtomicFile(path);
+  }
 
   /** Never throws: a missing file gives defaults, a damaged one is kept aside and reported. */
   async load(): Promise<SettingsState> {
@@ -121,24 +121,6 @@ export class SettingsFile {
 
   /** Queues a write of the latest state; intermediate states that were never written are skipped. */
   save(state: Pick<SettingsState, 'values' | 'repos'>): Promise<void> {
-    this.pending = encodeSettings(state);
-    const write = this.queue.then(() => this.flush());
-    this.queue = write.catch(() => {}); // a failed write must not block later ones
-    return write;
-  }
-
-  private async flush(): Promise<void> {
-    const text = this.pending;
-    if (text === null) return;
-    this.pending = null;
-    await mkdir(dirname(this.path), { recursive: true });
-    const temp = `${this.path}.${randomBytes(4).toString('hex')}.tmp`;
-    try {
-      await writeFile(temp, text, { encoding: 'utf8', flush: true });
-      await rename(temp, this.path);
-    } catch (error) {
-      await rm(temp, { force: true });
-      throw error;
-    }
+    return this.file.write(encodeSettings(state));
   }
 }

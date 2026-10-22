@@ -22,7 +22,8 @@ const COMMIT_OUTPUT_LINES = 40;
  * Operations on one repository run one at a time so they never race for index.lock.
  */
 export class StagingService {
-  private queue: Promise<unknown> = Promise.resolve();
+  /** One queue per repository: index operations of different tabs do not wait for each other. */
+  private readonly queues = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly git: GitCli,
@@ -31,12 +32,12 @@ export class StagingService {
 
   stageFiles(root: string, paths: readonly string[]): Promise<void> {
     // -A also records deletions of the given paths.
-    return this.serial(() => this.exec(root, ['add', '-A', '--', ...paths]));
+    return this.serial(root, () => this.exec(root, ['add', '-A', '--', ...paths]));
   }
 
   /** `unborn`: no commit yet, so there is no HEAD to restore the index from. */
   unstageFiles(root: string, paths: readonly string[], unborn: boolean): Promise<void> {
-    return this.serial(() =>
+    return this.serial(root, () =>
       unborn
         ? this.exec(root, ['rm', '--cached', '-r', '-q', '--', ...paths])
         : this.exec(root, ['restore', '--staged', '--', ...paths]),
@@ -45,19 +46,19 @@ export class StagingService {
 
   /** Reverts tracked files to their index version and deletes untracked ones. */
   discardFiles(root: string, tracked: readonly string[], untracked: readonly string[]): Promise<void> {
-    return this.serial(async () => {
+    return this.serial(root, async () => {
       if (tracked.length) await this.exec(root, ['restore', '--worktree', '--', ...tracked]);
       for (const path of untracked) await rm(join(root, path), { force: true });
     });
   }
 
   applyLines(root: string, request: LineActionRequest): Promise<void> {
-    return this.serial(() => this.applyLinesNow(root, request));
+    return this.serial(root, () => this.applyLinesNow(root, request));
   }
 
   /** Commits the index with hooks and signing as configured; returns the new HEAD. */
   commit(root: string, message: string, amend: boolean): Promise<string> {
-    return this.serial(async () => {
+    return this.serial(root, async () => {
       try {
         await this.git.exec(['commit', '--file=-', ...(amend ? ['--amend'] : [])], { cwd: root, input: message });
       } catch (error) {
@@ -141,9 +142,13 @@ export class StagingService {
     await this.git.exec(args, { cwd: root });
   }
 
-  private serial<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(task, task);
-    this.queue = run.catch(() => {});
+  private serial<T>(root: string, task: () => Promise<T>): Promise<T> {
+    const run = (this.queues.get(root) ?? Promise.resolve()).then(task, task);
+    const settled = run.catch(() => {});
+    this.queues.set(root, settled);
+    void settled.then(() => {
+      if (this.queues.get(root) === settled) this.queues.delete(root);
+    });
     return run;
   }
 }

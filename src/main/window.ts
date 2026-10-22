@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { BrowserWindow, shell } from 'electron';
+import { enableDevToolsShortcut } from './menu';
 import { APP_ENTRY_URL, devServerUrl, isAppUrl } from './origin';
 
 export function createMainWindow(): BrowserWindow {
@@ -21,6 +22,7 @@ export function createMainWindow(): BrowserWindow {
   });
 
   window.once('ready-to-show', () => window.show());
+  enableDevToolsShortcut(window);
 
   // External links open in the user's browser; the app never spawns extra windows.
   window.webContents.setWindowOpenHandler(({ url }) => {

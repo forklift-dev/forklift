@@ -22,14 +22,15 @@ const STATUS_CLASS: Record<FileChangeStatus, string> = {
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 interface CommitDetailsPanelProps {
+  repo: string;
   sha: string;
   selectedPath: string | null;
   onOpenFile(file: CommitFile): void;
   onClose(): void;
 }
 
-export function CommitDetailsPanel({ sha, selectedPath, onOpenFile, onClose }: CommitDetailsPanelProps) {
-  const { data, error } = useCommand('commit:details', [sha]);
+export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose }: CommitDetailsPanelProps) {
+  const { data, error } = useCommand('commit:details', [repo, sha]);
 
   if (error) return <div className="changes commit-details diff-message error">{error}</div>;
   if (!data) return <div className="changes commit-details empty-note">Loading…</div>;

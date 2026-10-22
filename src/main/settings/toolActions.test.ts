@@ -44,27 +44,26 @@ async function setup() {
 describe.skipIf(process.platform === 'win32')('ToolActions', () => {
   it('reads and writes the commit identity per scope; empty removes it', async () => {
     const { actions, config } = await setup();
-    await actions.setIdentity('global', null, { name: 'Ada Lovelace', email: 'ada@example.com' });
-    await actions.setIdentity('repository', repo, { name: 'Ada (work)', email: '' });
-    expect(await actions.identity('global', null)).toEqual({ name: 'Ada Lovelace', email: 'ada@example.com' });
-    expect(await actions.identity('repository', repo)).toEqual({ name: 'Ada (work)', email: '' });
+    await actions.setIdentity(null, { name: 'Ada Lovelace', email: 'ada@example.com' });
+    await actions.setIdentity(repo, { name: 'Ada (work)', email: '' });
+    expect(await actions.identity(null)).toEqual({ name: 'Ada Lovelace', email: 'ada@example.com' });
+    expect(await actions.identity(repo)).toEqual({ name: 'Ada (work)', email: '' });
     expect(config('--global', 'user.name')).toBe('Ada Lovelace');
-    await actions.setIdentity('repository', repo, { name: '', email: '' });
-    expect(await actions.identity('repository', repo)).toEqual({ name: '', email: '' });
-    await expect(actions.setIdentity('global', null, { name: 'a\nb', email: '' })).rejects.toThrow('single line');
-    await expect(actions.setIdentity('global', null, { name: 'a', email: '<a@b>' })).rejects.toThrow('< or >');
-    await expect(actions.identity('repository', null)).rejects.toThrow('No repository is open');
+    await actions.setIdentity(repo, { name: '', email: '' });
+    expect(await actions.identity(repo)).toEqual({ name: '', email: '' });
+    await expect(actions.setIdentity(null, { name: 'a\nb', email: '' })).rejects.toThrow('single line');
+    await expect(actions.setIdentity(null, { name: 'a', email: '<a@b>' })).rejects.toThrow('< or >');
   });
 
   it('writes the chosen tool to git config so git uses it too', async () => {
     const { settings, actions, config } = await setup();
-    await expect(actions.writeGitConfig('diff', 'global', null)).rejects.toThrow('already comes from git config');
+    await expect(actions.writeGitConfig('diff', null)).rejects.toThrow('already comes from git config');
     await settings.update({ values: { 'tools.diff': { mode: 'tool', name: 'meld' } } });
-    await actions.writeGitConfig('diff', 'global', null);
+    await actions.writeGitConfig('diff', null);
     expect(config('--global', 'diff.tool')).toBe('meld');
 
     await settings.update({ repo, values: { 'tools.merge': { mode: 'custom', command: 'cp', args: ['$REMOTE', '$MERGED'], trustExitCode: true } } });
-    await actions.writeGitConfig('merge', 'repository', repo);
+    await actions.writeGitConfig('merge', repo);
     expect(config('--local', 'merge.tool')).toBe('forklift-custom');
     expect(config('--local', 'mergetool.forklift-custom.cmd')).toBe('"cp" "$REMOTE" "$MERGED"');
     expect(config('--local', 'mergetool.forklift-custom.trustExitCode')).toBe('true');

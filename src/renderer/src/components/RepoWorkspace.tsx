@@ -20,6 +20,7 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 /** Center: commit list or an open diff. Side: the selected commit's details, or working changes and the commit form. */
 export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps) {
+  const repo = data.root;
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const { confirm, dialog } = useConfirm();
@@ -38,14 +39,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       confirmLabel: 'Discard',
       danger: true,
     });
-    if (ok) await run(() => invoke('index:discard', paths));
+    if (ok) await run(() => invoke('index:discard', repo, paths));
   };
 
   const editing: DiffEditing | undefined = worktreeDiff
     ? {
         mode: worktreeDiff.staged ? 'staged' : 'unstaged',
         apply: async (request) => {
-          await run(() => invoke('index:applyLines', request));
+          await run(() => invoke('index:applyLines', repo, request));
         },
         confirmDiscard,
       }
@@ -58,6 +59,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       {diffTarget ? (
         <DiffView
           key={JSON.stringify(diffTarget)}
+          repo={repo}
           target={diffTarget}
           title={diffTarget.oldPath ? `${diffTarget.oldPath} → ${diffTarget.path}` : diffTarget.path}
           subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.staged ? 'Staged' : 'Unstaged'}
@@ -68,12 +70,12 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           actions={
             worktreeDiff && (
               <>
-                <button type="button" onClick={() => void run(() => invoke('file:openInEditor', worktreeDiff.path))}>
+                <button type="button" onClick={() => void run(() => invoke('file:openInEditor', repo, worktreeDiff.path))}>
                   Edit
                 </button>
                 <button
                   type="button"
-                  onClick={() => void runInBackground(() => invoke('file:externalDiff', worktreeDiff.path, worktreeDiff.staged))}
+                  onClick={() => void runInBackground(() => invoke('file:externalDiff', repo, worktreeDiff.path, worktreeDiff.staged))}
                 >
                   External
                 </button>
@@ -92,6 +94,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         {selectedCommit ? (
           <CommitDetailsPanel
             key={selectedCommit}
+            repo={repo}
             sha={selectedCommit}
             selectedPath={diffTarget?.kind === 'commit' ? diffTarget.path : null}
             onOpenFile={(file) =>
@@ -112,17 +115,18 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
                 const oldPath = staged || !change.staged ? change.origPath : undefined;
                 setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
               }}
-              onStage={(paths) => void run(() => invoke('index:stage', paths))}
-              onUnstage={(paths) => void run(() => invoke('index:unstage', paths))}
+              onStage={(paths) => void run(() => invoke('index:stage', repo, paths))}
+              onUnstage={(paths) => void run(() => invoke('index:unstage', repo, paths))}
               onDiscard={(paths) => void discardFiles(paths)}
-              onOpenInEditor={(path) => void run(() => invoke('file:openInEditor', path))}
-              onExternalDiff={(path, staged) => void runInBackground(() => invoke('file:externalDiff', path, staged))}
-              onExternalMerge={(path) => void runInBackground(() => invoke('file:externalMerge', path))}
+              onOpenInEditor={(path) => void run(() => invoke('file:openInEditor', repo, path))}
+              onExternalDiff={(path, staged) => void runInBackground(() => invoke('file:externalDiff', repo, path, staged))}
+              onExternalMerge={(path) => void runInBackground(() => invoke('file:externalMerge', repo, path))}
             />
             <CommitPanel
+              repo={repo}
               stagedCount={stagedCount}
               headSha={data.branch.oid}
-              onCommit={(message, amend) => run(() => invoke('commit:create', message, amend))}
+              onCommit={(message, amend) => run(() => invoke('commit:create', repo, message, amend))}
             />
           </>
         )}

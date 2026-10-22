@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import type { ConfigScope } from '../../../../shared/ipc';
 import type { GitIdentity } from '../../../../shared/settings';
 import { invoke } from '../../api';
 import { useCommand } from '../../useCommand';
 import { errorText } from './SettingRow';
 
-/** user.name / user.email from git config: global, or the open repository's own. */
-export function GitIdentityEditor({ scope }: { scope: ConfigScope }) {
-  const { data, error } = useCommand('git:identity', [scope]);
+/** user.name / user.email from git config: global (`repo` null), or the repository's own. */
+export function GitIdentityEditor({ repo }: { repo: string | null }) {
+  const { data, error } = useCommand('git:identity', [repo]);
+  const scope = repo ? 'repository' : 'global';
   return (
     <div className="setting-row" data-setting="git.identity">
       <div className="setting-text">
@@ -20,13 +20,13 @@ export function GitIdentityEditor({ scope }: { scope: ConfigScope }) {
       </div>
       <div className="setting-control">
         {error && <p className="setting-error">{error}</p>}
-        {data && <IdentityForm scope={scope} initial={data} />}
+        {data && <IdentityForm repo={repo} initial={data} />}
       </div>
     </div>
   );
 }
 
-function IdentityForm({ scope, initial }: { scope: ConfigScope; initial: GitIdentity }) {
+function IdentityForm({ repo, initial }: { repo: string | null; initial: GitIdentity }) {
   const [saved, setSaved] = useState(initial);
   const [name, setName] = useState(initial.name);
   const [email, setEmail] = useState(initial.email);
@@ -35,7 +35,7 @@ function IdentityForm({ scope, initial }: { scope: ConfigScope; initial: GitIden
 
   const save = async () => {
     try {
-      await invoke('git:setIdentity', scope, { name, email });
+      await invoke('git:setIdentity', repo, { name, email });
       const trimmed = { name: name.trim(), email: email.trim() };
       setSaved(trimmed);
       setName(trimmed.name);
@@ -54,7 +54,7 @@ function IdentityForm({ scope, initial }: { scope: ConfigScope; initial: GitIden
         void save();
       }}
     >
-      <input id={`identity-${scope}-name`} aria-label="Name" placeholder="Name" value={name} maxLength={256} onChange={(e) => setName(e.target.value)} />
+      <input id={`identity-${repo ? 'repository' : 'global'}-name`} aria-label="Name" placeholder="Name" value={name} maxLength={256} onChange={(e) => setName(e.target.value)} />
       <input aria-label="Email" placeholder="Email" type="email" value={email} maxLength={256} onChange={(e) => setEmail(e.target.value)} />
       <button type="submit" disabled={!changed}>
         Save

@@ -36,12 +36,12 @@ export default async function ({ check }) {
   const editor = await recorded(join(work, 'editor.out'));
   check('Edit on changed file → code --goto file:1', JSON.stringify(editor) === JSON.stringify([root, '--goto', `${join(root, 'src', 'a b.ts')}:1`]), JSON.stringify(editor));
 
-  const traversal = await page.invoke('file:openInEditor', '../bin/code');
+  const traversal = await page.invoke('file:openInEditor', root, '../bin/code');
   check('path outside repo rejected', traversal?.ok === false && /outside the repository/.test(traversal.error?.message), JSON.stringify(traversal));
-  const badLine = await page.invoke('file:openInEditor', 'src/a b.ts', -3);
+  const badLine = await page.invoke('file:openInEditor', root, 'src/a b.ts', -3);
   check('invalid line rejected', /line must be a positive integer/.test(badLine?.error?.message ?? ''), JSON.stringify(badLine));
 
-  await page.invoke('repo:close');
-  const noRepo = await page.invoke('repo:openTerminal');
-  check('terminal without open repo rejected', /No repository is open/.test(noRepo?.error?.message ?? ''), JSON.stringify(noRepo));
+  await page.invoke('repo:close', root);
+  const noRepo = await page.invoke('repo:openTerminal', root);
+  check('terminal for a closed repository rejected', /not open/.test(noRepo?.error?.message ?? ''), JSON.stringify(noRepo));
 }
