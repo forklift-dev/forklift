@@ -1,0 +1,51 @@
+appId: dev.forklift.app
+productName: Forklift
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+  # nodegit's package carries libgit2/OpenSSL sources and build intermediates (~500 MB);
+  # at runtime it needs only lib/ and build/Release/nodegit.node.
+  - '!node_modules/@axosoft/nodegit/{vendor,bin,src,include,lifecycleScripts,GitKraken}/**'
+  - '!node_modules/@axosoft/nodegit/build/{vendor,*.gypi,*.mk,Makefile}'
+  - '!node_modules/@axosoft/nodegit/build/Release/{obj.target,.deps}/**'
+  - '!node_modules/@axosoft/nodegit/build/Release/*.a'
+  - '!node_modules/{nsfw,find-git-repositories}/build/Release/{obj.target,.deps}/**'
+  # Copies left by @electron/rebuild's prebuild cache; the addons load from build/Release.
+  - '!node_modules/{nsfw,find-git-repositories}/bin/**'
+
+asar: true
+asarUnpack:
+  - '**/*.node'
+
+# Native modules are rebuilt by scripts/rebuild-native.mjs (postinstall), which also
+# applies nodegit's static OpenSSL setting. Build each OS/arch on a matching runner.
+npmRebuild: false
+
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
+
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+
+win:
+  target: nsis
+
+linux:
+  # deb also needs `homepage` and a maintainer email in package.json (owner's decision, see T-001).
+  target: AppImage
+  category: Development
+  syncDesktopName: true

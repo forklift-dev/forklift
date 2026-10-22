@@ -1,0 +1,6 @@
+node_modules/
+out/
+dist/
+
+# Reference build of GitKraken used for architecture study, not part of the project
+gitkraken/

@@ -1,0 +1,54 @@
+{
+  "name": "forklift",
+  "productName": "Forklift",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop Git client",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "oxlint src",
+    "test": "node scripts/test.mjs",
+    "postinstall": "node scripts/rebuild-native.mjs",
+    "rebuild:native": "node scripts/rebuild-native.mjs --force",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@axosoft/nodegit": "0.28.0-alpha.38",
+    "@reduxjs/toolkit": "^2.13.0",
+    "cross-spawn": "^7.0.6",
+    "find-git-repositories": "0.2.2",
+    "nsfw": "2.3.1"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^24.19.2",
+    "@types/nodegit": "^0.28.11",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "oxlint": "^1.89.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@axosoft/nodegit": {
+      "nan": "2.30.0"
+    }
+  },
+  "allowScripts": {
+    "@axosoft/nodegit@0.28.0-alpha.38": true,
+    "find-git-repositories@0.2.2": true,
+    "nsfw@2.3.1": true
+  },
+  "desktopName": "forklift.desktop"
+}
