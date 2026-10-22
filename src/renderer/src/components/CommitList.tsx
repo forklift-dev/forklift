@@ -2,7 +2,13 @@ import type { Commit } from '../../../shared/state';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-export function CommitList({ commits }: { commits: Commit[] }) {
+interface CommitListProps {
+  commits: Commit[];
+  selectedHash: string | null;
+  onSelect(hash: string): void;
+}
+
+export function CommitList({ commits, selectedHash, onSelect }: CommitListProps) {
   if (commits.length === 0) {
     return <section className="commits empty-note">No commits yet</section>;
   }
@@ -19,7 +25,11 @@ export function CommitList({ commits }: { commits: Commit[] }) {
         </thead>
         <tbody>
           {commits.map((commit) => (
-            <tr key={commit.hash}>
+            <tr
+              key={commit.hash}
+              className={commit.hash === selectedHash ? 'selected' : undefined}
+              onClick={() => onSelect(commit.hash)}
+            >
               <td className="subject">
                 {commit.refs.map((ref) => (
                   <span key={ref} className={ref.startsWith('tag: ') ? 'ref tag' : 'ref'}>

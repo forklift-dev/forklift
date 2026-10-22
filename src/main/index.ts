@@ -34,16 +34,14 @@ async function start() {
   // The UI needs no camera, notifications, geolocation, etc.
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
 
-  const store = createAppStore(
-    { version: app.getVersion(), platform: process.platform },
-    { git: createGitService() },
-  );
+  const git = createGitService();
+  const store = createAppStore({ version: app.getVersion(), platform: process.platform }, { git });
   const replication = startReplication(store);
   const runner = new ProcessRunner();
   const gitCli = new GitCli(runner);
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);
-  registerCommands(createCommandHandlers({ store, tools, diffTools }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools }), replication);
 
   app.on('will-quit', () => runner.dispose());
   if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {

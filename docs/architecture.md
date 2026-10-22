@@ -7,7 +7,7 @@
 | Слой | Выбор |
 |---|---|
 | Оболочка | Electron 45 |
-| UI | React 19, CSS-переменные (без UI-фреймворка) |
+| UI | React 19, CSS-переменные (без UI-фреймворка), Monaco 0.57 (diff) |
 | Язык | TypeScript 7 (strict) |
 | Сборка | Vite 8 + electron-vite 6, упаковка electron-builder 26 |
 | Состояние | Redux Toolkit 2 в main-процессе |
@@ -22,7 +22,7 @@
 ```
 main process ─ src/main
   store/          Redux Toolkit: единственный источник правды
-  git/service.ts  чтение репозитория через nodegit
+  git/service.ts  чтение репозитория через nodegit (+ git/diff.ts: детали коммита, версии файлов)
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
   external/       внешний редактор, терминал, diff/merge tools (выбор по ОС/рабочему столу/git config)
   replication.ts  копия состояния в окна через MessagePort

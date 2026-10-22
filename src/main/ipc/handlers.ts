@@ -1,6 +1,8 @@
 import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
+import type { DiffTarget } from '../../shared/diff';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
+import type { GitService } from '../git/service';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
 import type { AppStore } from '../store';
 import { loadRepo, repoClosed } from '../store/repoSlice';
@@ -8,6 +10,7 @@ import type { CommandHandlers } from './registry';
 
 export interface HandlerDeps {
   store: AppStore;
+  git: GitService;
   tools: ExternalTools;
   diffTools: DiffTools;
 }
@@ -17,14 +20,45 @@ function assertString(value: unknown, name: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${name} must be a non-empty string`);
 }
 
+function assertSha(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(value)) throw new TypeError('sha must be a full commit hash');
+}
+
+function parseDiffTarget(value: unknown): DiffTarget {
+  if (typeof value !== 'object' || value === null) throw new TypeError('target must be an object');
+  const raw = value as Record<string, unknown>;
+  assertString(raw['path'], 'target.path');
+  const path = normalizeRepoRelative(raw['path']);
+  const oldPath = raw['oldPath'] === undefined ? undefined : normalizeRepoRelative(String(raw['oldPath']));
+  const paths = { path, ...(oldPath !== undefined && { oldPath }) };
+  if (raw['kind'] === 'commit') {
+    assertSha(raw['sha']);
+    return { kind: 'commit', sha: raw['sha'], ...paths };
+  }
+  if (raw['kind'] === 'worktree') {
+    if (typeof raw['staged'] !== 'boolean') throw new TypeError('target.staged must be a boolean');
+    return { kind: 'worktree', staged: raw['staged'], ...paths };
+  }
+  throw new TypeError('target.kind must be "commit" or "worktree"');
+}
+
 function openRepoRoot(store: AppStore): string {
   const { path } = store.getState().repo;
   if (!path) throw new Error('No repository is open');
   return path;
 }
 
-export function createCommandHandlers({ store, tools, diffTools }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools }: HandlerDeps): CommandHandlers {
   return {
+    async 'commit:details'(_ctx, sha) {
+      assertSha(sha);
+      return git.commitDetails(openRepoRoot(store), sha);
+    },
+
+    async 'diff:file'(_ctx, target) {
+      return git.fileDiff(openRepoRoot(store), parseDiffTarget(target));
+    },
+
     async 'repo:pick'({ sender }) {
       const options: OpenDialogOptions = { title: 'Open repository', properties: ['openDirectory'] };
       const window = BrowserWindow.fromWebContents(sender);

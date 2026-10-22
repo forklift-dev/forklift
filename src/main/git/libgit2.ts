@@ -29,6 +29,19 @@ export const STATUS = {
   CONFLICTED: 1 << 15,
 } as const;
 
+/** git_delta_t */
+export const DELTA = {
+  ADDED: 1,
+  DELETED: 2,
+  MODIFIED: 3,
+  RENAMED: 4,
+  COPIED: 5,
+  TYPECHANGE: 8,
+} as const;
+
+export const DIFF_FLAG_BINARY = 1 << 0;
+export const DIFF_FIND_RENAMES = 1 << 0;
+
 export const INDEX_MASK =
   STATUS.INDEX_NEW | STATUS.INDEX_MODIFIED | STATUS.INDEX_DELETED | STATUS.INDEX_RENAMED | STATUS.INDEX_TYPECHANGE;
 

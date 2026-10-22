@@ -1,12 +1,16 @@
 import { basename } from 'node:path';
 import { Branch, Graph, Reference, Repository, type StatusFile } from '@axosoft/nodegit';
+import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
 import type { BranchInfo, ChangeKind, Commit, FileChange, RepoData } from '../../shared/state';
+import { readCommitDetails, readFileDiff } from './diff';
 import { INDEX_MASK, OBJECT_TYPE_COMMIT, SORT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
 export interface GitService {
   /** Resolves any path inside a working tree to the repository root; throws when it is not a repository. */
   resolveRoot(path: string): Promise<string>;
   read(root: string): Promise<RepoData>;
+  commitDetails(root: string, sha: string): Promise<CommitDetails>;
+  fileDiff(root: string, target: DiffTarget): Promise<FileDiff>;
 }
 
 const MAX_COMMITS = 1000;
@@ -40,6 +44,14 @@ export function createGitService(): GitService {
         changes,
         loadedAt: Date.now(),
       };
+    },
+
+    async commitDetails(root, sha) {
+      return readCommitDetails(await Repository.open(root), sha);
+    },
+
+    async fileDiff(root, target) {
+      return readFileDiff(await Repository.open(root), root, target);
     },
   };
 }

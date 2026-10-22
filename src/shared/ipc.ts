@@ -1,6 +1,11 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
+import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 
 export interface Commands {
+  /** Metadata and changed files of a commit in the open repository. */
+  'commit:details': { args: [sha: string]; result: CommitDetails };
+  /** Both versions of one file for the built-in diff view. */
+  'diff:file': { args: [target: DiffTarget]; result: FileDiff };
   /** Shows a folder picker; resolves to the chosen path or null when cancelled. */
   'repo:pick': { args: []; result: string | null };
   'repo:open': { args: [path: string]; result: void };
@@ -26,6 +31,8 @@ export type IpcResult<T> =
 
 // A Record keyed by CommandName makes the compiler reject missing or unknown channels.
 const commandChannelSet = {
+  'commit:details': true,
+  'diff:file': true,
   'repo:pick': true,
   'repo:open': true,
   'repo:refresh': true,

@@ -33,6 +33,7 @@
     "electron": "^45.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",
+    "monaco-editor": "^0.57.0",
     "oxlint": "^1.89.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -48,12 +48,18 @@
 | [T-013](tasks/stage-1-processes/T-013-editor-terminal.md) | Открытие во внешнем редакторе и терминале | review |
 | [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | review |
 
-### Этап 2 — Базовые git-операции (черновик, ждёт списка функций)
+### Этап 2 — Основная работа внутри приложения
+
+Решения владельца (2026-10-22): основные сценарии — внутри приложения, внешние программы (этап 1) — для
+совместимости и настройки; встроенный терминал нужен; pull — merge и rebase; при переключении ветки — автоматический stash.
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-020](tasks/stage-2-git-core/T-020-file-watching.md) | Слежение за файлами и автообновление | draft |
-| [T-021](tasks/stage-2-git-core/T-021-stage-commit.md) | Stage/unstage и коммит | draft |
-| [T-022](tasks/stage-2-git-core/T-022-branches.md) | Ветки: создание, переключение, удаление | draft |
-| [T-023](tasks/stage-2-git-core/T-023-remote-sync.md) | Fetch/pull/push и учётные данные | draft |
-| [T-024](tasks/stage-2-git-core/T-024-commit-graph.md) | Граф коммитов и виртуализация списка | draft |
+| [T-020](tasks/stage-2-git-core/T-020-built-in-diff.md) | Детали коммита и встроенный diff | review |
+| [T-021](tasks/stage-2-git-core/T-021-stage-commit.md) | Индексация (файлы, фрагменты, строки) и коммит | todo |
+| [T-022](tasks/stage-2-git-core/T-022-commit-graph.md) | Граф коммитов и виртуализация списка | todo |
+| [T-023](tasks/stage-2-git-core/T-023-branches.md) | Ветки и теги, переключение с автоматическим stash | todo |
+| [T-024](tasks/stage-2-git-core/T-024-remote-sync.md) | Fetch, pull (merge и rebase), push; учётные данные в UI | todo |
+| [T-025](tasks/stage-2-git-core/T-025-conflict-editor.md) | Встроенное разрешение конфликтов | todo |
+| [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | todo |
+| [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | todo |
