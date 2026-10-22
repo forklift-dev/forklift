@@ -4,7 +4,9 @@ import { detectGitVersion } from './git/cliVersion';
 import { createGitService } from './git/service';
 import { createCommandHandlers } from './ipc/handlers';
 import { registerCommands } from './ipc/registry';
+import { sanitizeEnv } from './process/env';
 import { ProcessRunner } from './process/runner';
+import { resolveShellEnv, shouldResolveShellEnv } from './process/shellEnv';
 import { handleAppProtocol, registerAppScheme } from './protocol';
 import { startReplication } from './replication';
 import { createAppStore, gitVersionDetected } from './store';
@@ -39,6 +41,14 @@ async function start() {
 
   const runner = new ProcessRunner();
   app.on('will-quit', () => runner.dispose());
+  if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {
+    // Commands issued meanwhile wait for this, so they already see the user's PATH.
+    const shellEnv = resolveShellEnv((command, args, options) => runner.run(command, args, { ...options, replaceEnv: true }), {
+      env: sanitizeEnv(process.env),
+      log: (message) => console.log(`[process] ${message}`),
+    });
+    runner.setBaseEnv(shellEnv.then((env) => env ?? process.env));
+  }
   void detectGitVersion(runner).then((version) => store.dispatch(gitVersionDetected(version)));
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.

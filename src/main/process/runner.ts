@@ -9,6 +9,8 @@ export interface RunOptions {
   cwd?: string;
   /** Added on top of the base environment (see ProcessRunner.setBaseEnv). */
   env?: Env;
+  /** Use `env` as the complete environment instead of extending the base one. */
+  replaceEnv?: boolean;
   input?: string | Uint8Array;
   timeoutMs?: number;
   maxOutputBytes?: number;
@@ -62,14 +64,18 @@ export class ProcessRunner {
   private host: UtilityProcess | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, PendingCall>();
-  private baseEnv: Env = sanitizeEnv(process.env);
+  private baseEnv: Promise<Env> = Promise.resolve(sanitizeEnv(process.env));
 
-  /** Replaces the environment every process starts from (e.g. the login-shell env, T-011). */
-  setBaseEnv(env: NodeJS.ProcessEnv | Env): void {
-    this.baseEnv = sanitizeEnv(env);
+  /**
+   * Replaces the environment every process starts from. A promise (e.g. the login-shell env
+   * being resolved) holds back subsequent calls until it settles; rejection falls back to process.env.
+   */
+  setBaseEnv(env: NodeJS.ProcessEnv | Env | Promise<NodeJS.ProcessEnv | Env>): void {
+    this.baseEnv = Promise.resolve(env).then(sanitizeEnv, () => sanitizeEnv(process.env));
   }
 
   async run(command: string, args: readonly string[], options: RunOptions = {}): Promise<TextRunResult> {
+    const env = options.replaceEnv ? sanitizeEnv(options.env ?? {}) : this.extendEnv(await this.baseEnv, options.env);
     const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
     const streaming = Boolean(options.onStdout || options.onStderr);
     const event = await this.call(
@@ -79,7 +85,7 @@ export class ProcessRunner {
         command,
         args: [...args],
         cwd: options.cwd,
-        env: this.envFor(options.env),
+        env,
         input: typeof options.input === 'string' ? new TextEncoder().encode(options.input) : options.input,
         timeoutMs: options.timeoutMs,
         maxOutputBytes: options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
@@ -100,6 +106,7 @@ export class ProcessRunner {
   }
 
   async launch(command: string, args: readonly string[], options: LaunchOptions = {}): Promise<LaunchResult> {
+    const env = this.extendEnv(await this.baseEnv, options.env);
     const event = await this.call(
       (id) => ({
         type: 'launch',
@@ -107,7 +114,7 @@ export class ProcessRunner {
         command,
         args: [...args],
         cwd: options.cwd,
-        env: this.envFor(options.env),
+        env,
         wait: options.wait ?? false,
         showConsole: options.showConsole,
       }),
@@ -132,8 +139,8 @@ export class ProcessRunner {
     }
   }
 
-  private envFor(extra: Env | undefined): Env {
-    return extra ? { ...this.baseEnv, ...extra } : this.baseEnv;
+  private extendEnv(base: Env, extra: Env | undefined): Env {
+    return extra ? { ...base, ...extra } : base;
   }
 
   private call(
