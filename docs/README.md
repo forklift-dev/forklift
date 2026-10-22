@@ -83,7 +83,7 @@
 | ID | Задача | Статус |
 |---|---|---|
 | [T-040](tasks/stage-4-repositories/T-040-clone-init.md) | Clone и init | todo |
-| [T-041](tasks/stage-4-repositories/T-041-tabs-repos.md) | Вкладки, недавние и поиск репозиториев | todo |
+| [T-041](tasks/stage-4-repositories/T-041-tabs-repos.md) | Вкладки репозиториев, восстановление сессии, недавние и поиск | todo |
 | [T-042](tasks/stage-4-repositories/T-042-remotes.md) | Удалённые репозитории и auto-fetch | todo |
 | [T-043](tasks/stage-4-repositories/T-043-submodules.md) | Подмодули | todo |
 | [T-044](tasks/stage-4-repositories/T-044-worktrees.md) | Worktrees | todo |
@@ -95,7 +95,7 @@
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-050](tasks/stage-5-settings/T-050-settings.md) | Хранилище настроек и окно Preferences | todo |
+| [T-050](tasks/stage-5-settings/T-050-settings.md) | Настройки: хранилище, окно Preferences, внешние инструменты | todo |
 | [T-051](tasks/stage-5-settings/T-051-themes.md) | Темы | todo |
 | [T-052](tasks/stage-5-settings/T-052-keybindings-palette.md) | Сочетания клавиш, палитра команд, нечёткий поиск | todo |
 | [T-053](tasks/stage-5-settings/T-053-profiles-keys.md) | Профили, SSH- и GPG-ключи | todo |
@@ -139,11 +139,13 @@ Workspaces, Cloud Patches, Launchpad, AI-функции, Team, онбордин�
 ### Порядок
 
 1. T-005 сквозные проверки в репозитории
-2. T-022 граф коммитов → T-026 автообновление → T-023 ветки и теги (автоматический stash)
-3. T-035 stash → T-025 разрешение конфликтов → T-032 cherry-pick/revert/reset → T-033 merge и rebase
-4. T-024 fetch/pull/push + askpass → T-042 remotes и auto-fetch → T-034 интерактивный rebase → T-036 undo/redo
-5. T-030 поиск → T-031 история файла и blame → T-028 Hunk View
-6. T-027 встроенный терминал → T-050 настройки → T-040 clone/init → T-041 вкладки и репозитории
-7. T-051 темы → T-052 клавиши и палитра команд → T-053 профили и ключи → T-054 уведомления и журнал → T-055 аватары
-8. T-043 подмодули → T-044 worktrees → T-045 LFS → T-046 Gitflow → T-047 хуки
-9. T-003 CI (GitHub Actions; workflow пишется, запуск — после выбора владельцем)
+2. **T-050 настройки и выбор внешних инструментов → T-041 вкладки и восстановление сессии** (решение владельца
+   2026-10-23: при запуске открывать прежние репозитории; меняет структуру состояния — делать до остальных функций)
+3. T-022 граф коммитов → T-026 автообновление → T-023 ветки и теги (автоматический stash)
+4. T-035 stash → T-025 разрешение конфликтов → T-032 cherry-pick/revert/reset → T-033 merge и rebase
+5. T-024 fetch/pull/push + askpass → T-042 remotes и auto-fetch → T-034 интерактивный rebase → T-036 undo/redo
+6. T-030 поиск → T-031 история файла и blame → T-028 Hunk View
+7. T-027 встроенный терминал → T-040 clone/init
+8. T-051 темы → T-052 клавиши и палитра команд → T-053 профили и ключи → T-054 уведомления и журнал → T-055 аватары
+9. T-043 подмодули → T-044 worktrees → T-045 LFS → T-046 Gitflow → T-047 хуки
+10. T-003 CI (GitHub Actions; workflow пишется, запуск — после выбора владельцем)
