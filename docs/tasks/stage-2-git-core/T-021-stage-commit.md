@@ -2,7 +2,7 @@
 id: T-021
 title: Индексация (файлы, фрагменты, строки) и коммит
 stage: 2 — Основная работа внутри приложения
-status: todo
+status: review
 depends_on: [T-020, T-012]
 updated: 2026-10-22
 ---
@@ -42,3 +42,15 @@ Stage/unstage/discard файлов, отдельных фрагментов (hun
 Реализуй docs/tasks/stage-2-git-core/T-021-stage-commit.md. Перед индексацией фрагментов опиши в задаче,
 как обрабатываются CRLF, отсутствие перевода строки в конце и фильтры .gitattributes.
 ```
+
+## Итог (2026-10-22)
+
+Реализовано: stage/unstage/discard файлов, hunk'ов (иконка в «желобе» Monaco, контекстное меню) и
+выделенных строк (слева — удаления, справа — добавления); подтверждение Discard; коммит с хуками, Amend.
+Подход VS Code: новый текст строится из изменений Monaco (`src/main/git/partial.ts`) и пишется
+`git hash-object --path` + `git update-index --cacheinfo` (фильтры autocrlf/eol как у `git add`).
+Отказ частичных операций: LFS/filter, бинарные, не-UTF-8, symlink/submodule, удалённые файлы,
+устаревший вид (сверка SHA-256), включённый «Ignore whitespace». BOM сохраняется; Discard в CRLF-checkout — CRLF.
+Тесты: partial (9, вкл. 500 случайных случаев), staging (15) — всего 112; e2e UI 17/17.
+Не сделано: отдельный Hunk View (используется «Collapse unchanged» Monaco), ручная проверка владельцем,
+обновление документации нюансов подробнее.

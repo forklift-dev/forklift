@@ -17,7 +17,8 @@ function GitCliStatus({ info }: { info: GitCliInfo }) {
   return <small className="git-version">git {info.version}</small>;
 }
 
-export type RunAction = (action: () => Promise<unknown>) => void;
+/** Runs a command and reports failures in the banner; resolves to whether it succeeded. */
+export type RunAction = (action: () => Promise<unknown>) => Promise<boolean>;
 
 export function App() {
   const repo = useAppState((s) => s.repo);
@@ -29,19 +30,29 @@ export function App() {
 
   // Short commands: the UI shows a busy state until they finish.
   const run: RunAction = (action) =>
-    startTransition(async () => {
-      setActionError(null);
-      try {
-        await action();
-      } catch (error) {
-        reportError(error);
-      }
-    });
+    new Promise((resolve) =>
+      startTransition(async () => {
+        setActionError(null);
+        try {
+          await action();
+          resolve(true);
+        } catch (error) {
+          reportError(error);
+          resolve(false);
+        }
+      }),
+    );
 
   // External tool windows can stay open for minutes; they must not put the UI into a busy state.
-  const runInBackground: RunAction = (action) => {
+  const runInBackground: RunAction = async (action) => {
     setActionError(null);
-    action().catch(reportError);
+    try {
+      await action();
+      return true;
+    } catch (error) {
+      reportError(error);
+      return false;
+    }
   };
 
   const openRepo = () =>

@@ -112,6 +112,10 @@ button:disabled {
 }
 
 .error-banner {
+  white-space: pre-wrap;
+  max-height: 30vh;
+  overflow: auto;
+  font-family: inherit;
   padding: 8px 12px;
   background: var(--danger-bg);
   color: var(--danger-fg);
@@ -196,10 +200,18 @@ button:disabled {
   color: var(--fg-muted);
 }
 
-.changes {
-  overflow: auto;
+.side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-panel);
+}
+
+.changes {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   padding: 8px 12px;
 }
 
@@ -226,17 +238,6 @@ button:disabled {
   gap: 4px;
 }
 
-.change-action {
-  flex: none;
-  padding: 0 6px;
-  font-size: 11px;
-  visibility: hidden;
-}
-
-.change-row:hover .change-action,
-.change-action:focus-visible {
-  visibility: visible;
-}
 
 .change-item {
   display: block;
@@ -411,4 +412,147 @@ button:disabled {
 
 .diff-message.error {
   color: var(--danger-fg);
+}
+
+/* Buttons */
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.danger {
+  background: #c93c3c;
+  border-color: #c93c3c;
+  color: #fff;
+}
+
+.danger-text {
+  color: var(--danger-fg);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.icon-button:hover {
+  background: var(--bg);
+}
+
+/* Change list actions */
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.group-actions {
+  display: flex;
+  gap: 2px;
+  text-transform: none;
+}
+
+.row-actions {
+  display: flex;
+  flex: none;
+  visibility: hidden;
+}
+
+.change-row:hover .row-actions,
+.row-actions:focus-within {
+  visibility: visible;
+}
+
+/* Commit form */
+.commit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.commit-panel input,
+.commit-panel textarea {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.commit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.commit-actions label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Diff staging */
+.hunk-glyph {
+  cursor: pointer;
+  color: var(--accent);
+  opacity: 0.75;
+}
+
+.hunk-glyph:hover {
+  opacity: 1;
+}
+
+.diff-hint {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Confirm dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 35%);
+  z-index: 100;
+}
+
+.modal {
+  width: min(420px, 90vw);
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 30%);
+}
+
+.modal h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+
+.modal p {
+  margin: 0 0 16px;
+  color: var(--fg-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

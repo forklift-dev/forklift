@@ -14,9 +14,20 @@ const KIND_LABEL: Record<ChangeKind, string> = {
 export interface FileActions {
   /** Built-in diff: the primary action. */
   onShowDiff(change: FileChange, staged: boolean): void;
+  onStage(paths: string[]): void;
+  onUnstage(paths: string[]): void;
+  onDiscard(paths: string[]): void;
   onOpenInEditor(path: string): void;
   onExternalDiff(path: string, staged: boolean): void;
   onExternalMerge(path: string): void;
+}
+
+function IconButton({ icon, label, onClick, danger }: { icon: string; label: string; onClick(): void; danger?: boolean }) {
+  return (
+    <button type="button" className={`icon-button${danger ? ' danger-text' : ''}`} title={label} aria-label={label} onClick={onClick}>
+      <span className={`codicon codicon-${icon}`} />
+    </button>
+  );
 }
 
 interface ChangeGroupProps extends FileActions {
@@ -26,11 +37,26 @@ interface ChangeGroupProps extends FileActions {
   selected: { path: string; staged: boolean } | null;
 }
 
-function ChangeGroup({ title, staged, changes, selected, onShowDiff, onOpenInEditor, onExternalDiff, onExternalMerge }: ChangeGroupProps) {
+function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGroupProps) {
+  if (changes.length === 0) return null;
+  const paths = changes.map((c) => c.path);
+  const discardable = changes.filter((c) => c.kind !== 'conflicted').map((c) => c.path);
   return (
     <div className="change-group">
-      <h3>
-        {title} <span className="count">{changes.length}</span>
+      <h3 className="group-header">
+        <span>
+          {title} <span className="count">{changes.length}</span>
+        </span>
+        <span className="group-actions">
+          {staged ? (
+            <IconButton icon="remove" label="Unstage all" onClick={() => actions.onUnstage(paths)} />
+          ) : (
+            <>
+              {discardable.length > 0 && <IconButton icon="discard" label="Discard all" danger onClick={() => actions.onDiscard(discardable)} />}
+              <IconButton icon="add" label="Stage all" onClick={() => actions.onStage(paths)} />
+            </>
+          )}
+        </span>
       </h3>
       <ul>
         {changes.map((change) => {
@@ -43,27 +69,27 @@ function ChangeGroup({ title, staged, changes, selected, onShowDiff, onOpenInEdi
                 type="button"
                 className={`change-item${isSelected ? ' selected' : ''}`}
                 title={`${label}\nShow changes`}
-                onClick={() => onShowDiff(change, staged)}
+                onClick={() => actions.onShowDiff(change, staged)}
               >
                 <span className={`kind kind-${change.kind}`}>{KIND_LABEL[change.kind]}</span>
                 {change.path}
               </button>
-              {change.kind !== 'deleted' && (
-                <button type="button" className="change-action" title="Open in editor" onClick={() => onOpenInEditor(change.path)}>
-                  Edit
-                </button>
-              )}
-              {conflicted ? (
-                <button type="button" className="change-action" title="Resolve in external merge tool" onClick={() => onExternalMerge(change.path)}>
-                  Merge
-                </button>
-              ) : (
-                change.kind !== 'untracked' && (
-                  <button type="button" className="change-action" title="Open in external diff tool" onClick={() => onExternalDiff(change.path, staged)}>
-                    Ext
-                  </button>
-                )
-              )}
+              <span className="row-actions">
+                {change.kind !== 'deleted' && <IconButton icon="go-to-file" label="Open in editor" onClick={() => actions.onOpenInEditor(change.path)} />}
+                {conflicted ? (
+                  <IconButton icon="git-merge" label="Resolve in external merge tool" onClick={() => actions.onExternalMerge(change.path)} />
+                ) : (
+                  change.kind !== 'untracked' && (
+                    <IconButton icon="diff" label="Open in external diff tool" onClick={() => actions.onExternalDiff(change.path, staged)} />
+                  )
+                )}
+                {!staged && !conflicted && <IconButton icon="discard" label="Discard changes" danger onClick={() => actions.onDiscard([change.path])} />}
+                {staged ? (
+                  <IconButton icon="remove" label="Unstage" onClick={() => actions.onUnstage([change.path])} />
+                ) : (
+                  <IconButton icon="add" label={conflicted ? 'Mark resolved (stage)' : 'Stage'} onClick={() => actions.onStage([change.path])} />
+                )}
+              </span>
             </li>
           );
         })}
@@ -79,12 +105,12 @@ interface ChangesPanelProps extends FileActions {
 
 export function ChangesPanel({ changes, ...rest }: ChangesPanelProps) {
   if (changes.length === 0) {
-    return <aside className="changes empty-note">Working tree clean</aside>;
+    return <div className="changes empty-note">Working tree clean</div>;
   }
   return (
-    <aside className="changes">
+    <div className="changes">
       <ChangeGroup title="Unstaged" staged={false} changes={changes.filter((c) => c.unstaged)} {...rest} />
       <ChangeGroup title="Staged" staged changes={changes.filter((c) => c.staged)} {...rest} />
-    </aside>
+    </div>
   );
 }

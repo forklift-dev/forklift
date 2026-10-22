@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstat, readFile, readlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Diff, type Blob, type Commit, type Repository, type Tree } from '@axosoft/nodegit';
@@ -75,23 +76,50 @@ export async function readCommitDetails(repo: Repository, sha: string): Promise<
   };
 }
 
-const missing = (path: string): FileVersion => ({ path, exists: false, binary: false, tooLarge: false, size: 0, text: null });
+const missing = (path: string): FileVersion => ({
+  path,
+  exists: false,
+  binary: false,
+  tooLarge: false,
+  size: 0,
+  text: null,
+  lossy: false,
+  hash: null,
+});
+
+const tooLarge = (path: string, size: number): FileVersion => ({ ...missing(path), exists: true, tooLarge: true, size });
+
+// ignoreBOM keeps a byte-order mark in the text, so writing the text back reproduces it.
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+const lenientUtf8 = new TextDecoder('utf-8', { ignoreBOM: true });
+
+function decode(bytes: Buffer): { text: string; lossy: boolean } {
+  try {
+    return { text: strictUtf8.decode(bytes), lossy: false };
+  } catch {
+    // Shown with replacement characters; partial staging refuses such text (it cannot be written back).
+    return { text: lenientUtf8.decode(bytes), lossy: true };
+  }
+}
 
 function fromBytes(path: string, bytes: Buffer, binary: boolean): FileVersion {
+  if (binary) return { ...missing(path), exists: true, binary: true, size: bytes.length };
+  const { text, lossy } = decode(bytes);
   return {
     path,
     exists: true,
-    binary,
+    binary: false,
     tooLarge: false,
     size: bytes.length,
-    // Invalid UTF-8 is shown with replacement characters rather than failing the whole diff.
-    text: binary ? null : new TextDecoder().decode(bytes),
+    text,
+    lossy,
+    hash: createHash('sha256').update(text).digest('hex'),
   };
 }
 
 function fromBlob(path: string, blob: Blob): FileVersion {
   const size = blob.rawsize();
-  if (size > MAX_DIFF_FILE_BYTES) return { path, exists: true, binary: false, tooLarge: true, size, text: null };
+  if (size > MAX_DIFF_FILE_BYTES) return tooLarge(path, size);
   return fromBytes(path, blob.content(), blob.isBinary() !== 0);
 }
 
@@ -115,7 +143,7 @@ async function fromWorkingTree(root: string, path: string): Promise<FileVersion>
   if (!stats) return missing(path);
   // git stores a symlink as its target path, so compare that rather than the file it points to.
   if (stats.isSymbolicLink()) return fromBytes(path, Buffer.from(await readlink(fullPath)), false);
-  if (stats.size > MAX_DIFF_FILE_BYTES) return { path, exists: true, binary: false, tooLarge: true, size: stats.size, text: null };
+  if (stats.size > MAX_DIFF_FILE_BYTES) return tooLarge(path, stats.size);
   const bytes = await readFile(fullPath);
   return fromBytes(path, bytes, bytes.subarray(0, BINARY_SNIFF_BYTES).includes(0));
 }

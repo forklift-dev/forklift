@@ -4,6 +4,7 @@ import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { createGitService } from './git/service';
+import { StagingService } from './git/staging';
 import { createCommandHandlers } from './ipc/handlers';
 import { registerCommands } from './ipc/registry';
 import { sanitizeEnv } from './process/env';
@@ -41,7 +42,8 @@ async function start() {
   const gitCli = new GitCli(runner);
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools }), replication);
+  const staging = new StagingService(gitCli, git);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging }), replication);
 
   app.on('will-quit', () => runner.dispose());
   if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {
@@ -63,7 +65,7 @@ async function start() {
   );
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

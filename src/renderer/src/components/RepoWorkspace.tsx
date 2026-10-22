@@ -6,7 +6,9 @@ import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
 import { CommitList } from './CommitList';
-import { DiffView } from './DiffView';
+import { CommitPanel } from './CommitPanel';
+import { useConfirm } from './ConfirmDialog';
+import { DiffView, type DiffEditing } from './DiffView';
 
 interface RepoWorkspaceProps {
   data: RepoData;
@@ -14,12 +16,42 @@ interface RepoWorkspaceProps {
   runInBackground: RunAction;
 }
 
-/** Center: commit list or an open diff. Side: the selected commit's details or the working changes. */
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** Center: commit list or an open diff. Side: the selected commit's details, or working changes and the commit form. */
 export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps) {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
+  const { confirm, dialog } = useConfirm();
   const closeDiff = useCallback(() => setDiffTarget(null), []);
   const worktreeDiff = diffTarget?.kind === 'worktree' ? diffTarget : null;
+
+  const confirmDiscard = (what: string) =>
+    confirm({ title: `Discard ${what}?`, detail: 'This cannot be undone.', confirmLabel: 'Discard', danger: true });
+
+  const discardFiles = async (paths: string[]) => {
+    const untracked = paths.filter((path) => data.changes.find((c) => c.path === path)?.kind === 'untracked').length;
+    const what = paths.length === 1 ? `changes in ${paths[0]}` : `changes in ${plural(paths.length, 'file')}`;
+    const ok = await confirm({
+      title: `Discard ${what}?`,
+      detail: untracked ? `${plural(untracked, 'untracked file')} will be deleted. This cannot be undone.` : 'This cannot be undone.',
+      confirmLabel: 'Discard',
+      danger: true,
+    });
+    if (ok) await run(() => invoke('index:discard', paths));
+  };
+
+  const editing: DiffEditing | undefined = worktreeDiff
+    ? {
+        mode: worktreeDiff.staged ? 'staged' : 'unstaged',
+        apply: async (request) => {
+          await run(() => invoke('index:applyLines', request));
+        },
+        confirmDiscard,
+      }
+    : undefined;
+
+  const stagedCount = data.changes.filter((c) => c.staged).length;
 
   return (
     <main className="workspace">
@@ -31,16 +63,17 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.staged ? 'Staged' : 'Unstaged'}
           // Working-tree diffs follow refreshes; commit diffs never change.
           reloadKey={diffTarget.kind === 'worktree' ? data.loadedAt : undefined}
+          editing={editing}
           onClose={closeDiff}
           actions={
             worktreeDiff && (
               <>
-                <button type="button" onClick={() => run(() => invoke('file:openInEditor', worktreeDiff.path))}>
+                <button type="button" onClick={() => void run(() => invoke('file:openInEditor', worktreeDiff.path))}>
                   Edit
                 </button>
                 <button
                   type="button"
-                  onClick={() => runInBackground(() => invoke('file:externalDiff', worktreeDiff.path, worktreeDiff.staged))}
+                  onClick={() => void runInBackground(() => invoke('file:externalDiff', worktreeDiff.path, worktreeDiff.staged))}
                 >
                   External
                 </button>
@@ -55,33 +88,46 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           onSelect={(hash) => setSelectedCommit((current) => (current === hash ? null : hash))}
         />
       )}
-      {selectedCommit ? (
-        <CommitDetailsPanel
-          key={selectedCommit}
-          sha={selectedCommit}
-          selectedPath={diffTarget?.kind === 'commit' ? diffTarget.path : null}
-          onOpenFile={(file) =>
-            setDiffTarget({ kind: 'commit', sha: selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
-          }
-          onClose={() => {
-            setSelectedCommit(null);
-            setDiffTarget((target) => (target?.kind === 'commit' ? null : target));
-          }}
-        />
-      ) : (
-        <ChangesPanel
-          changes={data.changes}
-          selected={worktreeDiff && { path: worktreeDiff.path, staged: worktreeDiff.staged }}
-          onShowDiff={(change, staged) => {
-            // A rename already in the index is under its new name there, so the unstaged side needs no old path.
-            const oldPath = staged || !change.staged ? change.origPath : undefined;
-            setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
-          }}
-          onOpenInEditor={(path) => run(() => invoke('file:openInEditor', path))}
-          onExternalDiff={(path, staged) => runInBackground(() => invoke('file:externalDiff', path, staged))}
-          onExternalMerge={(path) => runInBackground(() => invoke('file:externalMerge', path))}
-        />
-      )}
+      <aside className="side">
+        {selectedCommit ? (
+          <CommitDetailsPanel
+            key={selectedCommit}
+            sha={selectedCommit}
+            selectedPath={diffTarget?.kind === 'commit' ? diffTarget.path : null}
+            onOpenFile={(file) =>
+              setDiffTarget({ kind: 'commit', sha: selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
+            }
+            onClose={() => {
+              setSelectedCommit(null);
+              setDiffTarget((target) => (target?.kind === 'commit' ? null : target));
+            }}
+          />
+        ) : (
+          <>
+            <ChangesPanel
+              changes={data.changes}
+              selected={worktreeDiff && { path: worktreeDiff.path, staged: worktreeDiff.staged }}
+              onShowDiff={(change, staged) => {
+                // A rename already in the index is under its new name there, so the unstaged side needs no old path.
+                const oldPath = staged || !change.staged ? change.origPath : undefined;
+                setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
+              }}
+              onStage={(paths) => void run(() => invoke('index:stage', paths))}
+              onUnstage={(paths) => void run(() => invoke('index:unstage', paths))}
+              onDiscard={(paths) => void discardFiles(paths)}
+              onOpenInEditor={(path) => void run(() => invoke('file:openInEditor', path))}
+              onExternalDiff={(path, staged) => void runInBackground(() => invoke('file:externalDiff', path, staged))}
+              onExternalMerge={(path) => void runInBackground(() => invoke('file:externalMerge', path))}
+            />
+            <CommitPanel
+              stagedCount={stagedCount}
+              headSha={data.branch.oid}
+              onCommit={(message, amend) => run(() => invoke('commit:create', message, amend))}
+            />
+          </>
+        )}
+      </aside>
+      {dialog}
     </main>
   );
 }

@@ -47,6 +47,10 @@ export interface FileVersion {
   tooLarge: boolean;
   size: number;
   text: string | null;
+  /** The bytes are not valid UTF-8, so `text` has replacement characters and must not be written back. */
+  lossy: boolean;
+  /** SHA-256 of `text`; lets main check that a view's line changes refer to the current content. */
+  hash: string | null;
 }
 
 export interface FileDiff {

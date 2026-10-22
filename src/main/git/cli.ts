@@ -34,6 +34,8 @@ export class GitCliError extends Error {
     readonly stderr: string,
     /** Process-level error code, e.g. ENOENT when git is not installed. */
     readonly code?: string,
+    /** Hooks and some commands report on stdout. */
+    readonly stdout = '',
   ) {
     super(message);
     this.name = 'GitCliError';
@@ -87,7 +89,7 @@ export class GitCli {
     if (result.timedOut) throw new GitCliError(`${command} timed out`, args, result.code, result.stderr);
     if (result.code === null) throw new GitCliError(`${command} was terminated (${result.signal})`, args, null, result.stderr);
     if (result.code !== 0 && !options.allowedExitCodes?.includes(result.code)) {
-      throw new GitCliError(describeFailure(command, result.code, result.stderr), args, result.code, result.stderr);
+      throw new GitCliError(describeFailure(command, result.code, result.stderr), args, result.code, result.stderr, undefined, result.stdout);
     }
     return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
   }

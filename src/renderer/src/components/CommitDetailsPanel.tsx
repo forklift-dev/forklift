@@ -31,15 +31,15 @@ interface CommitDetailsPanelProps {
 export function CommitDetailsPanel({ sha, selectedPath, onOpenFile, onClose }: CommitDetailsPanelProps) {
   const { data, error } = useCommand('commit:details', [sha]);
 
-  if (error) return <aside className="changes commit-details diff-message error">{error}</aside>;
-  if (!data) return <aside className="changes commit-details empty-note">Loading…</aside>;
+  if (error) return <div className="changes commit-details diff-message error">{error}</div>;
+  if (!data) return <div className="changes commit-details empty-note">Loading…</div>;
 
   const [subject = '', ...rest] = data.message.trimEnd().split('\n');
   const body = rest.join('\n').trim();
   const sameCommitter = data.committer.name === data.author.name && data.committer.email === data.author.email;
 
   return (
-    <aside className="changes commit-details">
+    <div className="changes commit-details">
       <div className="commit-details-header">
         <span className="hash" title={data.hash}>
           {data.hash.slice(0, 10)}
@@ -95,6 +95,6 @@ export function CommitDetailsPanel({ sha, selectedPath, onOpenFile, onClose }: C
           ))}
         </ul>
       </div>
-    </aside>
+    </div>
   );
 }
