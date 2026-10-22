@@ -215,10 +215,24 @@ button:disabled {
 }
 
 .change-group li {
-  padding: 2px 0;
+  overflow: hidden;
+}
+
+.change-item {
+  display: block;
+  width: 100%;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.change-item:hover:not(:disabled) {
+  background: var(--bg);
 }
 
 .kind {

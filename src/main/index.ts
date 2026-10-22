@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, shell } from 'electron';
+import { ExternalTools } from './external/tools';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { createGitService } from './git/service';
 import { createCommandHandlers } from './ipc/handlers';
@@ -37,9 +38,10 @@ async function start() {
     { git: createGitService() },
   );
   const replication = startReplication(store);
-  registerCommands(createCommandHandlers(store), replication);
-
   const runner = new ProcessRunner();
+  const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
+  registerCommands(createCommandHandlers({ store, tools }), replication);
+
   app.on('will-quit', () => runner.dispose());
   if (shouldResolveShellEnv(process.env, process.platform, Boolean(process.stdout.isTTY))) {
     // Commands issued meanwhile wait for this, so they already see the user's PATH.
@@ -61,7 +63,7 @@ async function start() {
   );
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

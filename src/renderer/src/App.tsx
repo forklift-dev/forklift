@@ -51,12 +51,13 @@ export function App() {
         onOpen={openRepo}
         onRefresh={() => run(() => invoke('repo:refresh'))}
         onClose={() => run(() => invoke('repo:close'))}
+        onOpenTerminal={() => run(() => invoke('repo:openTerminal'))}
       />
       {error && <div className="error-banner">{error}</div>}
       {repo.data ? (
         <main className="workspace">
           <CommitList commits={repo.data.commits} />
-          <ChangesPanel changes={repo.data.changes} />
+          <ChangesPanel changes={repo.data.changes} onOpenFile={(path) => run(() => invoke('file:openInEditor', path))} />
         </main>
       ) : (
         <main className="empty">

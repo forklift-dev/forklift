@@ -6,6 +6,10 @@ export interface Commands {
   'repo:open': { args: [path: string]; result: void };
   'repo:refresh': { args: []; result: void };
   'repo:close': { args: []; result: void };
+  /** Opens the open repository's root in the user's terminal. */
+  'repo:openTerminal': { args: []; result: void };
+  /** Opens a file of the open repository (path relative to its root) in the external editor. */
+  'file:openInEditor': { args: [path: string, line?: number]; result: void };
 }
 
 export type CommandName = keyof Commands;
@@ -22,6 +26,8 @@ const commandChannelSet = {
   'repo:open': true,
   'repo:refresh': true,
   'repo:close': true,
+  'repo:openTerminal': true,
+  'file:openInEditor': true,
 } satisfies Record<CommandName, true>;
 
 export const COMMAND_CHANNELS = Object.keys(commandChannelSet) as CommandName[];

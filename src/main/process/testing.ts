@@ -21,6 +21,8 @@ async function settle<T>(result: Promise<T>, signal: AbortSignal | undefined): P
 
 export function directRunner(baseEnv: Env = sanitizeEnv(process.env)): Runner {
   return {
+    environment: async () => baseEnv,
+
     async run(command, args, options = {}) {
       options.signal?.throwIfAborted();
       const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };

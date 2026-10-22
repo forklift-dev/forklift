@@ -2,7 +2,7 @@
 id: T-013
 title: Открытие во внешнем редакторе и терминале
 stage: 1 — Процессы и внешние программы
-status: todo
+status: review
 depends_on: [T-010, T-011]
 updated: 2026-10-22
 ---
@@ -21,15 +21,23 @@ updated: 2026-10-22
 
 ## Этапы
 
-- [ ] `src/main/external/tools.ts`: описание команды `{ command, args }` с плейсхолдерами `{file}`, `{line}`, `{dir}`, подстановка поаргументно
-- [ ] Редактор по умолчанию: `code --goto {file}:{line}`, если `code` найден; иначе `shell.openPath(file)` (приложение ОС по умолчанию)
-- [ ] Терминал по умолчанию:
+- [x] `src/main/external/commands.ts`: `ToolCommand { command, args }` с плейсхолдерами `{file}`, `{line}`, `{dir}`, подстановка поаргументно; `tools.ts` — сервис `ExternalTools`; `which.ts` — поиск в PATH (+PATHEXT)
+- [x] Редактор: первый найденный из `code`, `cursor`, `codium`, `zed`, `subl` (переход на строку); иначе `shell.openPath` (приложение ОС по умолчанию)
+- [x] Терминал по умолчанию:
   - macOS: `open -a Terminal {dir}`
   - Windows: `wt.exe -d {dir}`, если есть Windows Terminal; иначе `cmd.exe` в `{dir}` с новым окном консоли
-  - Linux: `$TERMINAL`, затем `x-terminal-emulator`, затем gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm (у каждого свой флаг рабочей папки)
-- [ ] IPC-команды `file:openInEditor`, `repo:openTerminal` в `src/shared/ipc.ts` + обработчики с проверкой, что путь внутри открытого репозитория
-- [ ] UI: кнопка «Terminal» в тулбаре; открытие файла из панели изменений
-- [ ] Понятная ошибка, если ничего не найдено («Не найден терминал — укажите команду в настройках»)
+  - Linux: `$TERMINAL` → терминал рабочего стола (KDE: konsole; GNOME/Ubuntu: ptyxis, kgx, gnome-terminal; XFCE: xfce4-terminal) →
+    `x-terminal-emulator` (symlink разрешается до настоящего терминала ради флага папки) → остальные известные;
+    рабочая папка передаётся и флагом, и cwd процесса
+- [x] IPC `file:openInEditor(path, line?)`, `repo:openTerminal()`; путь — относительно репозитория, проверка через `realpath` (`src/main/repoPaths.ts`), включая symlink наружу
+- [x] UI: кнопка «Terminal» в тулбаре; клик по файлу в панели изменений открывает его в редакторе (удалённые — неактивны)
+- [x] Понятная ошибка, если терминал не найден (подсказка про `TERMINAL`; настроек пока нет)
+- [x] Тесты: подстановка (в т.ч. «враждебные» имена файлов), выбор терминала по платформам/рабочим столам, PATH/PATHEXT,
+      проверка путей, интеграция с фейковыми `code`, `konsole` (через `x-terminal-emulator`) и `$TERMINAL` — 18
+- [x] Живая проверка через настоящие кнопки UI (CDP): 6/6
+- [ ] Ручная проверка владельцем на KDE: Terminal → Konsole в папке репозитория, клик по файлу → VS Code на строке
+- [ ] Проверка на macOS и Windows (T-003)
+- [ ] Выбор редактора/терминала в настройках (когда появятся настройки)
 
 ## Критерии готовности
 
@@ -40,6 +48,11 @@ updated: 2026-10-22
 
 - Путь из окна — недоверенный: проверять, что он внутри `repo.path` (после `realpath`).
 - `wt.exe` на Windows — это App Execution Alias; `cross-spawn` находит его через PATH.
+- 2026-10-22: у владельца Ubuntu 26.04 + KDE Plasma: `x-terminal-emulator` → konsole, есть ptyxis, xterm и VS Code.
+  На KDE Electron не подменяет `XDG_CURRENT_DESKTOP`; на прочих окружениях восстановление из
+  `ORIGINAL_XDG_CURRENT_DESKTOP` делает `sanitizeEnv` (T-010).
+- 2026-10-22: в Ubuntu 25.10+ терминал GNOME по умолчанию — Ptyxis, раньше — GNOME Console (`kgx`); оба в списке перед gnome-terminal.
+- 2026-10-22: проверка путей вынесена в `src/main/repoPaths.ts`, чтобы тесты не импортировали `electron` через handlers.
 - Snap/AppImage-окружение не должно утекать в терминал пользователя (санитизация из T-010).
 
 ## Промт

@@ -1,14 +1,27 @@
 import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
+import type { ExternalTools } from '../external/tools';
+import { resolveInsideRepo } from '../repoPaths';
 import type { AppStore } from '../store';
 import { loadRepo, repoClosed } from '../store/repoSlice';
 import type { CommandHandlers } from './registry';
+
+export interface HandlerDeps {
+  store: AppStore;
+  tools: ExternalTools;
+}
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
 function assertString(value: unknown, name: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${name} must be a non-empty string`);
 }
 
-export function createCommandHandlers(store: AppStore): CommandHandlers {
+function openRepoRoot(store: AppStore): string {
+  const { path } = store.getState().repo;
+  if (!path) throw new Error('No repository is open');
+  return path;
+}
+
+export function createCommandHandlers({ store, tools }: HandlerDeps): CommandHandlers {
   return {
     async 'repo:pick'({ sender }) {
       const options: OpenDialogOptions = { title: 'Open repository', properties: ['openDirectory'] };
@@ -29,6 +42,17 @@ export function createCommandHandlers(store: AppStore): CommandHandlers {
 
     async 'repo:close'() {
       store.dispatch(repoClosed());
+    },
+
+    async 'repo:openTerminal'() {
+      await tools.openTerminal(openRepoRoot(store));
+    },
+
+    async 'file:openInEditor'(_ctx, path, line) {
+      assertString(path, 'path');
+      if (line !== undefined && (!Number.isInteger(line) || line < 1)) throw new TypeError('line must be a positive integer');
+      const root = openRepoRoot(store);
+      await tools.openInEditor(await resolveInsideRepo(root, path), line, root);
     },
   };
 }

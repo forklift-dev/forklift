@@ -6,9 +6,10 @@ interface ToolbarProps {
   onOpen(): void;
   onRefresh(): void;
   onClose(): void;
+  onOpenTerminal(): void;
 }
 
-export function Toolbar({ repo, busy, onOpen, onRefresh, onClose }: ToolbarProps) {
+export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal }: ToolbarProps) {
   const branch = repo?.branch;
   return (
     <header className="toolbar">
@@ -32,6 +33,9 @@ export function Toolbar({ repo, busy, onOpen, onRefresh, onClose }: ToolbarProps
         </button>
         <button type="button" onClick={onRefresh} disabled={busy || !repo}>
           Refresh
+        </button>
+        <button type="button" onClick={onOpenTerminal} disabled={!repo}>
+          Terminal
         </button>
         <button type="button" onClick={onClose} disabled={busy || !repo}>
           Close

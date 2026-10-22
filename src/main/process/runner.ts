@@ -37,6 +37,10 @@ export class ProcessRunner implements Runner {
     this.baseEnv = Promise.resolve(env).then(sanitizeEnv, () => sanitizeEnv(process.env));
   }
 
+  environment(): Promise<Env> {
+    return this.baseEnv;
+  }
+
   async run(command: string, args: readonly string[], options: RunOptions = {}): Promise<TextRunResult> {
     const env = options.replaceEnv ? sanitizeEnv(options.env ?? {}) : this.extendEnv(await this.baseEnv, options.env);
     const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };

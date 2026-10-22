@@ -35,6 +35,8 @@ export interface TextRunResult extends Omit<RunResult, 'stdout' | 'stderr'> {
 export interface Runner {
   run(command: string, args: readonly string[], options?: RunOptions): Promise<TextRunResult>;
   launch(command: string, args: readonly string[], options?: LaunchOptions): Promise<LaunchResult>;
+  /** The environment processes start from (login-shell env once resolved, sanitized). */
+  environment(): Promise<Env>;
 }
 
 export class ProcessError extends Error {
