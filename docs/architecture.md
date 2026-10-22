@@ -15,7 +15,7 @@
 | Файловые события | `nsfw` (GitKraken, MIT) — подключён, ещё не используется |
 | Поиск репозиториев | `find-git-repositories` (GitKraken, MIT) — подключён, ещё не используется |
 | Запуск процессов | `cross-spawn` 7 в `utilityProcess` (ProcessRunner) |
-| Тесты / линт | Vitest 5 (внутри Electron), oxlint |
+| Тесты / линт | Vitest 5 (внутри Electron), сквозные наборы `tests/e2e` через CDP, oxlint |
 
 ## Процессы
 

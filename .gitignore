@@ -4,3 +4,4 @@ dist/
 
 # Reference build of GitKraken used for architecture study, not part of the project
 gitkraken/
+tests/e2e/artifacts/

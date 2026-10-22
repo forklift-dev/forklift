@@ -10,8 +10,9 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "lint": "oxlint src",
+    "lint": "oxlint src tests",
     "test": "node scripts/test.mjs",
+    "test:e2e": "node tests/e2e/run.mjs",
     "postinstall": "node scripts/rebuild-native.mjs",
     "rebuild:native": "node scripts/rebuild-native.mjs --force",
     "dist": "npm run build && electron-builder"
