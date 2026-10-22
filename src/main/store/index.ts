@@ -1,5 +1,5 @@
 import { combineReducers, configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { AppInfo, AppState } from '../../shared/state';
+import type { AppInfo, AppState, GitCliInfo } from '../../shared/state';
 import { repoSlice } from './repoSlice';
 import type { ThunkExtra } from './types';
 
@@ -8,13 +8,13 @@ const appSlice = createSlice({
   initialState: { version: '0.0.0', platform: 'unknown' } as AppInfo,
   reducers: {
     appInfoSet: (_state, action: PayloadAction<AppInfo>) => action.payload,
-    gitVersionDetected: (state, action: PayloadAction<string | null>) => {
-      state.gitVersion = action.payload;
+    gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
+      state.gitCli = action.payload;
     },
   },
 });
 
-export const { gitVersionDetected } = appSlice.actions;
+export const { gitCliDetected } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,

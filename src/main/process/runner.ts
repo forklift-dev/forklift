@@ -2,48 +2,11 @@ import { utilityProcess, type UtilityProcess } from 'electron';
 // oxlint-disable-next-line import/default -- virtual module: electron-vite bundles the entry and returns its path
 import hostPath from '../../process-host/index?modulePath';
 import { terminateTree } from '../../process-host/kill';
-import type { Env, HostError, HostEvent, HostRequest, LaunchResult, RunResult } from '../../shared/process';
+import type { Env, HostError, HostEvent, HostRequest, LaunchResult } from '../../shared/process';
 import { sanitizeEnv } from './env';
+import { ProcessError, type LaunchOptions, type RunOptions, type Runner, type TextRunResult } from './types';
 
-export interface RunOptions {
-  cwd?: string;
-  /** Added on top of the base environment (see ProcessRunner.setBaseEnv). */
-  env?: Env;
-  /** Use `env` as the complete environment instead of extending the base one. */
-  replaceEnv?: boolean;
-  input?: string | Uint8Array;
-  timeoutMs?: number;
-  maxOutputBytes?: number;
-  signal?: AbortSignal;
-  /** Decoded output chunks as they arrive, e.g. for `git fetch --progress`. */
-  onStdout?(text: string): void;
-  onStderr?(text: string): void;
-}
-
-export interface LaunchOptions {
-  cwd?: string;
-  env?: Env;
-  /** Resolve only when the program exits (diff/merge tools). Default: detach immediately. */
-  wait?: boolean;
-  signal?: AbortSignal;
-  /** Windows: show a console window (for terminals). */
-  showConsole?: boolean;
-}
-
-export interface TextRunResult extends Omit<RunResult, 'stdout' | 'stderr'> {
-  stdout: string;
-  stderr: string;
-}
-
-export class ProcessError extends Error {
-  constructor(
-    message: string,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'ProcessError';
-  }
-}
+export { ProcessError, type LaunchOptions, type RunOptions, type Runner, type TextRunResult } from './types';
 
 const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
@@ -60,7 +23,7 @@ interface PendingCall {
  * Runs external programs in a dedicated utilityProcess so spawning and output handling never
  * block the main process. The host starts on first use and restarts after a crash.
  */
-export class ProcessRunner {
+export class ProcessRunner implements Runner {
   private host: UtilityProcess | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, PendingCall>();

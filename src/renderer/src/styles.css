@@ -130,6 +130,10 @@ button:disabled {
   font-size: 11px;
 }
 
+.git-version.warning {
+  color: var(--danger-fg);
+}
+
 .workspace {
   flex: 1;
   display: grid;

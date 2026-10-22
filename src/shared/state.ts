@@ -59,11 +59,18 @@ export interface RepoState {
   pendingRequestId: string | null;
 }
 
+export interface GitCliInfo {
+  /** `git --version` of the git CLI in PATH, or null when not found. */
+  version: string | null;
+  minimumVersion: string;
+  meetsMinimum: boolean;
+}
+
 export interface AppInfo {
   version: string;
   platform: string;
-  /** `git --version` of the git CLI in PATH; undefined until checked, null when not found. */
-  gitVersion?: string | null;
+  /** Undefined until checked at startup. */
+  gitCli?: GitCliInfo;
 }
 
 export interface AppState {

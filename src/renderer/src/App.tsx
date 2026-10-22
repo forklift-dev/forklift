@@ -4,10 +4,23 @@ import { ChangesPanel } from './components/ChangesPanel';
 import { CommitList } from './components/CommitList';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
+import type { GitCliInfo } from '../../shared/state';
+
+function GitCliStatus({ info }: { info: GitCliInfo }) {
+  if (!info.version) return <small className="git-version warning">git CLI not found in PATH</small>;
+  if (!info.meetsMinimum) {
+    return (
+      <small className="git-version warning">
+        git {info.version} is older than {info.minimumVersion}; some operations may fail
+      </small>
+    );
+  }
+  return <small className="git-version">git {info.version}</small>;
+}
 
 export function App() {
   const repo = useAppState((s) => s.repo);
-  const gitVersion = useAppState((s) => s.app.gitVersion);
+  const gitCli = useAppState((s) => s.app.gitCli);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -51,9 +64,7 @@ export function App() {
           <button type="button" onClick={openRepo} disabled={busy}>
             Open repository…
           </button>
-          {gitVersion !== undefined && (
-            <small className="git-version">{gitVersion ? `git ${gitVersion}` : 'git CLI not found in PATH'}</small>
-          )}
+          {gitCli && <GitCliStatus info={gitCli} />}
         </main>
       )}
     </div>

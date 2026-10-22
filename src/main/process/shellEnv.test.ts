@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { runProcess } from '../../process-host/spawn';
+import { directRunner } from './testing';
 import { parseEnvBlock, resolveShellEnv, shellArgs, shouldResolveShellEnv, type RunText } from './shellEnv';
 
 describe('shouldResolveShellEnv', () => {
@@ -44,11 +44,8 @@ describe('parseEnvBlock', () => {
 });
 
 // Integration: real login shells with throwaway rc files, run through the process-host spawn core.
-const run: RunText = async (command, args, options) => {
-  const result = await runProcess({ type: 'run', id: 0, command, args: [...args], streamOutput: false, ...options }).result;
-  const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
-  return { code: result.code, timedOut: result.timedOut, stdout: decode(result.stdout), stderr: decode(result.stderr) };
-};
+const runner = directRunner();
+const run: RunText = (command, args, options) => runner.run(command, args, { ...options, replaceEnv: true });
 
 function which(name: string): string | null {
   try {

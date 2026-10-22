@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, session } from 'electron';
-import { detectGitVersion } from './git/cliVersion';
+import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { createGitService } from './git/service';
 import { createCommandHandlers } from './ipc/handlers';
 import { registerCommands } from './ipc/registry';
@@ -9,7 +9,7 @@ import { ProcessRunner } from './process/runner';
 import { resolveShellEnv, shouldResolveShellEnv } from './process/shellEnv';
 import { handleAppProtocol, registerAppScheme } from './protocol';
 import { startReplication } from './replication';
-import { createAppStore, gitVersionDetected } from './store';
+import { createAppStore, gitCliDetected } from './store';
 import { createMainWindow } from './window';
 
 registerAppScheme();
@@ -49,10 +49,19 @@ async function start() {
     });
     runner.setBaseEnv(shellEnv.then((env) => env ?? process.env));
   }
-  void detectGitVersion(runner).then((version) => store.dispatch(gitVersionDetected(version)));
+  const gitCli = new GitCli(runner);
+  void gitCli.version().then((version) =>
+    store.dispatch(
+      gitCliDetected({
+        version,
+        minimumVersion: MIN_GIT_VERSION,
+        meetsMinimum: version !== null && isVersionAtLeast(version, MIN_GIT_VERSION),
+      }),
+    ),
+  );
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli } });
 
   showMainWindow();
   app.on('activate', showMainWindow);
