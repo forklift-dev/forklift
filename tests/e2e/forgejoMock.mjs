@@ -1,7 +1,9 @@
 // A small Forgejo for tests: the /api/v1 endpoints Forklift uses (token auth), and git over smart HTTP
 // (basic auth with the user's name and token) for the repositories under `gitRoot`. `flavor: 'gitverse'`
 // answers like GitVerse instead: the API under /api, Bearer tokens, the version in Accept, errors as
-// {"error": {...}}, and issue lists that include pull requests.
+// {"error": {...}}, and issue lists that include pull requests. `flavor: 'github'` answers like GitHub
+// (Enterprise Server's /api/v3): Bearer tokens, its media type and API version, `name` instead of `full_name`,
+// `merged_at` instead of `merged` in lists, issue lists with pull requests, and 403 for rate limits.
 import { createServer } from 'node:http';
 import { gitBackend } from './gitHttp.mjs';
 
@@ -9,8 +11,12 @@ const DAY = '2026-10-2';
 
 export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullName = 'Ada Lovelace', gitRoot = null, flavor = 'forgejo' } = {}) {
   const gitverse = flavor === 'gitverse';
-  const prefix = gitverse ? '/api' : '/api/v1';
-  const authorization = gitverse ? `Bearer ${token}` : `token ${token}`;
+  const github = flavor === 'github';
+  const prefix = { forgejo: '/api/v1', gitverse: '/api', github: '/api/v3' }[flavor];
+  const authorization = flavor === 'forgejo' ? `token ${token}` : `Bearer ${token}`;
+  const accept = { gitverse: 'application/vnd.gitverse.object+json;version=1', github: 'application/vnd.github+json' }[flavor];
+  /** Requests answered before the rate limit is "exhausted" (GitHub flavor), for tests of that message. */
+  let budget = Infinity;
   const requests = [];
   let base = '';
   const repo = (owner, name, updated) => ({
@@ -39,15 +45,17 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
     { number: 4, title: 'Closed idea', body: '', user: { login: 'ada' }, state: 'closed', labels: [] },
   ];
   let next = 6;
-  const pullJson = (p) => ({ ...p, head: { ...p.head, repo: { ...p.head.repo, clone_url: `${base}/${p.head.repo.full_name}.git` } }, html_url: `${base}/ada/demo/pulls/${p.number}`, comments: (comments[p.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${p.number}T08:00:00Z` });
+  const pullJson = (p, list = false) => ({
+    ...p,
+    ...(github && list && { merged: undefined, merged_at: p.merged ? `${DAY}2T08:00:00Z` : null }), head: { ...p.head, repo: { ...p.head.repo, clone_url: `${base}/${p.head.repo.full_name}.git` } }, html_url: `${base}/ada/demo/pulls/${p.number}`, comments: (comments[p.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${p.number}T08:00:00Z` });
   const issueJson = (i) => ({ ...i, html_url: `${base}/ada/demo/issues/${i.number}`, comments: (comments[i.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${i.number}T08:00:00Z` });
   const byState = (list, state) => list.filter((item) => state === 'all' || item.state === (state ?? 'open'));
 
   const routes = [
-    ['GET', /^\/user$/, () => ({ login: user, full_name: fullName })],
+    ['GET', /^\/user$/, () => (github ? { login: user, name: fullName } : { login: user, full_name: fullName })],
     ['GET', /^\/user\/repos$/, (_m, q) => (q.get('page') === '1' ? [repo('ada', 'demo', 3), repo('ada', 'secret', 5), repo('team', 'tools', 1)] : [])],
     ['GET', /^\/repos\/ada\/demo$/, () => repo('ada', 'demo', 3)],
-    ['GET', /^\/repos\/ada\/demo\/pulls$/, (_m, q) => byState(pulls, q.get('state')).map(pullJson)],
+    ['GET', /^\/repos\/ada\/demo\/pulls$/, (_m, q) => byState(pulls, q.get('state')).map((p) => pullJson(p, true))],
     ['GET', /^\/repos\/ada\/demo\/pulls\/(\d+)$/, (m) => pulls.find((p) => p.number === Number(m[1])) && pullJson(pulls.find((p) => p.number === Number(m[1])))],
     ['GET', /^\/repos\/ada\/demo\/pulls\/(\d+)\/commits$/, () => [{ sha: 'a'.repeat(40), commit: { message: 'Add the feature\n\nDetails', author: { name: 'Bob', date: `${DAY}1T08:00:00Z` } } }]],
     ['GET', /^\/repos\/ada\/demo\/pulls\/(\d+)\/files$/, () => [{ filename: 'src/feature.txt', status: 'added', additions: 3, deletions: 0 }]],
@@ -59,7 +67,7 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
     ['GET', /^\/repos\/ada\/demo\/issues$/, (_m, q) => [
       ...byState(issues, q.get('state')).map(issueJson),
       // GitVerse has no type filter here: pull requests come too.
-      ...(gitverse ? byState(pulls, q.get('state')).map((p) => ({ ...issueJson({ ...p, labels: [] }), pull_request: { merged: p.merged } })) : []),
+      ...(gitverse || github ? byState(pulls, q.get('state')).map((p) => ({ ...issueJson({ ...p, labels: [] }), pull_request: { merged: p.merged } })) : []),
     ]],
     ['GET', /^\/repos\/ada\/demo\/issues\/(\d+)$/, (m) => {
       const found = issues.find((i) => i.number === Number(m[1]));
@@ -94,7 +102,12 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
     const send = (status, data) =>
       res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(gitverse && status >= 400 ? { error: { code: 'ERROR', message: data.message, status } } : data));
     if (req.headers.authorization !== authorization) return send(401, { message: 'token is required' });
-    if (gitverse && req.headers.accept !== 'application/vnd.gitverse.object+json;version=1') return send(400, { message: 'The request format is invalid' });
+    if (accept && req.headers.accept !== accept) return send(400, { message: 'The request format is invalid' });
+    if (github && req.headers['x-github-api-version'] !== '2022-11-28') return send(400, { message: 'Unsupported API version' });
+    if (github && budget-- <= 0) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 1800) });
+      return res.end(JSON.stringify({ message: 'API rate limit exceeded' }));
+    }
     let raw = '';
     req.on('data', (chunk) => (raw += chunk));
     req.on('end', () => {
@@ -109,5 +122,5 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
-  return { url: base, requests, pulls, issues, comments, close: () => new Promise((resolve) => server.close(resolve)) };
+  return { url: base, requests, pulls, issues, comments, limit: (n) => (budget = n), close: () => new Promise((resolve) => server.close(resolve)) };
 }

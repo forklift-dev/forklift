@@ -58,6 +58,15 @@ const STYLES: Record<HostingProvider, ApiStyle> = {
     issuesOnly: '',
     errorMessage: (body) => str((body['error'] as Json | undefined)?.['message']) || str(body['message']),
   },
+  // GitHub: api.github.com (GitHub Enterprise Server: /api/v3), Bearer tokens, its media type and API version
+  // (https://docs.github.com/en/rest/about-the-rest-api/api-versions).
+  github: {
+    base: (server) => (new URL(server).host === 'github.com' ? 'https://api.github.com' : `${server}/api/v3`),
+    headers: (token) => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }),
+    pageSize: 'per_page',
+    issuesOnly: '',
+    errorMessage: (body) => str(body['message']),
+  },
 };
 
 /** A Gitea-style REST API (Forgejo, Gitea, GitVerse) with a personal access token. */
@@ -82,7 +91,7 @@ export class HostingClient {
   /** The token's user: checks the address and the token. */
   async user(): Promise<{ login: string; name: string }> {
     const user = (await this.request('/user')) as Json;
-    return { login: login(user), name: str(user['full_name']) || login(user) };
+    return { login: login(user), name: str(user['full_name']) || str(user['name']) || login(user) };
   }
 
   /** Repositories the user can access, most recently updated first (up to 1000). */
@@ -224,11 +233,14 @@ export class HostingClient {
         // not JSON
       }
       if (response.status === 401) throw new HostingError('The server refused the token (wrong, expired or revoked)', 401);
-      if (response.status === 403) throw new HostingError(`Not allowed${message ? `: ${message}` : ' (does the token have the needed access?)'}`, 403);
-      if (response.status === 429) {
-        const wait = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
-        throw new HostingError(`Too many requests to the server${Number.isFinite(wait) ? `: try again in ${Math.ceil(wait / 60)} min` : ', try again later'}`, 429);
+      // GitHub reports its rate limit as 403 with no requests remaining; others as 429.
+      if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0')) {
+        const retry = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
+        const reset = Number.parseInt(response.headers.get('x-ratelimit-reset') ?? '', 10);
+        const wait = Number.isFinite(retry) ? retry : Number.isFinite(reset) ? reset - Date.now() / 1000 : Number.NaN;
+        throw new HostingError(`Too many requests to the server${Number.isFinite(wait) ? `: try again in ${Math.max(1, Math.ceil(wait / 60))} min` : ', try again later'}`, 429);
       }
+      if (response.status === 403) throw new HostingError(`Not allowed${message ? `: ${message}` : ' (does the token have the needed access?)'}`, 403);
       if (response.status === 404) throw new HostingError(`Not found on the server${message ? `: ${message}` : ''}`, 404);
       throw new HostingError(`The server answered ${response.status}${message ? `: ${message}` : ''}`, response.status);
     }
@@ -254,7 +266,8 @@ function toPull(pull: Json, baseRepo: string): PullSummary {
     number: num(pull['number']),
     title: str(pull['title']),
     author: login(pull['user']),
-    state: pull['merged'] === true ? 'merged' : str(pull['state']) === 'closed' ? 'closed' : 'open',
+    // Lists on GitHub have merged_at but no merged.
+    state: pull['merged'] === true || Boolean(pull['merged_at']) ? 'merged' : str(pull['state']) === 'closed' ? 'closed' : 'open',
     draft: pull['draft'] === true || /^(WIP|\[WIP\]):?\s/i.test(str(pull['title'])),
     head: str(head['ref']),
     headRepo: headRepo && headRepo !== baseRepo ? headRepo : null,

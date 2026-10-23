@@ -5,7 +5,9 @@ export interface ForgejoMock {
   pulls: Array<Record<string, unknown>>;
   issues: Array<Record<string, unknown>>;
   comments: Record<string, Array<Record<string, unknown>>>;
+  /** GitHub flavor: answer `n` more requests, then report the rate limit. */
+  limit(n: number): void;
   close(): Promise<void>;
 }
 
-export function startForgejoMock(options?: { token?: string; user?: string; fullName?: string; gitRoot?: string | null; flavor?: 'forgejo' | 'gitverse' }): Promise<ForgejoMock>;
+export function startForgejoMock(options?: { token?: string; user?: string; fullName?: string; gitRoot?: string | null; flavor?: 'forgejo' | 'gitverse' | 'github' }): Promise<ForgejoMock>;

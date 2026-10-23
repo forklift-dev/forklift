@@ -1,11 +1,17 @@
-// Hosting services (Forgejo first; GitVerse, GitHub, GitLab later): accounts, and what the app shows of them.
+// Hosting services (Forgejo, GitVerse, GitHub; GitLab later): accounts, and what the app shows of them.
 // Tokens never appear here: main keeps them encrypted (safeStorage) and uses them itself.
 
-export type HostingProvider = 'forgejo' | 'gitverse';
+export type HostingProvider = 'forgejo' | 'gitverse' | 'github';
 
 export const PROVIDERS: Record<HostingProvider, { name: string; tokenHelp: string; /** The service's own server, filled in for the user. */ server?: string }> = {
-  forgejo: { name: 'Forgejo / Gitea', tokenHelp: 'Settings → Applications → Generate new token (repository and issue access, read and write)' },
+  forgejo: { name: 'Forgejo / Gitea', tokenHelp: 'Settings → Applications → Generate new token (repository and issue: read and write; user: read)' },
   gitverse: { name: 'GitVerse', server: 'https://gitverse.ru', tokenHelp: 'gitverse.ru/settings/tokens → create a token with write access (it is shown only once)' },
+  github: {
+    name: 'GitHub',
+    server: 'https://github.com',
+    tokenHelp:
+      'github.com/settings/tokens → a fine-grained token with Contents, Pull requests and Issues (read and write) and Metadata (read) for the repositories, or a classic token with the “repo” scope',
+  },
 };
 
 /** An account on a server (stored in the settings; its token separately). */

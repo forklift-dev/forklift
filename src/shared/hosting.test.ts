@@ -49,7 +49,7 @@ describe('parseAccounts', () => {
 
   it.each([
     ['not a list', 'x'],
-    ['an unknown service', [{ ...account('https://a.com'), provider: 'github' }]],
+    ['an unknown service', [{ ...account('https://a.com'), provider: 'bitbucket' }]],
     ['an address that is not normalized', [account('https://a.com/')]],
     ['duplicate ids', [account('https://a.com'), account('https://b.com')]],
     ['a multi-line name', [{ ...account('https://a.com'), name: 'a\nb' }]],

@@ -29,7 +29,7 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe.each(['forgejo', 'gitverse'] as const)('HostingClient (%s)', (provider) => {
+describe.each(['forgejo', 'gitverse', 'github'] as const)('HostingClient (%s)', (provider) => {
   let served: ForgejoMock;
   beforeEach(async () => {
     served = await startForgejoMock({ flavor: provider });
@@ -109,6 +109,29 @@ it('GitVerse: the API of gitverse.ru is api.gitverse.ru, with Bearer and the API
   };
   expect(await new HostingClient('gitverse', 'https://gitverse.ru', 'tok', record).user()).toEqual({ login: 'ada', name: 'ada' });
   expect(seen[0]).toEqual({ url: 'https://api.gitverse.ru/user', headers: { Authorization: 'Bearer tok', Accept: 'application/vnd.gitverse.object+json;version=1' } });
+});
+
+it('GitHub: the API of github.com is api.github.com, with Bearer, its media type and API version', async () => {
+  const seen: Array<{ url: string; headers: Record<string, string> }> = [];
+  const record: Fetch = async (url, init) => {
+    seen.push({ url, headers: init.headers });
+    return { status: 200, ok: true, headers: { get: () => null }, text: async () => '{"login":"ada","name":"Ada Lovelace"}' };
+  };
+  expect(await new HostingClient('github', 'https://github.com', 'tok', record).user()).toEqual({ login: 'ada', name: 'Ada Lovelace' });
+  expect(seen[0]).toEqual({ url: 'https://api.github.com/user', headers: { Authorization: 'Bearer tok', Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
+  // GitHub Enterprise Server.
+  await new HostingClient('github', 'https://git.example.com', 'tok', record).user();
+  expect(seen[1]?.url).toBe('https://git.example.com/api/v3/user');
+});
+
+it('GitHub: a 403 with no requests left is the rate limit, not a refusal', async () => {
+  const served = await startForgejoMock({ flavor: 'github' });
+  try {
+    served.limit(0);
+    await expect(new HostingClient('github', served.url, 'tok-ada', fetch).user()).rejects.toThrow(/Too many requests to the server: try again in (29|30) min/);
+  } finally {
+    await served.close();
+  }
 });
 
 it('explains rate limits', async () => {

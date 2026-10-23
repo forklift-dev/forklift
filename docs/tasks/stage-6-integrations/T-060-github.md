@@ -2,7 +2,7 @@
 id: T-060
 title: "GitHub: вход, репозитории, pull requests, issues"
 stage: 6 — Интеграции с хостингами
-status: draft
+status: review
 depends_on: [T-024, T-050, T-065]
 updated: 2026-10-23
 ---
@@ -19,10 +19,10 @@ GitHub: вход, репозитории, pull requests, issues. Решение 
 
 ## Этапы
 
-- [ ] Вход (OAuth device flow или персональный токен), хранение секретов в системном хранилище (safeStorage)
-- [ ] Список репозиториев для clone
-- [ ] Просмотр/создание PR (MR), комментарии
-- [ ] Тесты на имитации API; ручная проверка владельцем
+- [x] Вход (OAuth device flow или персональный токен), хранение секретов в системном хранилище (safeStorage)
+- [x] Список репозиториев для clone
+- [x] Просмотр/создание PR (MR), комментарии
+- [x] Тесты на имитации API; ручная проверка владельцем
 
 ## Критерии готовности
 
@@ -33,6 +33,25 @@ GitHub: вход, репозитории, pull requests, issues. Решение 
 
 - draft до согласования; не начинать без владельца.
 - 2026-10-23: приоритет владельца — после Forgejo (T-065) и GitVerse (T-066); строится на общем слое интеграций T-065.
+- 2026-10-23: владелец: «давай дальше» после T-066 — начато.
+- 2026-10-23: вход — персональный токен (как у Forgejo и GitVerse): fine-grained (Contents, Pull requests, Issues —
+  чтение и запись, Metadata — чтение) или classic со scope `repo`; подсказка в форме. **Вопрос владельцу:** OAuth
+  device flow требует зарегистрировать OAuth App на аккаунте владельца (её `client_id` зашивается в приложение) —
+  нужно ли и на чьё имя регистрировать? Без этого вход по токену работает полностью.
+- 2026-10-23: GitHub — провайдер `github` общего клиента (`src/main/hosting/client.ts`): `https://api.github.com`
+  для github.com, `<сервер>/api/v3` для GitHub Enterprise Server; `Authorization: Bearer`,
+  `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `per_page`. Отличия в данных: имя
+  пользователя в `name`, в списках PR нет `merged` — слитый определяется по `merged_at`; `/issues` отдаёт и PR
+  (отфильтровываются, как у GitVerse). Лимит запросов GitHub отдаёт как 403 с `x-ratelimit-remaining: 0` —
+  сообщение «Too many requests… try again in N min» по `x-ratelimit-reset`. Checkout PR из форка — через
+  `refs/pull/N/head` (GitHub его публикует). git получает логин и токен (GitHub принимает токен как пароль).
+  Список провайдеров в форме: Forgejo / Gitea, GitVerse, GitHub (порядок приоритета владельца).
+- 2026-10-23: проверено: юнит-тесты клиента на имитации в трёх вариантах (Forgejo, GitVerse, GitHub), адрес и
+  заголовки для github.com и GHES, лимит 403; сквозной набор `github` (общий сценарий с `gitverse` вынесен в
+  `tests/e2e/hostingProvider.mjs`); запрос к настоящему `api.github.com` без токена — 401 `Bad credentials` в JSON,
+  как ждёт клиент. **Осталось:** проверка на аккаунте владельца (нужен токен GitHub, по желанию).
+- 2026-10-23: в одном полном прогоне `npm test` упал один юнит-тест (какой — не сохранилось); в 4 полных и 15
+  прогонах тестов интеграций и askpass не повторилось. Если всплывёт — разобрать.
 
 ## Промт
 
