@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
@@ -157,6 +158,13 @@ export interface Commands {
   'keys:publicKey': { args: [path: string]; result: string };
   /** Whether a commit is signed and by whom (slow: runs gpg or ssh-keygen). */
   'commit:signature': { args: [repo: string, sha: string]; result: CommitSignature };
+  /** Operation log entries after `afterId`, oldest first. */
+  'log:entries': { args: [afterId: number]; result: LogPage };
+  /** One operation with the git runs inside it. */
+  'log:operation': { args: [id: number]; result: LogEntry[] };
+  'log:clear': { args: []; result: void };
+  /** Saves the log as text where the user chooses; resolves to the file, or null when cancelled. */
+  'log:export': { args: []; result: string | null };
   /** Opens userData/themes in the file manager. */
   'themes:openFolder': { args: []; result: void };
   /** Editors, terminals and git diff/merge tools found on this machine (git config as seen from `repo`). */
@@ -177,7 +185,8 @@ export type CommandResult<K extends CommandName> = Commands[K]['result'];
 
 export type IpcResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: { message: string } };
+  /** `logId`: the operation log entry with the details (the git commands and their output). */
+  | { ok: false; error: { message: string; logId?: number } };
 
 // A Record keyed by CommandName makes the compiler reject missing or unknown channels.
 const commandChannelSet = {
@@ -255,6 +264,10 @@ const commandChannelSet = {
   'settings:dismissProblems': true,
   'settings:browseExecutable': true,
   'themes:openFolder': true,
+  'log:entries': true,
+  'log:operation': true,
+  'log:clear': true,
+  'log:export': true,
   'profile:apply': true,
   'profile:current': true,
   'keys:list': true,

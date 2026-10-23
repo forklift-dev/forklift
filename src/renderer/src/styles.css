@@ -1349,6 +1349,173 @@ select {
   resize: vertical;
 }
 
+/* Operation log */
+.error-details {
+  margin-left: 12px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.log-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-header h1 {
+  margin: 0 8px 0 0;
+  font-size: 15px;
+}
+
+.log-spacer {
+  flex: 1;
+}
+
+.log-list,
+.log-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.log-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 3px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.log-row:hover {
+  background: var(--bg-hover);
+}
+
+.log-entry.nested .log-row {
+  padding-left: 40px;
+}
+
+.log-entry.error > .log-row .codicon,
+.log-entry.error > .log-row .log-title {
+  color: var(--danger-fg);
+}
+
+.log-entry.git .log-title {
+  font: 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.log-time,
+.log-duration,
+.log-repo {
+  flex: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-details {
+  margin: 0 16px 8px 40px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--border-strong);
+  background: var(--bg-panel);
+}
+
+.log-entry.nested .log-details {
+  margin-left: 64px;
+}
+
+.log-details h4 {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.log-details pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.log-meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* Notifications */
+/* Bottom left: the commit button and the diff toolbar are on the right. */
+.toasts {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 6px 24px var(--shadow);
+  pointer-events: auto;
+}
+
+.toast.success > .codicon {
+  color: var(--success);
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-detail {
+  color: var(--fg-muted);
+}
+
 /* Profiles and keys */
 .setting-row[data-setting='profiles.list'] {
   grid-template-columns: minmax(0, 1fr);

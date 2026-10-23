@@ -31,6 +31,8 @@ import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
 import type { ProfileService } from '../profiles/service';
+import type { OperationLog } from '../log/operationLog';
+import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
@@ -58,6 +60,7 @@ export interface HandlerDeps {
   terminals: TerminalService;
   creator: RepoCreator;
   profiles: ProfileService;
+  log: OperationLog;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -194,7 +197,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -780,6 +783,29 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       assertSha(sha);
       return profiles.signature(root, sha);
+    },
+
+    async 'log:entries'(_ctx, afterId) {
+      if (!Number.isInteger(afterId) || afterId < 0) throw new TypeError('afterId must be a non-negative integer');
+      return log.page(afterId);
+    },
+
+    async 'log:operation'(_ctx, id) {
+      if (!Number.isInteger(id) || id < 1) throw new TypeError('id must be a positive integer');
+      return log.family(id);
+    },
+
+    async 'log:clear'() {
+      log.clear();
+    },
+
+    async 'log:export'({ sender }) {
+      const window = BrowserWindow.fromWebContents(sender);
+      const options = { title: 'Save the operation log', defaultPath: `forklift-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt` };
+      const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) return null;
+      await writeFile(result.filePath, `${log.text()}\n`, { mode: 0o600 });
+      return result.filePath;
     },
 
     async 'themes:openFolder'() {

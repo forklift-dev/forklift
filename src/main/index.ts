@@ -41,8 +41,9 @@ import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected, noticeAdded, promptAdded, promptRemoved, userThemesRead } from './store';
+import { createAppStore, gitCliDetected, logChanged, noticeAdded, promptAdded, promptRemoved, userThemesRead } from './store';
 import { ThemeLibrary } from './themes';
+import { OperationLog } from './log/operationLog';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
@@ -87,7 +88,15 @@ async function start() {
   // Before the window exists, so its first state snapshot already has the user's settings and themes.
   await Promise.all([settings.load(), themes.start().catch((error: unknown) => console.error('[themes] could not read user themes:', error))]);
   app.on('will-quit', () => themes.stop());
-  const gitCli = new GitCli(runner, () => settings.values['git.executable'] || 'git');
+  // Every git run, and every window command that changes something, for Help → Operation log.
+  let logTimer: NodeJS.Timeout | null = null;
+  const log = new OperationLog(() => {
+    logTimer ??= setTimeout(() => {
+      logTimer = null;
+      store.dispatch(logChanged());
+    }, 250);
+  });
+  const gitCli = new GitCli(runner, () => settings.values['git.executable'] || 'git', (run) => log.git(run));
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);
   // Index, HEAD and working tree are written one operation at a time per repository.
@@ -133,7 +142,7 @@ async function start() {
     saveDir: join(app.getPath('temp'), `forklift-undo-${process.pid}`),
     changed: (root, labels) => store.dispatch(undoChanged({ id: root, ...labels })),
   });
-  const autoFetch = new AutoFetch({ store, settings, networkOps, remotes, isFocused: () => BrowserWindow.getFocusedWindow() !== null });
+  const autoFetch = new AutoFetch({ store, settings, networkOps, remotes, log, isFocused: () => BrowserWindow.getFocusedWindow() !== null });
   autoFetch.start();
   app.on('will-quit', () => autoFetch.stop());
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
@@ -149,7 +158,7 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

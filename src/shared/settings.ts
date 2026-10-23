@@ -79,6 +79,13 @@ export const SETTING_FIELDS = {
     label: 'Prune when fetching',
     description: 'Remove remote branches that were deleted on the remote (git fetch --prune).',
   },
+  'general.notifications': {
+    section: 'general',
+    type: 'boolean',
+    default: true,
+    label: 'Show notifications',
+    description: 'A short note when an operation (commit, push, stash…) finishes. Errors are always shown.',
+  },
   'general.repositoriesFolder': {
     section: 'general',
     type: 'string',

@@ -53,11 +53,15 @@ const GIT_ENV: Env = {
   LANGUAGE: 'en_US:en',
 };
 
+/** Told about every finished git run (the operation log). */
+export type GitRunObserver = (run: { args: readonly string[]; cwd: string; readOnly: boolean; durationMs: number; exitCode: number | null; ok: boolean; stdout: string; stderr: string }) => void;
+
 export class GitCli {
   constructor(
     private readonly runner: Runner,
     /** The git program; a function is asked on every call, so a changed setting applies at once. */
     private readonly gitExecutable: string | (() => string) = 'git',
+    private readonly observer?: GitRunObserver,
   ) {}
 
   get executable(): string {
@@ -65,6 +69,22 @@ export class GitCli {
   }
 
   async exec(args: readonly string[], options: GitCliOptions): Promise<GitCliResult> {
+    if (!this.observer) return this.run(args, options);
+    const start = performance.now();
+    const report = (exitCode: number | null, ok: boolean, stdout: string, stderr: string) =>
+      this.observer!({ args, cwd: options.cwd, readOnly: Boolean(options.readOnly), durationMs: performance.now() - start, exitCode, ok, stdout, stderr });
+    try {
+      const result = await this.run(args, options);
+      report(result.exitCode, true, result.stdout, result.stderr);
+      return result;
+    } catch (error) {
+      if (error instanceof GitCliError) report(error.exitCode, false, error.stdout, error.stderr || error.message);
+      else report(null, false, '', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  private async run(args: readonly string[], options: GitCliOptions): Promise<GitCliResult> {
     const stdoutLines = options.onStdoutLine && createLineSplitter(options.onStdoutLine);
     const stderrLines = options.onStderrLine && createLineSplitter(options.onStderrLine);
 

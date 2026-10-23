@@ -2,7 +2,9 @@ import { useEffect, useState, useTransition, type DragEvent, type PointerEvent a
 import type { SettingsSection } from '../../shared/settings';
 import type { TabsState } from '../../shared/state';
 import { BUILTIN_THEMES } from '../../shared/themes';
-import { invoke } from './api';
+import { invoke, logIdOf } from './api';
+import { LogView } from './components/LogView';
+import { Toasts } from './components/Toasts';
 import { OPEN_COMMANDS_EVENT, startShortcuts, useCommandHandlers } from './commands';
 import { CommandPalette } from './components/CommandPalette';
 import { ProfileSwitcher } from './components/ProfileSwitcher';
@@ -21,7 +23,7 @@ import { useAppState } from './state';
 /** Runs a command and reports failures in the banner; resolves to whether it succeeded. */
 export type RunAction = (action: () => Promise<unknown>) => Promise<boolean>;
 
-type Screen = 'repo' | 'repositories' | 'preferences';
+type Screen = 'repo' | 'repositories' | 'preferences' | 'log';
 
 /** Tab to switch to for Ctrl+Tab (+1), Ctrl+Shift+Tab (-1) or Ctrl+N (index N-1; Ctrl+9 is the last tab). */
 function tabFor(tabs: TabsState, key: { step?: number; number?: number }): string | null {
@@ -38,7 +40,8 @@ export function App() {
   const notices = useAppState((s) => s.app.notices);
   const prompts = useAppState((s) => s.app.prompts);
   const [isPending, startTransition] = useTransition();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ message: string; logId: number | null } | null>(null);
+  const [logFocus, setLogFocus] = useState<number | null>(null);
   const [screen, setScreen] = useState<Screen>('repo');
   // Repositories whose terminal panel was opened (their shells live while the tab is open) and whether it shows.
   const [terminalRepos, setTerminalRepos] = useState<string[]>([]);
@@ -82,7 +85,11 @@ export function App() {
   const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const userThemes = useAppState((s) => s.app.userThemes.themes);
 
-  const reportError = (error: unknown) => setActionError(error instanceof Error ? error.message : String(error));
+  const reportError = (error: unknown) => setActionError({ message: error instanceof Error ? error.message : String(error), logId: logIdOf(error) });
+  const showLog = (id: number | null) => {
+    setLogFocus(id);
+    setScreen('log');
+  };
 
   // Short commands: the UI shows a busy state until they finish.
   const run: RunAction = (action) =>
@@ -153,6 +160,7 @@ export function App() {
     'app.keybindings': { run: () => openPreferences('keys') },
     'theme.choose': { run: () => openPreferences('ui') },
     'profile.switch': { run: () => setSwitchingProfile(true) },
+    'app.log': { run: () => showLog(null) },
     'app.repositories': { run: () => setScreen('repositories') },
     'repo.clone': { run: () => openCreate('clone') },
     'repo.init': { run: () => openCreate('init') },
@@ -206,7 +214,7 @@ export function App() {
   const error = actionError;
   const data = repo.data;
   const activeId = tabs.activeId;
-  const showRepositories = screen === 'repositories' || tabs.tabs.length === 0;
+  const showRepositories = screen === 'repositories' || (tabs.tabs.length === 0 && screen !== 'log');
 
   return (
     <div
@@ -254,16 +262,27 @@ export function App() {
           </button>
         </div>
       )}
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div className="error-banner">
+          {error.message}
+          {error.logId !== null && (
+            <button type="button" className="error-details" onClick={() => showLog(error.logId)}>
+              Details
+            </button>
+          )}
+        </div>
+      )}
+      <Toasts onShowLog={showLog} />
       {remoteActions.dialogs}
       {menu}
       {prompts[0] && (
         <PromptDialog key={prompts[0].id} prompt={prompts[0]} repoName={tabs.tabs.find((tab) => tab.id === prompts[0]!.repo)?.name ?? null} />
       )}
+      {screen === 'log' && <LogView key={logFocus ?? 0} focus={logFocus} onClose={() => setScreen('repo')} />}
       {screen === 'preferences' && <Preferences key={preferencesSection ?? ''} repo={data} section={preferencesSection} onClose={() => setScreen('repo')} />}
       {palette !== null && <CommandPalette query={palette} onQuery={setPalette} onClose={() => setPalette(null)} />}
       {switchingProfile && <ProfileSwitcher repo={screen === 'repo' ? tabs.activeId : null} run={run} onClose={() => setSwitchingProfile(false)} onEdit={() => openPreferences('profiles')} />}
-      {screen !== 'preferences' && showRepositories && (
+      {screen !== 'preferences' && screen !== 'log' && showRepositories && (
         <RepositoriesScreen
           run={run}
           onOpened={() => setScreen('repo')}
@@ -273,7 +292,7 @@ export function App() {
         />
       )}
       {/* Kept mounted under the other screens, so the selection and an open diff survive a visit there. */}
-      <div className="app-main" hidden={screen === 'preferences' || showRepositories}>
+      <div className="app-main" hidden={screen === 'preferences' || screen === 'log' || showRepositories}>
         {data ? (
           // Keyed by repository: selection and open diff belong to the repository they were made in.
           <RepoWorkspace key={data.root} data={data} run={run} runInBackground={runInBackground} />

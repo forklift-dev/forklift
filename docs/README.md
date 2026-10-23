@@ -100,7 +100,7 @@
 | [T-051](tasks/stage-5-settings/T-051-themes.md) | Темы приложения и редактора | review |
 | [T-052](tasks/stage-5-settings/T-052-keybindings-palette.md) | Сочетания клавиш, палитра команд, нечёткий поиск | review |
 | [T-053](tasks/stage-5-settings/T-053-profiles-keys.md) | Профили, SSH- и GPG-ключи | review |
-| [T-054](tasks/stage-5-settings/T-054-notifications-log.md) | Уведомления и журнал операций | todo |
+| [T-054](tasks/stage-5-settings/T-054-notifications-log.md) | Уведомления и журнал операций | review |
 | [T-055](tasks/stage-5-settings/T-055-avatars.md) | Аватары авторов | todo |
 | [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
 

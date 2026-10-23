@@ -1,3 +1,4 @@
+import type { OperationLog } from '../log/operationLog';
 import type { RemoteService } from '../git/remote';
 import type { SettingsService } from '../settings/service';
 import { noticeAdded, type AppStore } from '../store';
@@ -9,6 +10,8 @@ export interface AutoFetchDeps {
   settings: SettingsService;
   networkOps: NetworkOps;
   remotes: Pick<RemoteService, 'fetch'>;
+  /** Background fetches appear in the operation log too. */
+  log?: Pick<OperationLog, 'operation'>;
   /** Whether a window has focus: auto-fetch pauses while the app is in the background. */
   isFocused(): boolean;
   now?(): number;
@@ -43,7 +46,7 @@ export class AutoFetch {
 
   /** One check: fetch the active repository if it is due. Resolves to whether it fetched. */
   async tick(): Promise<boolean> {
-    const { store, settings, networkOps, remotes, isFocused } = this.deps;
+    const { store, settings, networkOps, remotes, isFocused, log } = this.deps;
     const values = settings.values;
     const root = store.getState().repos.view.activeId;
     if (!values['general.autoFetch'] || !root || !isFocused()) return false;
@@ -58,7 +61,8 @@ export class AutoFetch {
     if (this.now() - last < values['general.autoFetchMinutes'] * 60_000) return false;
     this.lastFetch.set(root, this.now());
     try {
-      await networkOps.run(root, 'fetch', (run) => remotes.fetch(root, null, values['general.fetchPrune'], run, false));
+      const fetch = () => networkOps.run(root, 'fetch', (run) => remotes.fetch(root, null, values['general.fetchPrune'], run, false));
+      await (log ? log.operation('auto-fetch', root, fetch) : fetch());
       if (store.getState().repos.byId[root]) await store.dispatch(refreshRepo(root));
       return true;
     } catch (error) {
