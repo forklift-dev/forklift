@@ -44,7 +44,7 @@ describe('parseSettingValue', () => {
     ['diff.contextLines', 2.5],
     ['diff.contextLines', -1],
     ['editor.fontSize', 100],
-    ['diff.layout', 'hunk'],
+    ['diff.layout', 'hunks'],
     ['editor.fontFamily', 'x'.repeat(201)],
     ['git.executable', 'bad\0path'],
     ['tools.editor', null],

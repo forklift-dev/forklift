@@ -37,11 +37,11 @@ export default async function ({ check, artifactsDir }) {
   check('syntax highlighting active', (await page.evaluate(`document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines span[class*="mtk"]').length`)) > 3);
   if (process.env.E2E_SCREENSHOTS) await page.screenshot(join(artifactsDir, 'diff-commit.png'));
 
-  const splitToggle = `[...document.querySelectorAll('.diff-toolbar label')].find(l => l.textContent.includes('Split')).querySelector('input').click()`;
-  await page.evaluate(splitToggle);
+  const layout = `document.querySelector('[aria-label="Diff layout"]')`;
+  await page.selectOption(layout, 'inline');
   const inline = await page.waitFor(`!document.querySelector('.monaco-diff-editor').classList.contains('side-by-side')`, 2000);
   check('inline mode (no side-by-side layout)', inline === true, await page.evaluate(`document.querySelector('.monaco-diff-editor').className`));
-  await page.evaluate(splitToggle);
+  await page.selectOption(layout, 'split');
 
   await page.evaluate(`[...document.querySelectorAll('.commit-details .change-item')].find(b => b.textContent.includes('logo.bin')).click()`);
   const binaryMessage = await page.waitFor(`document.querySelector('.diff-message')?.textContent.startsWith('Binary') && document.querySelector('.diff-message').textContent`);

@@ -88,6 +88,8 @@ export const SETTING_FIELDS = {
     options: [
       { value: 'split', label: 'Split (side by side)' },
       { value: 'inline', label: 'Inline' },
+      { value: 'hunk', label: 'Hunks (only the changed fragments)' },
+      { value: 'file', label: 'File (the whole file, changes highlighted)' },
     ],
     label: 'Layout',
   },

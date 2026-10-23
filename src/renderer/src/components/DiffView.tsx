@@ -6,8 +6,12 @@ import { invoke } from '../api';
 import { CODE_FONT, languageForPath, monaco } from '../monaco/setup';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
+import { FileView, fileViewSelection, HunkView, type LineSelection } from './DiffModes';
+
+export type DiffLayout = 'split' | 'inline' | 'hunk' | 'file';
 
 interface DiffPrefs {
+  layout: DiffLayout;
   sideBySide: boolean;
   ignoreWhitespace: boolean;
   wordWrap: boolean;
@@ -23,6 +27,7 @@ function useDiffPrefs(): DiffPrefs {
   const values = useAppState((s) => s.settings.values);
   return useMemo(
     () => ({
+      layout: values['diff.layout'],
       sideBySide: values['diff.layout'] === 'split',
       ignoreWhitespace: values['diff.ignoreWhitespace'],
       wordWrap: values['diff.wordWrap'],
@@ -37,7 +42,6 @@ function useDiffPrefs(): DiffPrefs {
 }
 
 const TOGGLES = {
-  sideBySide: (on: boolean) => ({ 'diff.layout': on ? 'split' : 'inline' }),
   hideUnchanged: (on: boolean) => ({ 'diff.hideUnchanged': on }),
   ignoreWhitespace: (on: boolean) => ({ 'diff.ignoreWhitespace': on }),
   wordWrap: (on: boolean) => ({ 'diff.wordWrap': on }),
@@ -79,7 +83,11 @@ interface DiffViewProps {
 export function DiffView({ repo, target, title, subtitle, reloadKey, actions, editing, onClose }: DiffViewProps) {
   const { data, error, loading } = useCommand('diff:file', [repo, target], { reloadKey, keepPrevious: true });
   const prefs = useDiffPrefs();
-  const [changeCount, setChangeCount] = useState<number | null>(null);
+  const [changes, setChanges] = useState<LineChange[] | null>(null);
+  const changeCount = changes?.length ?? null;
+  const [hunkSelection, setHunkSelection] = useState<LineSelection>({ original: new Set(), modified: new Set() });
+  const fileEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const [currentChange, setCurrentChange] = useState(-1);
   const [hint, setHint] = useState<string | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
 
@@ -105,27 +113,53 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
   }
 
   /** Builds and sends a line request; `pick` gets the editor's current line changes. */
-  const runLineAction = async (action: LineAction, pick: (changes: LineChange[]) => LineActionRequest | null) => {
+  const runLineAction = async (action: LineAction, pick: (lineChanges: LineChange[]) => LineActionRequest | null) => {
     setHint(null);
     if (!editing || !data) return;
     if (blocked) return setHint(blocked);
-    const changes = editorRef.current?.getLineChanges();
-    if (!changes?.length) return setHint('No changes to work with');
-    const request = pick(changes);
+    const lineChanges = editorRef.current?.getLineChanges();
+    if (!lineChanges?.length) return setHint('No changes to work with');
+    const request = pick(lineChanges);
     if (!request) return setHint('Select changed lines first (left side: removals, right side: additions)');
     if (action === 'discard' && !(await editing.confirmDiscard(`the selected changes in ${target.path}`))) return;
     await editing.apply(request);
   };
 
   const hunkAction = (action: LineAction, change: LineChange) =>
-    runLineAction(action, (changes) => hunkRequest(action, target.path, data!, changes, change));
+    runLineAction(action, (lineChanges) => hunkRequest(action, target.path, data!, lineChanges, change));
 
   const selectionAction = (action: LineAction) =>
-    runLineAction(action, (changes) => {
-      const editor = editorRef.current!;
-      const selected = { original: selectedLines(editor.getOriginalEditor()), modified: selectedLines(editor.getModifiedEditor()) };
-      return selectionRequest(action, target.path, data!, changes, selected);
+    runLineAction(action, (current) => {
+      // The lines picked in whichever view is showing.
+      let selected: LineSelection;
+      if (prefs.layout === 'hunk') selected = hunkSelection;
+      else if (prefs.layout === 'file') selected = fileViewSelection(fileEditorRef.current);
+      else {
+        const editor = editorRef.current!;
+        selected = { original: selectedLines(editor.getOriginalEditor()), modified: selectedLines(editor.getModifiedEditor()) };
+      }
+      return selectionRequest(action, target.path, data!, current, selected);
     });
+
+  const setLayout = (layout: DiffLayout) => {
+    setHunkSelection({ original: new Set(), modified: new Set() });
+    invoke('settings:update', { values: { 'diff.layout': layout } }).catch((failure: unknown) => setHint(failure instanceof Error ? failure.message : String(failure)));
+  };
+
+  /** Previous/next change in any layout. */
+  const goToChange = (direction: 1 | -1) => {
+    if (prefs.layout === 'split' || prefs.layout === 'inline') return editorRef.current?.goToDiff(direction === 1 ? 'next' : 'previous');
+    if (!changes?.length) return;
+    const next = currentChange < 0 ? (direction === 1 ? 0 : changes.length - 1) : (currentChange + direction + changes.length) % changes.length;
+    setCurrentChange(next);
+    const change = changes[next]!;
+    if (prefs.layout === 'file') {
+      fileEditorRef.current?.revealLineInCenter(anchorLine(change));
+      fileEditorRef.current?.setPosition({ lineNumber: anchorLine(change), column: 1 });
+    } else {
+      document.querySelectorAll('.hunk-view .hunk')[next]?.scrollIntoView({ block: 'start' });
+    }
+  };
 
   const lineActions: LineAction[] = editing ? (editing.mode === 'unstaged' ? ['stage', 'discard'] : ['unstage']) : [];
 
@@ -137,16 +171,19 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
           {subtitle && <span className="diff-subtitle">{subtitle}</span>}
         </div>
         <div className="diff-toolbar">
-          <button type="button" onClick={() => editorRef.current?.goToDiff('previous')} disabled={!changeCount} title="Previous change">
+          <button type="button" onClick={() => goToChange(-1)} disabled={!changeCount} title="Previous change">
             ↑
           </button>
-          <button type="button" onClick={() => editorRef.current?.goToDiff('next')} disabled={!changeCount} title="Next change">
+          <button type="button" onClick={() => goToChange(1)} disabled={!changeCount} title="Next change">
             ↓
           </button>
           <span className="diff-count">{changeCount === null ? '' : `${changeCount} change${changeCount === 1 ? '' : 's'}`}</span>
-          <label>
-            <input type="checkbox" checked={prefs.sideBySide} onChange={() => toggle('sideBySide')} /> Split
-          </label>
+          <select aria-label="Diff layout" value={prefs.layout} onChange={(event) => setLayout(event.target.value as DiffLayout)}>
+            <option value="split">Split</option>
+            <option value="inline">Inline</option>
+            <option value="hunk">Hunks</option>
+            <option value="file">File</option>
+          </select>
           <label>
             <input type="checkbox" checked={prefs.hideUnchanged} onChange={() => toggle('hideUnchanged')} /> Collapse unchanged
           </label>
@@ -183,13 +220,39 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
       {!error && !data && loading && <div className="diff-message">Loading…</div>}
       {data && reason && <div className="diff-message">{reason}</div>}
       {data && !reason && (
-        <MonacoDiff
+        // Monaco's diff is the engine for every layout, so all of them show the same changes; for Hunks and
+        // File it stays mounted but hidden.
+        <div className={prefs.layout === 'hunk' || prefs.layout === 'file' ? 'diff-engine hidden' : 'diff-engine'}>
+          <MonacoDiff
+            data={data}
+            path={target.path}
+            prefs={prefs}
+            editorRef={editorRef}
+            onChanges={setChanges}
+            hunks={editing && !blocked ? { mode: editing.mode, run: hunkAction, runSelection: selectionAction } : null}
+          />
+        </div>
+      )}
+      {data && !reason && prefs.layout === 'hunk' && changes && (
+        <HunkView
+          data={data}
+          changes={changes}
+          actions={editing && !blocked ? lineActions : []}
+          onAction={(action, change) => void hunkAction(action, change)}
+          selection={hunkSelection}
+          onSelection={setHunkSelection}
+        />
+      )}
+      {data && !reason && prefs.layout === 'file' && changes && (
+        <FileView
           data={data}
           path={target.path}
-          prefs={prefs}
-          editorRef={editorRef}
-          onChangeCount={setChangeCount}
-          hunks={editing && !blocked ? { mode: editing.mode, run: hunkAction, runSelection: selectionAction } : null}
+          changes={changes}
+          fontFamily={prefs.fontFamily}
+          fontSize={prefs.fontSize}
+          hunkAction={editing && !blocked ? (editing.mode === 'staged' ? 'unstage' : 'stage') : null}
+          onAction={(action, change) => void hunkAction(action, change)}
+          editorRef={fileEditorRef}
         />
       )}
     </section>
@@ -207,12 +270,13 @@ interface MonacoDiffProps {
   path: string;
   prefs: DiffPrefs;
   editorRef: { current: monaco.editor.IStandaloneDiffEditor | null };
-  onChangeCount(count: number | null): void;
+  /** The current line changes (null while computing). */
+  onChanges(changes: LineChange[] | null): void;
   /** Null when lines cannot be staged right now; hunk glyphs and menu actions then stay inert. */
   hunks: HunkControls | null;
 }
 
-function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: MonacoDiffProps) {
+function MonacoDiff({ data, path, prefs, editorRef, onChanges, hunks }: MonacoDiffProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hunksRef = useRef(hunks);
   // New models take the current tab width; read through a ref so a model is not recreated when it changes.
@@ -262,7 +326,7 @@ function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: Mona
 
     const disposables = [
       editor.onDidUpdateDiff(() => {
-        onChangeCount(editor.getLineChanges()?.length ?? null);
+        onChanges(editor.getLineChanges() ?? null);
         refreshGlyphs();
       }),
       modified.onMouseDown((event) => {
@@ -320,7 +384,7 @@ function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: Mona
       editorRef.current = null;
       refreshGlyphsRef.current = () => {};
     };
-  }, [editorRef, onChangeCount]);
+  }, [editorRef, onChanges]);
 
   useEffect(() => {
     const editor = editorRef.current!;
@@ -334,8 +398,8 @@ function MonacoDiff({ data, path, prefs, editorRef, onChangeCount, hunks }: Mona
     editor.setModel({ original: model(data.original.text), modified: model(data.modified.text) });
     previous?.original.dispose();
     previous?.modified.dispose();
-    onChangeCount(null);
-  }, [data, path, editorRef, onChangeCount]);
+    onChanges(null);
+  }, [data, path, editorRef, onChanges]);
 
   useEffect(() => {
     const editor = editorRef.current;

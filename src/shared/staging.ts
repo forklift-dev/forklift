@@ -56,3 +56,9 @@ export interface LineActionRequest {
   /** 1-based lines on the modified side whose addition is picked. */
   selectedModified: number[];
 }
+
+/** `@@ -a,b +c,d @@` as git writes it (a count of 0 puts the start one line before). */
+export function hunkHeader(change: LineChange): string {
+  const range = (start: number, end: number) => (end === 0 ? `${start},0` : end === start ? `${start}` : `${start},${end - start + 1}`);
+  return `@@ -${range(change.originalStartLineNumber, change.originalEndLineNumber)} +${range(change.modifiedStartLineNumber, change.modifiedEndLineNumber)} @@`;
+}

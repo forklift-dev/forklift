@@ -58,8 +58,8 @@ export default async function ({ check }) {
   await page.click(`[...document.querySelectorAll('.change-item')].find(b => b.textContent.includes('a.txt'))`);
   await page.waitFor(`!!document.querySelector('.monaco-diff-editor .editor.modified .view-lines')`);
   check('diff opens inline as set in Preferences', await page.waitFor(`!document.querySelector('.monaco-diff-editor').classList.contains('side-by-side')`, 3000));
-  await page.evaluate(`[...document.querySelectorAll('.diff-toolbar label')].find(l => l.textContent.includes('Split')).querySelector('input').click()`);
-  check('diff toolbar toggle switches back to split', await page.waitFor(`document.querySelector('.monaco-diff-editor').classList.contains('side-by-side')`, 3000));
+  await page.selectOption(`document.querySelector('[aria-label="Diff layout"]')`, 'split');
+  check('diff toolbar layout switches back to split', await page.waitFor(`document.querySelector('.monaco-diff-editor').classList.contains('side-by-side')`, 3000));
   await page.press('Escape');
 
   // A custom editor command for all repositories.
