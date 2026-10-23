@@ -2,7 +2,7 @@
 id: T-034
 title: "Интерактивный rebase"
 stage: 3 — История и операции над коммитами
-status: todo
+status: review
 depends_on: [T-033]
 updated: 2026-10-23
 ---
@@ -19,11 +19,11 @@ updated: 2026-10-23
 
 ## Этапы
 
-- [ ] Запуск: «Interactive rebase from here» в графе
-- [ ] Свой `GIT_SEQUENCE_EDITOR` (скрипт, получающий план из приложения через IPC-мост, как askpass) или `git rebase -i` с подготовленным todo
-- [ ] Reword/squash: редактирование сообщений в окне приложения (свой `GIT_EDITOR`)
-- [ ] Конфликты посреди rebase → T-025; продолжить/прервать
-- [ ] Тесты: переупорядочивание, squash, fixup, drop, reword, конфликт
+- [x] Запуск: «Interactive rebase from here» в графе
+- [x] `git rebase -i` с подготовленным todo: `GIT_SEQUENCE_EDITOR="cp '<todo>'"`
+- [x] Reword/squash: сообщения в окне приложения; git получает их без редактора (`exec git commit --amend -F <файл>`)
+- [x] Конфликты посреди rebase → T-025; продолжить/пропустить/прервать (и после перезапуска)
+- [x] Тесты: переупорядочивание, squash, fixup, drop, reword, конфликт
 
 ## Критерии готовности
 
@@ -31,6 +31,19 @@ updated: 2026-10-23
 - Юнит/интеграционные тесты, `npm run typecheck`, `lint`, `test`, сквозной набор в `npm run test:e2e` — зелёные
 
 ## Нюансы
+
+- 2026-10-23: без редактора и без моста: приложение пишет todo и файлы сообщений в `.git/forklift-rebase/`
+  (переживают перезапуск посреди rebase), `GIT_SEQUENCE_EDITOR` копирует todo. reword = `pick` + `exec git commit
+  --amend -F <файл>`, squash = `pick` + `fixup` + тот же `exec` с объединённым сообщением (его можно править;
+  по умолчанию — сообщения через пустую строку, как предлагает git), fixup — `fixup`. Хуки при amend работают.
+- 2026-10-23: диапазон с merge-коммитами не поддерживается (rebase -i их бы «выпрямил») — понятное сообщение.
+  `--rebase-merges` — если понадобится.
+- 2026-10-23: план проверяется в main: те же коммиты, что `base..HEAD` сейчас (иначе «branch changed»), первый
+  оставшийся коммит не может быть squash/fixup, у reword должно быть сообщение. `--autostash` — как у merge/rebase.
+- 2026-10-23: попутно исправлено (T-025): `--continue`/`--skip`, остановившиеся на конфликте **следующего** коммита,
+  показывались как ошибка; теперь это продвижение (определяется по смене HEAD/REBASE_HEAD), ошибка — только если
+  git ничего не сделал.
+- 2026-10-23: проверено: юнит-тесты на реальном git и сквозной набор `interactive-rebase` (6 проверок).
 
 - GitKraken использует свой `GitSequenceEditor.sh` + `GitSequenceEditorClient.js` (src/js/redux/domain/Rebase) — идею можно повторить своим кодом.
 

@@ -7,6 +7,7 @@ import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
 import { CommitGraph } from './CommitGraph';
 import { ConflictView } from './ConflictView';
+import { InteractiveRebaseView } from './InteractiveRebaseView';
 import { OperationBanner } from './OperationBanner';
 import { copyText, useContextMenu } from './ContextMenu';
 import { LeftPanel } from './LeftPanel';
@@ -29,6 +30,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const [conflictPath, setConflictPath] = useState<string | null>(null);
+  const [rebaseBase, setRebaseBase] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
   const { open: openMenu, menu } = useContextMenu();
@@ -68,7 +70,9 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={setSelectedCommit} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
-      {conflictPath ? (
+      {rebaseBase ? (
+        <InteractiveRebaseView key={rebaseBase} repo={repo} base={rebaseBase} branch={data.branch.head ?? 'HEAD'} run={run} onClose={() => setRebaseBase(null)} />
+      ) : conflictPath ? (
         <ConflictView key={conflictPath} repo={repo} path={conflictPath} run={run} runInBackground={runInBackground} onClose={() => setConflictPath(null)} />
       ) : diffTarget ? (
         <DiffView
@@ -124,6 +128,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               { label: 'Revert commit…', disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },
               { label: `Merge this commit into ${data.branch.head ?? 'HEAD'}…`, disabled: isHead || busy, onSelect: () => refActions.merge(row.hash, short) },
               { label: `Rebase ${data.branch.head ?? 'HEAD'} onto this commit…`, disabled: isHead || busy, onSelect: () => refActions.rebase(row.hash, short) },
+              { label: `Interactive rebase ${data.branch.head ?? 'HEAD'} from here…`, disabled: isHead || busy, onSelect: () => setRebaseBase(row.hash) },
               'separator',
               { label: `Reset ${data.branch.head ?? 'HEAD'} to here: soft…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'soft') },
               { label: `Reset ${data.branch.head ?? 'HEAD'} to here: mixed…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'mixed') },

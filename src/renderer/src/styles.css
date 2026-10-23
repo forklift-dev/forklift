@@ -1543,3 +1543,87 @@ select {
 .prompt-note {
   font-size: 12px;
 }
+
+/* Interactive rebase */
+.rebase-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.center > .rebase-view {
+  flex: 1;
+}
+
+.rebase-hint {
+  margin: 8px 12px 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.rebase-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px 24px;
+  overflow: auto;
+}
+
+.rebase-row {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  background: var(--bg);
+}
+
+.rebase-row.dragging {
+  opacity: 0.5;
+}
+
+.rebase-row.action-drop .rebase-subject {
+  text-decoration: line-through;
+  color: var(--fg-muted);
+}
+
+.rebase-row.action-squash,
+.rebase-row.action-fixup {
+  margin-left: 24px;
+}
+
+.rebase-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--fg-muted);
+}
+
+.rebase-subject {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rebase-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px 8px 36px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.rebase-message textarea {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}

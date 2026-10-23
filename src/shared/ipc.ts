@@ -2,6 +2,7 @@
 import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
+import type { RebaseCommit, RebaseStep } from './rebase';
 import type { HistoryPage } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
@@ -70,6 +71,10 @@ export interface Commands {
   'remote:cancel': { args: [repo: string]; result: void };
   /** Answers a credential prompt (`null`: cancel). The answer is passed to git and kept nowhere. */
   'askpass:answer': { args: [id: number, answer: string | null]; result: void };
+  /** Commits after `base` up to HEAD (oldest first) for the interactive rebase editor. */
+  'rebase:plan': { args: [repo: string, base: string]; result: RebaseCommit[] };
+  /** Runs an edited plan ('conflicts': git stopped, the operation banner continues it). */
+  'rebase:interactive': { args: [repo: string, base: string, steps: RebaseStep[]]; result: 'done' | 'conflicts' };
   /** Versions of a conflicted file for the conflict editor. */
   'conflict:file': { args: [repo: string, path: string]; result: ConflictFile };
   /** Writes the edited result (refused if the file changed since `expectedHash`); optionally marks it resolved. */
@@ -163,6 +168,8 @@ const commandChannelSet = {
   'remote:setUrl': true,
   'remote:remove': true,
   'askpass:answer': true,
+  'rebase:plan': true,
+  'rebase:interactive': true,
   'conflict:file': true,
   'conflict:save': true,
   'conflict:take': true,

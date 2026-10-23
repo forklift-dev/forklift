@@ -73,8 +73,28 @@ export class ConflictService {
     return this.queue.run(root, async () => {
       const args = ACTIONS[operation.kind][action];
       if (!args) throw new ConflictError(`A ${operation.kind} cannot be ${action === 'skip' ? 'skipped' : `${action}d`}`);
-      await this.exec(root, args, true);
+      const before = await this.position(root);
+      try {
+        await this.exec(root, args, true);
+      } catch (error) {
+        // Continuing or skipping can stop again at the next commit's conflicts: that is progress, not a failure.
+        // (Refusing to continue because conflicts remain moves nothing.)
+        if (action === 'abort' || operation.kind === 'merge') throw error;
+        const { stdout } = await this.git.exec(['diff', '--name-only', '--diff-filter=U'], { cwd: root, readOnly: true });
+        if (!stdout.trim() || (await this.position(root)) === before) throw error;
+      }
     });
+  }
+
+  /** HEAD and the commit being applied: changes whenever a sequencer step happened. */
+  private async position(root: string): Promise<string> {
+    const refs = await Promise.all(
+      ['HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].map(async (ref) => {
+        const { stdout } = await this.git.exec(['rev-parse', '-q', '--verify', ref], { cwd: root, readOnly: true, allowedExitCodes: [1] });
+        return stdout.trim();
+      }),
+    );
+    return refs.join(' ');
   }
 
   private async exec(root: string, args: string[], showOutput = false): Promise<void> {

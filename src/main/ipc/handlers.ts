@@ -8,6 +8,8 @@ import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
+import type { InteractiveRebase } from '../git/interactiveRebase';
+import type { RebaseStep } from '../../shared/rebase';
 import type { RemoteRun, RemoteService } from '../git/remote';
 import type { NetworkKind, NetworkOps } from '../repos/network';
 import type { DiffTools } from '../external/diffTools';
@@ -42,6 +44,7 @@ export interface HandlerDeps {
   commitOps: CommitOps;
   remotes: RemoteService;
   networkOps: NetworkOps;
+  interactiveRebase: InteractiveRebase;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
   onFetched?(root: string): void;
   /** Hands a credential answer to the waiting git process. */
@@ -160,7 +163,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -289,6 +292,26 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (!Number.isInteger(id)) throw new TypeError('id must be a prompt id');
       if (answer !== null && (typeof answer !== 'string' || answer.length > 10_000 || /[\r\n\0]/.test(answer))) throw new TypeError('answer must be one line');
       answerPrompt(id, answer);
+    },
+
+    async 'rebase:plan'(_ctx, repo, base) {
+      const root = tab(repo);
+      assertSha(base);
+      return interactiveRebase.plan(root, base);
+    },
+
+    async 'rebase:interactive'(_ctx, repo, base, steps) {
+      const root = tab(repo);
+      assertSha(base);
+      if (!Array.isArray(steps) || steps.length > 10_000) throw new TypeError('steps must be an array');
+      const parsed: RebaseStep[] = steps.map((step: unknown) => {
+        const raw = (typeof step === 'object' && step !== null ? step : {}) as Record<string, unknown>;
+        assertSha(raw['sha']);
+        if (!['pick', 'reword', 'squash', 'fixup', 'drop'].includes(raw['action'] as string)) throw new TypeError('unknown rebase action');
+        if (raw['message'] !== undefined && (typeof raw['message'] !== 'string' || raw['message'].length > 100_000)) throw new TypeError('message must be text');
+        return { sha: raw['sha'], action: raw['action'] as RebaseStep['action'], ...(raw['message'] !== undefined && { message: raw['message'] as string }) };
+      });
+      return thenRefresh(root, () => interactiveRebase.run(root, base, parsed));
     },
 
     async 'conflict:file'(_ctx, repo, path) {
