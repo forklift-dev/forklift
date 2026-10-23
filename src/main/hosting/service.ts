@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { MAX_ACCOUNTS, matchRemote, normalizeServerUrl, type HostingAccount, type HostingProvider, type HostingRepo, type RepoHosting } from '../../shared/hosting';
 import type { CredentialFields } from '../askpass/credentials';
-import { HostingClient, HostingError, type Fetch } from './client';
+import { createClient, HostingError, type Fetch, type HostingApi } from './client';
 import type { TokenStore } from './tokens';
 
 export interface HostingDeps {
@@ -30,7 +30,7 @@ export class HostingService {
     if (!url) throw new Error(`"${rawUrl}" is not a server address`);
     const trimmed = token.trim();
     if (!trimmed || trimmed.length > MAX_TOKEN || /\s/.test(trimmed)) throw new Error('The token must be one word, as the server showed it');
-    const user = await new HostingClient(provider, url, trimmed, this.deps.fetch).user().catch((error: unknown) => {
+    const user = await createClient(provider, url, trimmed, this.deps.fetch).user().catch((error: unknown) => {
       // An address typed without a scheme is tried over HTTPS only; never quietly over plain HTTP (the token would travel unencrypted).
       if (error instanceof HostingError && error.status === null && !rawUrl.includes('://')) throw new HostingError(`${error.message}. If the server has no HTTPS, type its address with http://`);
       throw error;
@@ -60,10 +60,10 @@ export class HostingService {
     return account;
   }
 
-  async client(account: HostingAccount): Promise<HostingClient> {
+  async client(account: HostingAccount): Promise<HostingApi> {
     const token = await this.deps.tokens.get(account.id, account.url);
     if (!token) throw new HostingError(`No token is saved for ${account.username} on ${new URL(account.url).host}: add the account again in Preferences → Integrations`);
-    return new HostingClient(account.provider, account.url, token, this.deps.fetch);
+    return createClient(account.provider, account.url, token, this.deps.fetch);
   }
 
   async repos(accountId: string): Promise<HostingRepo[]> {

@@ -3,4 +3,4 @@
 import { hostingProviderSuite } from '../hostingProvider.mjs';
 
 export default (context) =>
-  hostingProviderSuite(context, { flavor: 'github', name: 'GitHub', server: 'https://github.com', tokenPage: 'github.com/settings/tokens', accept: 'application/vnd.github+json', pullRefs: true });
+  hostingProviderSuite(context, { flavor: 'github', name: 'GitHub', server: 'https://github.com', tokenPage: 'github.com/settings/tokens', accept: 'application/vnd.github+json', pullRef: 'refs/pull/2/head' });

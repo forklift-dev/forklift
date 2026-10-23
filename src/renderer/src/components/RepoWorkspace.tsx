@@ -30,6 +30,7 @@ import { DiffView, type DiffEditing } from './DiffView';
 import { useFormDialog } from './FormDialog';
 import { HostingView, type HostingItem } from './HostingView';
 import { useAppState } from '../state';
+import { pullTerm } from '../../../shared/hosting';
 
 interface RepoWorkspaceProps {
   data: RepoData;
@@ -156,20 +157,21 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const createPull = () => {
     if (!hosting || !data.branch.head) return;
     const remote = hosting.remote;
+    const term = pullTerm(hosting.account.provider);
     // The branch's name on the server: its upstream there, or the same name.
     const upstream = data.branch.upstream;
     const pushed = upstream?.startsWith(`${remote}/`) ? upstream.slice(remote.length + 1) : data.branch.head;
-    const unpushed = !upstream?.startsWith(`${remote}/`) ? `${data.branch.head} is not on ${remote} yet: push it first.` : data.branch.ahead > 0 ? `${data.branch.ahead} commit(s) of ${data.branch.head} are not pushed yet; the pull request will only have what is on ${remote}.` : null;
+    const unpushed = !upstream?.startsWith(`${remote}/`) ? `${data.branch.head} is not on ${remote} yet: push it first.` : data.branch.ahead > 0 ? `${data.branch.ahead} commit(s) of ${data.branch.head} are not pushed yet; the ${term.toLowerCase()} will only have what is on ${remote}.` : null;
     const bases = [...new Set([hosting.defaultBranch, ...data.remoteBranches.filter((branch) => branch.remote === remote).map((branch) => branch.name.slice(remote.length + 1)).filter((name) => name !== 'HEAD' && name !== pushed)])];
     void openForm({
-      title: `Pull request from ${pushed}`,
+      title: `${term} from ${pushed}`,
       detail: `${hosting.owner}/${hosting.name} on ${new URL(hosting.account.url).host}${unpushed ? `. ${unpushed}` : ''}`,
       fields: [
         { name: 'title', label: 'Title', initial: pushed.replace(/^[\w-]+\//, '').replace(/[-_]+/g, ' ') },
         { name: 'base', label: 'Into', type: 'select', options: bases.map((name) => ({ value: name, label: name })), initial: hosting.defaultBranch },
         { name: 'body', label: 'Description', type: 'textarea' },
       ],
-      confirmLabel: 'Create pull request',
+      confirmLabel: `Create ${term.toLowerCase()}`,
       validate: async (values) => (String(values['title']).trim() ? null : 'A title is needed'),
       submit: async (values) => {
         try {
@@ -245,7 +247,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     'hosting.showPulls': {
       run: () => {
         if (layout.leftHidden) togglePanel('left');
-        requestAnimationFrame(() => document.querySelector('.ref-section[aria-label="Pull requests"]')?.scrollIntoView({ block: 'start' }));
+        requestAnimationFrame(() => document.querySelector('.ref-section[data-section="pulls"]')?.scrollIntoView({ block: 'start' }));
       },
       enabled: () => Boolean(hosting),
     },
@@ -413,7 +415,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               setDiffTarget({ kind: 'commit', sha: file.sourceSha ?? selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
             }
             onFileHistory={(path) => setFileHistory({ path, mode: 'history' })}
-            onOpenIssue={hosting ? (number) => openHosting({ kind: 'issue', number }) : undefined}
+            onOpenRef={hosting ? openHosting : undefined}
+            provider={hosting?.account.provider}
             actions={selectedStash && (
               <>
                 <span className="stash-label">stash@{`{${selectedStash.index}}`}</span>

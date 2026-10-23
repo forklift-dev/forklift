@@ -65,7 +65,7 @@ describe.each(['forgejo', 'gitverse', 'github'] as const)('HostingClient (%s)', 
     expect(pull).toMatchObject({ title: 'Topic', head: 'topic', base: 'main', state: 'open', author: 'ada' });
     const issue = await client.createIssue('ada', 'demo', { title: 'New bug', body: '' });
     expect((await client.issues('ada', 'demo', 'open'))[0]?.number).toBe(issue.number);
-    const comment = await client.comment('ada', 'demo', 3, 'Me too');
+    const comment = await client.comment('ada', 'demo', 'issue', 3, 'Me too');
     expect((await client.issue('ada', 'demo', 3)).discussion).toEqual([comment]);
   });
 

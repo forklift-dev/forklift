@@ -3,4 +3,4 @@
 import { hostingProviderSuite } from '../hostingProvider.mjs';
 
 export default (context) =>
-  hostingProviderSuite(context, { flavor: 'gitverse', name: 'GitVerse', server: 'https://gitverse.ru', tokenPage: 'gitverse.ru/settings/tokens', accept: 'application/vnd.gitverse.object+json;version=1', pullRefs: false });
+  hostingProviderSuite(context, { flavor: 'gitverse', name: 'GitVerse', server: 'https://gitverse.ru', tokenPage: 'gitverse.ru/settings/tokens', accept: 'application/vnd.gitverse.object+json;version=1', pullRef: null });

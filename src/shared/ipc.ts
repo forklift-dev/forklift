@@ -116,8 +116,8 @@ export interface Commands {
   'hosting:issues': { args: [repo: string, state: 'open' | 'closed' | 'all']; result: IssueSummary[] };
   'hosting:issue': { args: [repo: string, number: number]; result: IssueDetails };
   'hosting:createIssue': { args: [repo: string, issue: { title: string; body: string }]; result: IssueSummary };
-  /** Comments on a pull request or an issue (they share numbers). */
-  'hosting:comment': { args: [repo: string, number: number, body: string]; result: HostingComment };
+  /** Comments on a pull request or an issue (Forgejo and GitHub number them together, GitLab separately). */
+  'hosting:comment': { args: [repo: string, kind: 'pull' | 'issue', number: number, body: string]; result: HostingComment };
   /** Commits after `base` up to HEAD (oldest first) for the interactive rebase editor. */
   'rebase:plan': { args: [repo: string, base: string]; result: RebaseCommit[] };
   /** Runs an edited plan ('conflicts': git stopped, the operation banner continues it). */

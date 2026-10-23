@@ -1,28 +1,9 @@
 import type { HostingComment, HostingProvider, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary } from '../../shared/hosting';
+import { num, str, Transport, type Fetch, type HostingApi, type Json } from './api';
+import { GitLabClient } from './gitlab';
 
-export type Fetch = (
-  url: string,
-  init: { method?: string; headers: Record<string, string>; body?: string; signal?: AbortSignal; redirect?: 'error' | 'manual' },
-) => Promise<{
-  status: number;
-  ok: boolean;
-  headers: { get(name: string): string | null };
-  text(): Promise<string>;
-}>;
+export { HostingError, type Fetch, type HostingApi } from './api';
 
-export class HostingError extends Error {
-  constructor(
-    message: string,
-    readonly status: number | null = null,
-  ) {
-    super(message);
-    this.name = 'HostingError';
-  }
-}
-
-type Json = Record<string, unknown>;
-const str = (value: unknown) => (typeof value === 'string' ? value : '');
-const num = (value: unknown) => (typeof value === 'number' ? value : 0);
 const login = (user: unknown) => str((user as Json | null)?.['login']);
 
 const PAGE = 50;
@@ -40,7 +21,7 @@ interface ApiStyle {
   errorMessage(body: Json): string;
 }
 
-const STYLES: Record<HostingProvider, ApiStyle> = {
+const STYLES: Record<Exclude<HostingProvider, 'gitlab'>, ApiStyle> = {
   // Forgejo and Gitea: /api/v1 on the server, "token" authorization.
   forgejo: {
     base: (server) => `${server}/api/v1`,
@@ -69,19 +50,23 @@ const STYLES: Record<HostingProvider, ApiStyle> = {
   },
 };
 
-/** A Gitea-style REST API (Forgejo, Gitea, GitVerse) with a personal access token. */
-export class HostingClient {
-  private readonly style: ApiStyle;
+/** The API client for an account's service. */
+export function createClient(provider: HostingProvider, server: string, token: string, fetch: Fetch, timeoutMs?: number): HostingApi {
+  return provider === 'gitlab' ? new GitLabClient(server, token, fetch, timeoutMs) : new HostingClient(provider, server, token, fetch, timeoutMs);
+}
 
-  constructor(
-    provider: HostingProvider,
-    /** Server address, e.g. https://code.example.com */
-    private readonly server: string,
-    private readonly token: string,
-    private readonly fetch: Fetch,
-    private readonly timeoutMs = 20_000,
-  ) {
+/** A Gitea-style REST API (Forgejo, Gitea, GitVerse, GitHub) with a personal access token. */
+export class HostingClient implements HostingApi {
+  private readonly style: ApiStyle;
+  private readonly transport: Transport;
+
+  constructor(provider: Exclude<HostingProvider, 'gitlab'>, server: string, token: string, fetch: Fetch, timeoutMs = 20_000) {
     this.style = STYLES[provider];
+    this.transport = new Transport({ server, base: this.style.base(server), headers: this.style.headers(token), errorMessage: this.style.errorMessage, fetch, timeoutMs });
+  }
+
+  pullRef(number: number): string {
+    return `refs/pull/${number}/head`;
   }
 
   private page(page: number) {
@@ -174,7 +159,7 @@ export class HostingClient {
   }
 
   /** Pull requests and issues share their comments (an issue number for both). */
-  async comment(owner: string, name: string, number: number, body: string): Promise<HostingComment> {
+  async comment(owner: string, name: string, _kind: 'pull' | 'issue', number: number, body: string): Promise<HostingComment> {
     return toComment((await this.request(`/repos/${seg(owner)}/${seg(name)}/issues/${number}/comments`, 'POST', { body })) as Json);
   }
 
@@ -182,77 +167,8 @@ export class HostingClient {
     return ((await this.request(`/repos/${seg(owner)}/${seg(name)}/issues/${number}/comments`)) as Json[]).map(toComment);
   }
 
-  /**
-   * Where `url` redirects to, asked again without the token (a failed request may have been a redirect, e.g.
-   * an old address of the server): the server address to use instead, or null.
-   */
-  private async redirectTarget(url: string): Promise<string | null> {
-    try {
-      const probe = await this.fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(this.timeoutMs), redirect: 'manual' });
-      const location = probe.status >= 300 && probe.status < 400 ? probe.headers.get('Location') : null;
-      if (!location) return null;
-      const target = new URL(location, url);
-      // The same API path on the new server: its address is what comes before it; otherwise just its origin.
-      const apiPath = new URL(url).pathname;
-      const prefix = target.pathname.endsWith(apiPath) ? target.pathname.slice(0, -apiPath.length) : '';
-      return `${target.origin}${prefix}`;
-    } catch {
-      return null;
-    }
-  }
-
-  private async request(path: string, method = 'GET', body?: unknown): Promise<unknown> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let response;
-    const url = `${this.style.base(this.server)}${path}`;
-    try {
-      response = await this.fetch(url, {
-        method,
-        headers: { ...this.style.headers(this.token), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
-        ...(body !== undefined && { body: JSON.stringify(body) }),
-        signal: controller.signal,
-        // The token is never sent on to wherever a redirect points.
-        redirect: 'error',
-      });
-    } catch (error) {
-      const host = new URL(this.server).host;
-      if (controller.signal.aborted) throw new HostingError(`${host} did not answer in time`);
-      const moved = await this.redirectTarget(url);
-      if (moved) throw new HostingError(`${host} sends requests on to ${moved}: add the account with that address`);
-      throw new HostingError(`Could not reach ${host}: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      clearTimeout(timer);
-    }
-    const text = await response.text();
-    if (!response.ok) {
-      let message = '';
-      try {
-        message = this.style.errorMessage(JSON.parse(text) as Json);
-      } catch {
-        // not JSON
-      }
-      if (response.status === 401) throw new HostingError('The server refused the token (wrong, expired or revoked)', 401);
-      // GitHub reports its rate limit as 403 with no requests remaining; others as 429.
-      if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0')) {
-        const retry = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
-        const reset = Number.parseInt(response.headers.get('x-ratelimit-reset') ?? '', 10);
-        const wait = Number.isFinite(retry) ? retry : Number.isFinite(reset) ? reset - Date.now() / 1000 : Number.NaN;
-        throw new HostingError(`Too many requests to the server${Number.isFinite(wait) ? `: try again in ${Math.max(1, Math.ceil(wait / 60))} min` : ', try again later'}`, 429);
-      }
-      if (response.status === 403) throw new HostingError(`Not allowed${message ? `: ${message}` : ' (does the token have the needed access?)'}`, 403);
-      if (response.status === 404) throw new HostingError(`Not found on the server${message ? `: ${message}` : ''}`, 404);
-      throw new HostingError(`The server answered ${response.status}${message ? `: ${message}` : ''}`, response.status);
-    }
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new HostingError(
-        /<title>[^<]*bot/i.test(text)
-          ? 'The server answered with a bot check page instead of its API (its bot protection let no app through)'
-          : 'The server did not answer with JSON: is this the right server address for the service?',
-      );
-    }
+  private request(path: string, method = 'GET', body?: unknown): Promise<unknown> {
+    return this.transport.request(path, method, body);
   }
 }
 

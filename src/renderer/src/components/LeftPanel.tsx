@@ -6,7 +6,7 @@ import { copyText, type MenuItem } from './ContextMenu';
 import { headLabel, type RefActions } from './useRefActions';
 import type { Gitflow } from './useGitflow';
 import { flowBranch } from '../../../shared/gitflow';
-import type { RepoHosting } from '../../../shared/hosting';
+import { pullTerm, refLabel, type RepoHosting } from '../../../shared/hosting';
 import type { HostingItem } from './HostingView';
 
 /** The repository's server (when an account matches its remotes): pull requests and issues sections. */
@@ -47,7 +47,7 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
   children: ReactNode;
 }) {
   return (
-    <section className="ref-section" aria-label={title}>
+    <section className="ref-section" aria-label={title} data-section={id}>
       <header className="ref-section-header">
         <button type="button" className="ref-section-toggle" aria-expanded={!collapsed} onClick={() => onToggle(id)}>
           <span className={`codicon ${collapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'}`} aria-hidden="true" />
@@ -504,6 +504,7 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
   const pulls = useCommand('hosting:pulls', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
   const issues = useCommand('hosting:issues', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
   const server = new URL(hosting.context.account.url).host;
+  const term = pullTerm(hosting.context.account.provider);
   const buttons = (create: string, onCreate: () => void) => (
     <span className="ref-section-actions">
       <button type="button" className="icon-button" aria-label={`Refresh from ${server}`} title={`Refresh from ${server}`} onClick={hosting.onRefresh}>
@@ -516,24 +517,25 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
   );
   const item = (kind: HostingItem['kind'], entry: { number: number; title: string; author: string; webUrl: string }, icon: string, note: string) => {
     const selected = hosting.selected?.kind === kind && hosting.selected.number === entry.number;
+    const label = refLabel(hosting.context.account.provider, kind, entry.number);
     return (
       <li
         key={entry.number}
         className={`ref-item hosting-item${selected ? ' current' : ''}`}
         data-hosting={`${kind}-${entry.number}`}
-        title={`#${entry.number} ${entry.title} — ${entry.author}`}
+        title={`${label} ${entry.title} — ${entry.author}`}
         onClick={() => hosting.onOpen({ kind, number: entry.number })}
         onContextMenu={(event) =>
           openMenu(event, [
             { label: 'Show', onSelect: () => hosting.onOpen({ kind, number: entry.number }) },
             { label: 'Copy link', onSelect: () => copyText(entry.webUrl) },
-            { label: 'Copy number', onSelect: () => copyText(`#${entry.number}`) },
+            { label: 'Copy number', onSelect: () => copyText(label) },
           ])
         }
       >
         <span className={`codicon codicon-${icon}`} aria-hidden="true" />
         <span className="ref-name">
-          <span className="hosting-number">#{entry.number}</span> {entry.title}
+          <span className="hosting-number">{label}</span> {entry.title}
         </span>
         {note && <span className="submodule-state">{note}</span>}
       </li>
@@ -542,10 +544,10 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
   const error = (text: string | null) => text && <li className="ref-error setting-error" title={text}>{text}</li>;
   return (
     <>
-      <Section id="pulls" title="Pull requests" count={pulls.data?.length ?? 0} collapsed={Boolean(collapsed['pulls'])} onToggle={onToggle} action={buttons('Create a pull request', hosting.onCreatePull)}>
+      <Section id="pulls" title={`${term}s`} count={pulls.data?.length ?? 0} collapsed={Boolean(collapsed['pulls'])} onToggle={onToggle} action={buttons(`Create a ${term.toLowerCase()}`, hosting.onCreatePull)}>
         {error(pulls.error)}
         {pulls.data?.filter((pull) => match(`${pull.number} ${pull.title} ${pull.head}`)).map((pull) => item('pull', pull, 'git-pull-request', pull.draft ? 'draft' : pull.head))}
-        {pulls.data?.length === 0 && <li className="empty-note">No open pull requests</li>}
+        {pulls.data?.length === 0 && <li className="empty-note">No open {term.toLowerCase()}s</li>}
       </Section>
       <Section id="issues" title="Issues" count={issues.data?.length ?? 0} collapsed={Boolean(collapsed['issues'])} onToggle={onToggle} action={buttons('Create an issue', hosting.onCreateIssue)}>
         {error(issues.error)}

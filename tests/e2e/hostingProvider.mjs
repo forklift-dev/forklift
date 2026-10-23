@@ -14,8 +14,13 @@ const view = `document.querySelector('.hosting-view')`;
 const viewText = `(${view}?.textContent ?? '')`;
 const accounts = `document.querySelector('.hosting-accounts')`;
 
-/** `flavor`: the mock's and the provider's id; `name`: as listed; `server`: filled in; `accept`: the API media type; `pullRefs`: the server has refs/pull/N/head. */
-export async function hostingProviderSuite({ check }, { flavor, name, server, tokenPage, accept, pullRefs }) {
+/**
+ * `flavor`: the provider's id (and the mock's flavor); `name`: as listed; `server`: filled in; `accept`: the API
+ * media type; `pullRef`: the ref the server keeps pull request 2's head under, or null; `startMock`: another mock
+ * server than startForgejoMock; `extra`: further checks with the repository open.
+ */
+export async function hostingProviderSuite({ check }, { flavor, name, server, tokenPage, accept, pullRef, startMock, extra }) {
+  const pullRefs = Boolean(pullRef);
   if (binary) return; // FORKLIFT_TEST_BASIC_SECRETS works in development builds only.
   const env = { ...process.env, ...GIT_IDENTITY, GIT_TERMINAL_PROMPT: '0' };
   const sh = (cwd, ...args) => execFileSync('git', args, { cwd, env, stdio: 'pipe' }).toString().trim();
@@ -37,10 +42,10 @@ export async function hostingProviderSuite({ check }, { flavor, name, server, to
   sh(served, 'clone', '-q', '--bare', seed, join(served, 'eve', 'demo.git'));
   // A server that publishes pull request refs has the fork's commits in the base repository too.
   if (pullRefs) {
-    sh(join(served, 'ada', 'demo.git'), 'fetch', '-q', join(served, 'eve', 'demo.git'), '+refs/heads/fix:refs/pull/2/head');
+    sh(join(served, 'ada', 'demo.git'), 'fetch', '-q', join(served, 'eve', 'demo.git'), `+refs/heads/fix:${pullRef}`);
     rmSync(join(served, 'eve', 'demo.git'), { recursive: true });
   }
-  const mock = await startForgejoMock({ gitRoot: served, flavor });
+  const mock = await (startMock ? startMock({ gitRoot: served }) : startForgejoMock({ gitRoot: served, flavor }));
   defer(() => mock.close());
   const root = join(tempDir('forklift-mine-'), 'demo');
   sh(served, 'clone', '-q', join(served, 'ada', 'demo.git'), root);
@@ -69,6 +74,7 @@ export async function hostingProviderSuite({ check }, { flavor, name, server, to
   await page.click(item('pull-2'));
   await page.waitFor(`/WIP: Fix from a fork/.test(${viewText}) && !!${button(view, 'Check out')}`);
   await page.click(button(view, 'Check out'));
-  check(`a fork’s pull request is fetched ${pullRefs ? 'from refs/pull/2/head' : 'from the fork’s branch'} as pr/2`, await page.waitFor(`document.querySelector('.toolbar .branch')?.textContent.startsWith('pr/2')`, 15000) && sh(root, 'rev-parse', 'pr/2') === forkSha);
+  check(`a fork’s pull request is fetched ${pullRefs ? `from ${pullRef}` : 'from the fork’s branch'} as pr/2`, await page.waitFor(`document.querySelector('.toolbar .branch')?.textContent.startsWith('pr/2')`, 15000) && sh(root, 'rev-parse', 'pr/2') === forkSha);
   check('git used the token, nobody was asked', !(await page.evaluate(`!!document.querySelector('.prompt-dialog')`)) && mock.requests.some((r) => r.git && r.path.startsWith(pullRefs ? '/ada/demo.git' : '/eve/demo.git') && r.authorized));
+  await extra?.({ page, check, mock, root, sh });
 }

@@ -474,14 +474,15 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         });
         return;
       }
-      // From a fork: the server keeps its commits at refs/pull/<number>/head; a local branch pr/<number> holds them.
+      // From a fork: the server keeps its commits under a ref of its own (refs/pull/<number>/head,
+      // refs/merge-requests/<number>/head); a local branch pr/<number> holds them.
       const local = `pr/${number}`;
       await thenRefresh(root, async () => {
         await network(root, 'fetch', async (run) => {
           try {
-            await remotes.networkCommand(root, ['fetch', '--progress', remote, `refs/pull/${number}/head`], run);
+            await remotes.networkCommand(root, ['fetch', '--progress', remote, client.pullRef(number)], run);
           } catch (error) {
-            // Not every service publishes that ref: then the fork's branch itself, from the same server only
+            // Not every service publishes the pull request's ref: then the fork's branch itself, from the same server only
             // (the URL comes from the server; git must not be pointed at another host or transport).
             const fork = pull.headCloneUrl ? new URL(pull.headCloneUrl) : null;
             const server = new URL(account.url);
@@ -518,11 +519,12 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       return client.createIssue(owner, name, request);
     },
 
-    async 'hosting:comment'(_ctx, repo, number, body) {
+    async 'hosting:comment'(_ctx, repo, kind, number, body) {
+      if (kind !== 'pull' && kind !== 'issue') throw new TypeError('kind must be pull or issue');
       assertNumber(number);
       const text = parseText(body, 'comment', true);
       const { client, owner, name } = await hostingOf(tab(repo));
-      return client.comment(owner, name, number, text);
+      return client.comment(owner, name, kind, number, text);
     },
 
     async 'rebase:plan'(_ctx, repo, base) {

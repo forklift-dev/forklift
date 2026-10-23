@@ -1,9 +1,22 @@
-// Hosting services (Forgejo, GitVerse, GitHub; GitLab later): accounts, and what the app shows of them.
+// Hosting services (Forgejo, GitVerse, GitHub, GitLab): accounts, and what the app shows of them.
 // Tokens never appear here: main keeps them encrypted (safeStorage) and uses them itself.
 
-export type HostingProvider = 'forgejo' | 'gitverse' | 'github';
+export type HostingProvider = 'forgejo' | 'gitverse' | 'github' | 'gitlab';
 
-export const PROVIDERS: Record<HostingProvider, { name: string; tokenHelp: string; /** The service's own server, filled in for the user. */ server?: string }> = {
+export interface ProviderInfo {
+  name: string;
+  tokenHelp: string;
+  /** The service's own server, filled in for the user. */
+  server?: string;
+  /** What the service calls a pull request. */
+  pullTerm?: 'Merge request';
+  /** `#` before issue numbers in text; GitLab marks merge requests with `!`. */
+  mergeRefs?: boolean;
+  /** Repositories may sit in nested groups (group/subgroup/project). */
+  nested?: boolean;
+}
+
+export const PROVIDERS: Record<HostingProvider, ProviderInfo> = {
   forgejo: { name: 'Forgejo / Gitea', tokenHelp: 'Settings → Applications → Generate new token (repository and issue: read and write; user: read)' },
   gitverse: { name: 'GitVerse', server: 'https://gitverse.ru', tokenHelp: 'gitverse.ru/settings/tokens → create a token with write access (it is shown only once)' },
   github: {
@@ -12,7 +25,21 @@ export const PROVIDERS: Record<HostingProvider, { name: string; tokenHelp: strin
     tokenHelp:
       'github.com/settings/tokens → a fine-grained token with Contents, Pull requests and Issues (read and write) and Metadata (read) for the repositories, or a classic token with the “repo” scope',
   },
+  gitlab: {
+    name: 'GitLab',
+    server: 'https://gitlab.com',
+    tokenHelp: 'User settings → Access tokens → a personal access token with the “api” scope (“read_api” and “read_repository” only to look)',
+    pullTerm: 'Merge request',
+    mergeRefs: true,
+    nested: true,
+  },
 };
+
+/** "Pull request" or what the service calls it. */
+export const pullTerm = (provider: HostingProvider) => PROVIDERS[provider].pullTerm ?? 'Pull request';
+
+/** How the service writes a pull request's or issue's number: #12, or on GitLab !12 for a merge request. */
+export const refLabel = (provider: HostingProvider, kind: 'pull' | 'issue', number: number) => `${kind === 'pull' && PROVIDERS[provider].mergeRefs ? '!' : '#'}${number}`;
 
 /** An account on a server (stored in the settings; its token separately). */
 export interface HostingAccount {
@@ -163,6 +190,7 @@ export function matchRemote(account: HostingAccount, remote: string): { owner: s
   const sub = server.pathname.replace(/^\/+/, '');
   const rest = sub && parsed.path.startsWith(`${sub}/`) ? parsed.path.slice(sub.length + 1) : parsed.path;
   const parts = rest.split('/');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
-  return { owner: parts[0], name: parts[1] };
+  // owner/name; GitLab also group/subgroup/…/name.
+  if (parts.length < 2 || (parts.length > 2 && !PROVIDERS[account.provider].nested) || parts.some((part) => !part)) return null;
+  return { owner: parts.slice(0, -1).join('/'), name: parts[parts.length - 1]! };
 }

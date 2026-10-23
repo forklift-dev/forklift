@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import type { HostingComment, IssueDetails, PullDetails, RepoHosting } from '../../../shared/hosting';
+import { PROVIDERS, pullTerm, refLabel, type HostingComment, type HostingProvider, type IssueDetails, type PullDetails, type RepoHosting } from '../../../shared/hosting';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useCommand } from '../useCommand';
@@ -9,19 +9,28 @@ export type HostingItem = { kind: 'pull' | 'issue'; number: number };
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const when = (iso: string) => (iso ? dateFormat.format(new Date(iso)) : '');
 
-/** Text with `#123` turned into links to that issue or pull request (shown in the app). */
-export function IssueRefs({ text, onOpen }: { text: string; onOpen?(number: number): void }): ReactNode {
+/**
+ * Text with `#123` (and on GitLab `!123`, a merge request) turned into links to that issue or pull request,
+ * shown in the app.
+ */
+export function IssueRefs({ text, provider, onOpen }: { text: string; provider?: HostingProvider; onOpen?(item: HostingItem): void }): ReactNode {
   if (!onOpen) return text;
-  const parts = text.split(/(?<![\w&/#])#(\d{1,7})\b/);
-  return parts.map((part, index) =>
-    index % 2 === 1 ? (
-      <button key={index} type="button" className="link-button issue-ref" onClick={() => onOpen(Number(part))} title={`Show #${part}`}>
-        #{part}
-      </button>
-    ) : (
-      <Fragment key={index}>{part}</Fragment>
-    ),
-  );
+  const marks = provider && PROVIDERS[provider].mergeRefs ? '#!' : '#';
+  const parts = text.split(new RegExp(`(?<![\\w&/#!])([${marks}])(\\d{1,7})\\b`));
+  const nodes: ReactNode[] = [];
+  for (let index = 0; index < parts.length; index += 3) {
+    nodes.push(<Fragment key={index}>{parts[index]}</Fragment>);
+    if (index + 2 >= parts.length) break;
+    const [mark, number] = [parts[index + 1]!, Number(parts[index + 2])];
+    const item: HostingItem = { kind: mark === '!' ? 'pull' : 'issue', number };
+    nodes.push(
+      <button key={`${index}-ref`} type="button" className="link-button issue-ref" onClick={() => onOpen(item)} title={`Show ${mark}${number}`}>
+        {mark}
+        {number}
+      </button>,
+    );
+  }
+  return nodes;
 }
 
 interface HostingViewProps {
@@ -43,7 +52,7 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
   const pull = useCommand(item.kind === 'pull' ? 'hosting:pull' : null, [repo, item.number], { reloadKey: reload });
   const issue = useCommand(item.kind === 'issue' ? 'hosting:issue' : null, [repo, item.number], { reloadKey: reload });
   const { data, error } = item.kind === 'pull' ? pull : issue;
-  // An issue number may turn out to be a pull request (they share numbers).
+  // An issue number may turn out to be a pull request (Forgejo and GitHub number them together).
   useEffect(() => {
     if (item.kind === 'issue' && (issue.data as IssueDetails | undefined)?.isPull) onOpen({ kind: 'pull', number: item.number });
   }, [item, issue.data, onOpen]);
@@ -53,17 +62,17 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const what = item.kind === 'pull' ? 'Pull request' : 'Issue';
+  const what = item.kind === 'pull' ? pullTerm(hosting.account.provider) : 'Issue';
   const details = data as (PullDetails | IssueDetails) | undefined;
   const pullDetails = item.kind === 'pull' ? (data as PullDetails | undefined) : undefined;
-  const openRef = (number: number) => onOpen({ kind: 'issue', number });
+  const provider = hosting.account.provider;
 
   return (
-    <section className="hosting-view" aria-label={`${what} #${item.number}`}>
+    <section className="hosting-view" aria-label={`${what} ${refLabel(hosting.account.provider, item.kind, item.number)}`}>
       <header className="diff-header">
         <div className="diff-title">
           <strong>
-            #{item.number} {details?.title ?? ''}
+            {refLabel(hosting.account.provider, item.kind, item.number)} {details?.title ?? ''}
           </strong>
           <span className="diff-subtitle">
             {what.toLowerCase()} · {hosting.owner}/{hosting.name}
@@ -113,7 +122,7 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
                 </span>
               ))}
           </div>
-          <div className="hosting-text">{details.body.trim() ? <IssueRefs text={details.body} onOpen={openRef} /> : <span className="empty-note">No description</span>}</div>
+          <div className="hosting-text">{details.body.trim() ? <IssueRefs text={details.body} provider={provider} onOpen={onOpen} /> : <span className="empty-note">No description</span>}</div>
           {pullDetails && (
             <>
               <h3>
@@ -150,12 +159,12 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
           </h3>
           <ol className="hosting-discussion">
             {details.discussion.map((comment) => (
-              <Comment key={comment.id} comment={comment} onOpenRef={openRef} />
+              <Comment key={comment.id} comment={comment} provider={provider} onOpenRef={onOpen} />
             ))}
           </ol>
           <CommentForm
             onSubmit={async (body) => {
-              await invoke('hosting:comment', repo, item.number, body);
+              await invoke('hosting:comment', repo, item.kind, item.number, body);
               setReload((n) => n + 1);
               onChanged();
             }}
@@ -166,14 +175,14 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
   );
 }
 
-function Comment({ comment, onOpenRef }: { comment: HostingComment; onOpenRef(number: number): void }) {
+function Comment({ comment, provider, onOpenRef }: { comment: HostingComment; provider: HostingProvider; onOpenRef(item: HostingItem): void }) {
   return (
     <li className="hosting-comment" data-comment={comment.id}>
       <div className="history-meta">
         <strong>{comment.author}</strong> · {when(comment.createdAt)}
       </div>
       <div className="hosting-text">
-        <IssueRefs text={comment.body} onOpen={onOpenRef} />
+        <IssueRefs text={comment.body} provider={provider} onOpen={onOpenRef} />
       </div>
     </li>
   );

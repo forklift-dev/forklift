@@ -3,7 +3,8 @@ import type { CommitFile, FileChangeStatus } from '../../../shared/diff';
 import type { SignatureStatus } from '../../../shared/profiles';
 import { useCommand } from '../useCommand';
 import { Avatar } from './Avatar';
-import { IssueRefs } from './HostingView';
+import { IssueRefs, type HostingItem } from './HostingView';
+import type { HostingProvider } from '../../../shared/hosting';
 
 const STATUS_LABEL: Record<FileChangeStatus, string> = {
   added: 'A',
@@ -34,8 +35,9 @@ interface CommitDetailsPanelProps {
   /** Extra header content: actions for a stash. */
   actions?: ReactNode;
   onFileHistory?(path: string): void;
-  /** `#123` in the message opens that issue or pull request (when the repository's server is known). */
-  onOpenIssue?(number: number): void;
+  /** `#123` (GitLab: also `!123`) in the message opens that issue or pull request (when the repository's server is known). */
+  onOpenRef?(item: HostingItem): void;
+  provider?: HostingProvider;
 }
 
 const SIGNATURE_TEXT: Record<SignatureStatus, string> = {
@@ -68,7 +70,7 @@ function Signature({ repo, sha }: { repo: string; sha: string }) {
   );
 }
 
-export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory, onOpenIssue }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory, onOpenRef, provider }: CommitDetailsPanelProps) {
   const { data, error } = useCommand('commit:details', [repo, sha]);
 
   if (error) return <div className="changes commit-details diff-message error">{error}</div>;
@@ -90,11 +92,11 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
       </div>
       {actions && <div className="commit-details-actions">{actions}</div>}
       <h2 className="commit-subject">
-        <IssueRefs text={subject} onOpen={onOpenIssue} />
+        <IssueRefs text={subject} provider={provider} onOpen={onOpenRef} />
       </h2>
       {body && (
         <pre className="commit-body">
-          <IssueRefs text={body} onOpen={onOpenIssue} />
+          <IssueRefs text={body} provider={provider} onOpen={onOpenRef} />
         </pre>
       )}
       <dl className="commit-meta">
