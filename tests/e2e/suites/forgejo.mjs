@@ -85,7 +85,7 @@ export default async function ({ check }) {
 
   // A pull request in the center.
   await page.click(item('pull-1'));
-  check('the pull request opens with its description, commits, files and discussion', await page.waitFor(`/It adds \\*\\*the feature\\*\\*/.test(${viewText}) && /src\\/feature\\.txt/.test(${viewText}) && /Looks good to me/.test(${viewText}) && /feature → main/.test(${viewText})`));
+  check('the pull request opens with its description, commits, files and discussion', await page.waitFor(`${view}?.querySelector('.markdown strong')?.textContent === 'the feature' && /It adds the feature/.test(${viewText}) && /src\\/feature\\.txt/.test(${viewText}) && /Looks good to me/.test(${viewText}) && /feature → main/.test(${viewText})`));
   await page.fill(`${view}.querySelector('textarea')`, 'Thanks, merging soon');
   await page.click(button(view, 'Comment'));
   check('a comment is sent and shown', await page.waitFor(`/Thanks, merging soon/.test([...${view}.querySelectorAll('.hosting-comment')].map(c => c.textContent).join())`));
@@ -107,6 +107,15 @@ export default async function ({ check }) {
   // Issues: view and create.
   await page.click(item('issue-3'));
   check('an issue opens with its description', await page.waitFor(`/It crashes\\./.test(${viewText}) && /bug/.test(${viewText}) && !/Check out/.test(${viewText})`));
+  const md = `${view}.querySelector('.markdown')`;
+  check('markdown: a code block colored by the editor', await page.waitFor(`${md}.querySelectorAll('.md-code span[class^="mtk"]').length > 3 && ${md}.querySelector('.md-code').textContent === 'const answer: number = 42;'`));
+  check('markdown: a table', (await page.evaluate(`${md}.querySelectorAll('table td').length`)) === 2);
+  check('markdown: links open outside, images are not loaded, HTML and javascript: are dropped', await page.evaluate(`(() => {
+    const m = ${md};
+    const docs = [...m.querySelectorAll('a')].find(a => a.textContent === 'docs');
+    const bad = [...m.querySelectorAll('a, span, button')].find(e => e.textContent === 'bad');
+    return docs?.target === '_blank' && docs.href === 'https://docs.example/x' && !m.querySelector('img, script') && /\\[image: shot\\]/.test(m.textContent) && !window.pwned && (!bad || !bad.getAttribute?.('href'));
+  })()`));
   await page.click(`${section('Issues')}.querySelector('[aria-label="Create an issue"]')`);
   await page.waitFor(`!!${formDialog}`);
   await page.fill(`${formDialog}.querySelector('[name="title"]')`, 'Made in Forklift');

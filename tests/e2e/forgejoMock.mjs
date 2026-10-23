@@ -41,7 +41,7 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
     { number: 5, title: 'Old change', body: '', user: { login: 'ada' }, state: 'closed', merged: true, head: { ref: 'old', repo: { full_name: 'ada/demo' } }, base: { ref: 'main' } },
   ];
   const issues = [
-    { number: 3, title: 'Crash on start', body: 'It crashes.', user: { login: 'eve' }, state: 'open', labels: [{ name: 'bug', color: 'ee0701' }] },
+    { number: 3, title: 'Crash on start', body: 'It crashes.\n\n```ts\nconst answer: number = 42;\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<script>window.pwned = 1</script>\n\nSee ![shot](https://img.example/s.png) [docs](https://docs.example/x) [bad](javascript:window.pwned=1)', user: { login: 'eve' }, state: 'open', labels: [{ name: 'bug', color: 'ee0701' }] },
     { number: 4, title: 'Closed idea', body: '', user: { login: 'ada' }, state: 'closed', labels: [] },
   ];
   let next = 6;

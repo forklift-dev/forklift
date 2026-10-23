@@ -3413,3 +3413,110 @@ select {
   padding: 0;
   text-align: left;
 }
+
+/* Markdown of pull requests, issues and comments */
+.markdown {
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.markdown.md-plain {
+  white-space: pre-wrap;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote,
+.markdown table,
+.markdown .md-code {
+  margin: 0 0 8px;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+
+.markdown h1,
+.markdown h2 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 22px;
+}
+
+.markdown li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -18px;
+}
+
+.markdown blockquote {
+  padding: 0 10px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--fg-muted);
+}
+
+.markdown a {
+  color: var(--accent);
+}
+
+.markdown .md-inline-code,
+.markdown .md-code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--bg-raised);
+  border-radius: 4px;
+}
+
+.markdown .md-inline-code {
+  padding: 1px 4px;
+}
+
+.markdown .md-code {
+  padding: 8px 10px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  display: block;
+  overflow: auto;
+}
+
+.markdown th,
+.markdown td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+}
+
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.markdown .md-image {
+  color: var(--fg-muted);
+}
+
+.markdown .md-mention {
+  font-weight: 600;
+}

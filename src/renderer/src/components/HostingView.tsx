@@ -3,6 +3,7 @@ import { PROVIDERS, pullTerm, refLabel, type HostingComment, type HostingProvide
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useCommand } from '../useCommand';
+import { Markdown } from './Markdown';
 
 export type HostingItem = { kind: 'pull' | 'issue'; number: number };
 
@@ -122,7 +123,9 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
                 </span>
               ))}
           </div>
-          <div className="hosting-text">{details.body.trim() ? <IssueRefs text={details.body} provider={provider} onOpen={onOpen} /> : <span className="empty-note">No description</span>}</div>
+          <div className="hosting-text">
+            {details.body.trim() ? <Markdown text={details.body} provider={provider} onOpen={onOpen} onShowCommit={onShowCommit} /> : <span className="empty-note">No description</span>}
+          </div>
           {pullDetails && (
             <>
               <h3>
@@ -159,7 +162,7 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
           </h3>
           <ol className="hosting-discussion">
             {details.discussion.map((comment) => (
-              <Comment key={comment.id} comment={comment} provider={provider} onOpenRef={onOpen} />
+              <Comment key={comment.id} comment={comment} provider={provider} onOpenRef={onOpen} onShowCommit={onShowCommit} />
             ))}
           </ol>
           <CommentForm
@@ -175,14 +178,14 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
   );
 }
 
-function Comment({ comment, provider, onOpenRef }: { comment: HostingComment; provider: HostingProvider; onOpenRef(item: HostingItem): void }) {
+function Comment({ comment, provider, onOpenRef, onShowCommit }: { comment: HostingComment; provider: HostingProvider; onOpenRef(item: HostingItem): void; onShowCommit(sha: string): void }) {
   return (
     <li className="hosting-comment" data-comment={comment.id}>
       <div className="history-meta">
         <strong>{comment.author}</strong> · {when(comment.createdAt)}
       </div>
       <div className="hosting-text">
-        <IssueRefs text={comment.body} provider={provider} onOpen={onOpenRef} />
+        <Markdown text={comment.body} provider={provider} onOpen={onOpenRef} onShowCommit={onShowCommit} />
       </div>
     </li>
   );
