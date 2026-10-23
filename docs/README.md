@@ -125,6 +125,7 @@
 | ID | Задача | Статус |
 |---|---|---|
 | [T-067](tasks/stage-6-integrations/T-067-hosting-markdown.md) | Markdown в описаниях и комментариях PR и issues | todo |
+| [T-068](tasks/stage-6-integrations/T-068-github-oauth.md) | GitHub: вход через браузер (OAuth device flow) | draft |
 
 Дальние планы:
 

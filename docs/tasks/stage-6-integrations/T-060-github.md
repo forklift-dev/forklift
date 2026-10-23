@@ -37,7 +37,8 @@ GitHub: вход, репозитории, pull requests, issues. Решение 
 - 2026-10-23: вход — персональный токен (как у Forgejo и GitVerse): fine-grained (Contents, Pull requests, Issues —
   чтение и запись, Metadata — чтение) или classic со scope `repo`; подсказка в форме. **Вопрос владельцу:** OAuth
   device flow требует зарегистрировать OAuth App на аккаунте владельца (её `client_id` зашивается в приложение) —
-  нужно ли и на чьё имя регистрировать? Без этого вход по токену работает полностью.
+  нужно ли и на чьё имя регистрировать? Без этого вход по токену работает полностью. Решение владельца
+  (2026-10-23): вход через браузер — позже, отдельной задачей T-068.
 - 2026-10-23: GitHub — провайдер `github` общего клиента (`src/main/hosting/client.ts`): `https://api.github.com`
   для github.com, `<сервер>/api/v3` для GitHub Enterprise Server; `Authorization: Bearer`,
   `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `per_page`. Отличия в данных: имя
