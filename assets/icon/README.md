@@ -5,14 +5,16 @@ Three layers, each a 1024×1024 PNG with a transparent background, composed by `
 `build/window.png` (the Linux window).
 
 Two variants (`compose.json` → `variants`): **large** (128 px and up) — the forklift and its load on the tile;
-**small** (64 px and below, and the window icon) — no tile, the forklift and its load fill the square, so they
-stay readable on a taskbar. The `.ico` takes each size from the right variant.
+**small** (64 px and below, and the window icon) — its own square picture `layers/small.png` (the forks raised
+high, the git badge on top, fewer details) that fills the square: the side view of the large icon is 1.4 times
+wider than high and looked too small on a taskbar. The `.ico` takes each size from the right variant.
 
 | Layer | File | What |
 |---|---|---|
 | background | `layers/background.png` | Plain rounded-square tile, blue-slate gradient (drawn with Pillow, no details: they made the icon unreadable when small); outside it transparent; `clip` keeps the other layers inside it |
 | forklift | `layers/forklift.png` | The forklift, strict side view facing right, forks empty |
 | load | `layers/git.png` | The git badge that sits on the forks |
+| small | `layers/small.png` | The whole small-size icon in one picture (Codex, from the two layers above as a style reference) |
 
 Each variant places its layers, first at the bottom: `scale` (around the layer's top-left corner), `x`, `y`;
 `solidify` makes the nearly opaque inside of generated pictures fully opaque and drops faint halos; `shadow`
@@ -49,6 +51,9 @@ one layer in the same style (pass the other layers with `-i … --` as a style r
   soft highlight upper-left; on its face in white a git branch glyph (a vertical line with nodes at both ends
   and a branch to a third node upper right), thick strokes, no text. Same style as the forklift layer,
   transparent background, ~70% of the canvas height."
+- **small** — "a SMALL-SIZE version of the icon as one picture: the same forklift from the side facing right,
+  forks RAISED HIGH carrying the git diamond badge, compact roughly square silhouette filling ~92% of the canvas;
+  chunky shapes, thick dark parts, no chain or thin bars, big wheels; transparent background, no text."
 - **background** (the first version; replaced by a plain tile, see above — it is in git history) — "an app-icon tile: a macOS-style squircle (corner radius ~22%) inset 50px from each edge,
   outside fully transparent; deep blue-slate gradient (#2E3A55 → #1B2232), soft radial glow behind the upper
   middle, a subtle warehouse floor band across the lower quarter, very subtle low-contrast shelves in the back.
