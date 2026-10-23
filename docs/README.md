@@ -63,7 +63,7 @@
 | [T-023](tasks/stage-2-git-core/T-023-branches.md) | Ветки и теги, переключение с автоматическим stash | todo |
 | [T-024](tasks/stage-2-git-core/T-024-remote-sync.md) | Fetch, pull (merge и rebase), push; учётные данные в UI | todo |
 | [T-025](tasks/stage-2-git-core/T-025-conflict-editor.md) | Встроенное разрешение конфликтов | todo |
-| [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | todo |
+| [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | review |
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | todo |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | todo |
 

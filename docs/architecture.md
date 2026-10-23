@@ -12,8 +12,8 @@
 | Сборка | Vite 8 + electron-vite 6, упаковка electron-builder 26 |
 | Состояние | Redux Toolkit 2 в main-процессе |
 | Git | `@axosoft/nodegit` 0.28.0-alpha.38 (libgit2-форк GitKraken), собирается из исходников |
-| Файловые события | `nsfw` (GitKraken, MIT) — подключён, ещё не используется |
-| Поиск репозиториев | `find-git-repositories` (GitKraken, MIT) — подключён, ещё не используется |
+| Файловые события | `nsfw` (GitKraken, MIT) — слежение за активной вкладкой (T-026) |
+| Поиск репозиториев | `find-git-repositories` (GitKraken, MIT) — экран Repositories (T-041) |
 | Запуск процессов | `cross-spawn` 7 в `utilityProcess` (ProcessRunner) |
 | Тесты / линт | Vitest 5 (внутри Electron), сквозные наборы `tests/e2e` через CDP, oxlint |
 
@@ -25,6 +25,7 @@ main process ─ src/main
   git/service.ts  чтение репозитория через nodegit (+ git/diff.ts: детали коммита, версии файлов)
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
   history/        история с раскладкой графа: кэш на вкладку и версию, страницы по запросу окна
+  watch/          слежение за активной вкладкой (nsfw), тихое перечитывание
   external/       внешний редактор, терминал, diff/merge tools (выбор по настройкам, ОС/рабочему столу, git config)
   settings/       settings.json (атомарная запись, миграции), проверка изменений, кнопки Test/git config
   replication.ts  копия состояния (проекция: вкладки + активный репозиторий) в окна через MessagePort

@@ -22,6 +22,7 @@ import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
 import { createAppStore, gitCliDetected, noticeAdded } from './store';
+import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
 
 registerAppScheme();
@@ -74,6 +75,11 @@ async function start() {
   const report = (message: string) => store.dispatch(noticeAdded(message));
   const cliPath = pathFromArgv(process.argv, app.isPackaged, process.cwd());
   if (cliPath) void repoSession.open(git, cliPath, report);
+  // Changes made outside the app (editors, git in a terminal) show up by themselves.
+  const watch = new WatchManager(store);
+  watch.start();
+  app.on('browser-window-focus', () => watch.refreshActive());
+  app.on('will-quit', () => void watch.stop());
   openFromSecondInstance = (argv, cwd) => {
     const path = pathFromArgv(argv, app.isPackaged, cwd);
     if (path) void repoSession.open(git, path, report);
@@ -107,7 +113,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

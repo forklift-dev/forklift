@@ -11,13 +11,21 @@ export interface ReposState {
 
 const initialState: ReposState = { view: { tabs: [], activeId: null }, byId: {} };
 
-/** Reads the repository of tab `id` (its root). */
-export const loadRepo = createAsyncThunk<RepoData, string, { extra: ThunkExtra }>('repos/load', async (id, { extra }) => {
+async function readTab(id: string, extra: ThunkExtra): Promise<RepoData> {
   const root = await extra.git.resolveRoot(id).catch(() => null);
   // A remembered repository that was moved or deleted (its folder may now sit inside another repository).
   if (root !== id) throw new Error(`No repository at ${id} any more`);
   return extra.git.read(root);
-});
+}
+
+/** Reads the repository of tab `id` (its root), showing it as loading. */
+export const loadRepo = createAsyncThunk<RepoData, string, { extra: ThunkExtra }>('repos/load', (id, { extra }) => readTab(id, extra));
+
+/**
+ * Re-reads a tab in the background (file watcher, window focus): no loading state, and a failure
+ * keeps what is shown (a git command may hold the index for a moment); the next change retries.
+ */
+export const refreshRepo = createAsyncThunk<RepoData, string, { extra: ThunkExtra }>('repos/refresh', (id, { extra }) => readTab(id, extra));
 
 export const repoName = (path: string) => basename(path) || path;
 
@@ -80,6 +88,14 @@ export const reposSlice = createSlice({
         repo.pendingRequestId = null;
         repo.data = action.payload;
         updateTab(state, action.meta.arg, { loading: false, error: null });
+      })
+      .addCase(refreshRepo.fulfilled, (state, action) => {
+        const repo = state.byId[action.meta.arg];
+        // A load in progress wins; a closed tab or one never read stays as it is.
+        if (!repo || repo.pendingRequestId !== null || !repo.data) return;
+        repo.data = action.payload;
+        repo.error = null;
+        updateTab(state, action.meta.arg, { error: null });
       })
       .addCase(loadRepo.rejected, (state, action) => {
         const repo = state.byId[action.meta.arg];
