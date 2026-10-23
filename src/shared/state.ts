@@ -1,4 +1,5 @@
 // Application state owned by the main process and replicated to every renderer.
+import type { CloneActivity } from './repos';
 import type { SettingsState } from './settings';
 
 export type ChangeKind =
@@ -154,6 +155,8 @@ export interface AppInfo {
   /** Problems outside any window action (e.g. a repository named on the command line could not be opened). */
   notices: string[];
   prompts: AskPrompt[];
+  /** The clone running from the Repositories screen. */
+  clone: CloneActivity | null;
 }
 
 /** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */

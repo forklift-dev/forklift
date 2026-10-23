@@ -143,10 +143,18 @@ export class RemoteService {
     await this.network(root, args, run);
   }
 
-  private async network(root: string, args: string[], run: RemoteRun, interactive = true): Promise<string> {
+  /**
+   * Clones `url` into `target` (a new or empty folder inside `parent`). Credential prompts belong to no tab.
+   * On failure or cancellation git removes what it created; the caller cleans up after a killed git.
+   */
+  async clone(parent: string, url: string, target: string, run: RemoteRun): Promise<void> {
+    await this.network(parent, ['clone', '--progress', '--', parseUrl(url), target], run, true, null);
+  }
+
+  private async network(root: string, args: string[], run: RemoteRun, interactive = true, promptRepo: string | null = root): Promise<string> {
     // In the background nothing may ask: an empty askpass fails at once, and ssh is told never to ask.
     const session = interactive
-      ? this.askpass.session(root)
+      ? this.askpass.session(promptRepo)
       : { env: { GIT_ASKPASS: '', SSH_ASKPASS: '', SSH_ASKPASS_REQUIRE: 'never' }, dispose: () => {} };
     // Cancelling the operation also withdraws its open credential prompts.
     run.signal.addEventListener('abort', () => session.dispose(), { once: true });

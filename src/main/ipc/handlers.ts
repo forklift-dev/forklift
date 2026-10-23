@@ -26,9 +26,10 @@ import { MAX_PAGE, type HistoryService } from '../history/service';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
-import { noticeAdded, noticesDismissed, type AppStore } from '../store';
+import { cloneActivity, noticeAdded, noticesDismissed, type AppStore } from '../store';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
+import type { RepoCreator } from '../repos/create';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
@@ -54,6 +55,7 @@ export interface HandlerDeps {
   undo: UndoService;
   fileHistory: FileHistory;
   terminals: TerminalService;
+  creator: RepoCreator;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -188,8 +190,9 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
+  let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
   /** The tab named by the window; operations always say which repository they mean. */
@@ -535,8 +538,65 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     },
 
     async 'repo:pick'({ sender }, purpose) {
-      const title = purpose === 'scan' ? 'Choose a folder to search for repositories' : 'Open repository';
-      return showOpenDialog(sender, { title, properties: ['openDirectory'] });
+      const title = purpose === 'scan' ? 'Choose a folder to search for repositories' : purpose === 'parent' ? 'Choose a folder' : 'Open repository';
+      return showOpenDialog(sender, { title, properties: ['openDirectory', ...(purpose === 'parent' ? (['createDirectory'] as const) : [])] });
+    },
+
+    async 'repo:createDefaults'() {
+      return creator.defaults();
+    },
+
+    async 'repo:checkTarget'(_ctx, kind, parent, name) {
+      if (kind !== 'clone' && kind !== 'init') throw new TypeError('kind must be clone or init');
+      return creator.targetProblem(kind, parent, name);
+    },
+
+    async 'repo:clone'(_ctx, request) {
+      if (typeof request !== 'object' || request === null) throw new TypeError('request must be an object');
+      const { url, parent, name } = request as unknown as Record<string, unknown>;
+      assertString(url, 'url');
+      assertAbsolutePath(parent, 'parent');
+      assertString(name, 'name');
+      if (cloning) throw new Error('A clone is already running');
+      const controller = new AbortController();
+      cloning = controller;
+      let last = 0;
+      const target = await creator.cloneTarget(parent, name).catch((error: unknown) => {
+        cloning = null;
+        throw error;
+      });
+      store.dispatch(cloneActivity({ url, target, phase: null, percent: null }));
+      try {
+        const root = await creator.clone({ url, parent, name }, {
+          signal: controller.signal,
+          onProgress: ({ phase, percent }) => {
+            const now = Date.now();
+            if (now - last < 100 && percent !== 100) return;
+            last = now;
+            store.dispatch(cloneActivity({ url, target, phase, percent }));
+          },
+        });
+        return await openRepository(store, git, root);
+      } catch (error) {
+        if (controller.signal.aborted) throw new Error('The clone was cancelled', { cause: error });
+        throw error;
+      } finally {
+        cloning = null;
+        store.dispatch(cloneActivity(null));
+      }
+    },
+
+    async 'repo:cancelClone'() {
+      cloning?.abort();
+    },
+
+    async 'repo:init'(_ctx, request) {
+      if (typeof request !== 'object' || request === null) throw new TypeError('request must be an object');
+      const raw = request as unknown as Record<string, unknown>;
+      if (typeof raw['initialCommit'] !== 'boolean') throw new TypeError('initialCommit must be a boolean');
+      const { root, warning } = await creator.init(request);
+      if (warning) store.dispatch(noticeAdded(warning));
+      return openRepository(store, git, root);
     },
 
     async 'repo:open'(_ctx, path) {

@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -92,7 +93,16 @@ export interface Commands {
   /** Continues, aborts or skips the merge/rebase/cherry-pick/revert in progress. */
   'operation:run': { args: [repo: string, action: OperationAction]; result: void };
   /** Shows a folder picker; resolves to the chosen path or null when cancelled. */
-  'repo:pick': { args: [purpose: 'open' | 'scan']; result: string | null };
+  'repo:pick': { args: [purpose: 'open' | 'scan' | 'parent']; result: string | null };
+  /** Starting values and template lists for the Clone and Init dialogs. */
+  'repo:createDefaults': { args: []; result: CreateDefaults };
+  /** Why a new repository can't go into `parent`/`name`, or null. */
+  'repo:checkTarget': { args: [kind: 'clone' | 'init', parent: string, name: string]; result: string | null };
+  /** Clones (progress in `app.clone`) and opens the result in a tab; resolves to its id. */
+  'repo:clone': { args: [request: CloneRequest]; result: string };
+  'repo:cancelClone': { args: []; result: void };
+  /** Creates a repository with the chosen starter files and opens it in a tab. */
+  'repo:init': { args: [request: InitRequest]; result: string };
   /** Opens the repository containing `path` in a tab (or switches to its tab); resolves to the tab id. */
   'repo:open': { args: [path: string]; result: string };
   'repo:activate': { args: [repo: string]; result: void };
@@ -195,6 +205,11 @@ const commandChannelSet = {
   'conflict:take': true,
   'operation:run': true,
   'repo:pick': true,
+  'repo:createDefaults': true,
+  'repo:checkTarget': true,
+  'repo:clone': true,
+  'repo:cancelClone': true,
+  'repo:init': true,
   'repo:open': true,
   'repo:activate': true,
   'repo:refresh': true,

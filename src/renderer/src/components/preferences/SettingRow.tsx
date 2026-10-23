@@ -96,12 +96,12 @@ export function EnumControl({ id, settingKey, value, save }: ControlProps) {
 }
 
 /** Text and number inputs keep a draft and save on Enter or when focus leaves. */
-export function TextControl(props: ControlProps & { browse?: boolean }) {
+export function TextControl(props: ControlProps & { browse?: 'executable' | 'folder' }) {
   // Remounted when the stored value changes, so the draft starts from it.
   return <TextDraft key={String(props.value)} {...props} />;
 }
 
-function TextDraft({ id, settingKey, value, save, browse }: ControlProps & { browse?: boolean }) {
+function TextDraft({ id, settingKey, value, save, browse }: ControlProps & { browse?: 'executable' | 'folder' }) {
   const field = settingField(settingKey);
   const [draft, setDraft] = useState(String(value));
   const numeric = field.type === 'integer';
@@ -112,7 +112,7 @@ function TextDraft({ id, settingKey, value, save, browse }: ControlProps & { bro
   };
 
   const pick = async () => {
-    const path = await invoke('settings:browseExecutable');
+    const path = await (browse === 'folder' ? invoke('repo:pick', 'parent') : invoke('settings:browseExecutable'));
     if (path) {
       setDraft(path);
       commit(path);

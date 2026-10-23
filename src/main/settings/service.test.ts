@@ -63,6 +63,7 @@ describe('SettingsService', () => {
     [{ values: { 'tools.editor': { mode: 'custom', command: 'missing-editor', args: [] } } }, 'was not found'],
     [{ values: { 'git.executable': 'relative/git' } }, 'full path'],
     [{ values: { 'git.executable': '/no/such/git' } }, 'was not found'],
+    [{ values: { 'general.repositoriesFolder': 'projects' } }, 'full folder path'],
   ])('rejects %j', async (patch, message) => {
     const { service, store } = await setup();
     const before = store.getState().settings;

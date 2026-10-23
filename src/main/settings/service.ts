@@ -67,6 +67,9 @@ export class SettingsService {
       if (repo !== undefined && !REPO_SETTING_KEYS.includes(key)) throw new TypeError(`${key} cannot be set per repository`);
       const parsed = value === null ? null : parseSettingValue(key, value);
       if (parsed !== null) await this.checkProgram(key, parsed);
+      if (settingField(key).type === 'string' && (settingField(key) as { kind?: string }).kind === 'folder' && parsed && !isAbsolute(parsed as string)) {
+        throw new TypeError('Enter a full folder path (or leave it empty)');
+      }
       (change.values as Record<SettingKey, unknown>)[key] = parsed;
     }
     this.deps.store.dispatch(settingsChanged(change));

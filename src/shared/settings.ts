@@ -45,7 +45,7 @@ export type SettingField =
   | (FieldBase & { type: 'boolean'; default: boolean })
   | (FieldBase & { type: 'integer'; default: number; min: number; max: number })
   | (FieldBase & { type: 'enum'; default: string; options: readonly { value: string; label: string }[] })
-  | (FieldBase & { type: 'string'; default: string; maxLength: number; placeholder?: string; kind?: 'executable' })
+  | (FieldBase & { type: 'string'; default: string; maxLength: number; placeholder?: string; kind?: 'executable' | 'folder' })
   | (FieldBase & { type: 'appTool'; default: AppToolSetting; tool: AppToolKind })
   | (FieldBase & { type: 'gitTool'; default: GitToolSetting; tool: GitToolKind });
 
@@ -71,6 +71,16 @@ export const SETTING_FIELDS = {
     default: false,
     label: 'Prune when fetching',
     description: 'Remove remote branches that were deleted on the remote (git fetch --prune).',
+  },
+  'general.repositoriesFolder': {
+    section: 'general',
+    type: 'string',
+    kind: 'folder',
+    default: '',
+    maxLength: 4096,
+    placeholder: 'Home folder',
+    label: 'Folder for new repositories',
+    description: 'Where Clone and Init suggest creating repositories.',
   },
   'git.executable': {
     section: 'git',

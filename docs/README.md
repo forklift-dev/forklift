@@ -83,7 +83,7 @@
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-040](tasks/stage-4-repositories/T-040-clone-init.md) | Clone и init | todo |
+| [T-040](tasks/stage-4-repositories/T-040-clone-init.md) | Clone и init | review |
 | [T-041](tasks/stage-4-repositories/T-041-tabs-repos.md) | Вкладки репозиториев, восстановление сессии, недавние и поиск | review |
 | [T-042](tasks/stage-4-repositories/T-042-remotes.md) | Удалённые репозитории и auto-fetch | review |
 | [T-043](tasks/stage-4-repositories/T-043-submodules.md) | Подмодули | todo |

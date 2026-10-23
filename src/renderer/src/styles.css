@@ -1370,6 +1370,68 @@ select {
   resize: vertical;
 }
 
+/* Clone and Init */
+.modal.new-repo-dialog {
+  width: min(520px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.new-repo-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.new-repo-fields .text-control {
+  display: flex;
+  gap: 6px;
+}
+
+.new-repo-fields .text-control input {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2px 12px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.template-list legend {
+  padding: 0 4px;
+}
+
+.modal p.new-repo-target {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.clone-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clone-progress progress {
+  width: 100%;
+}
+
+/* Credential prompts come up over the dialog that started the operation. */
+.modal-backdrop:has(> .prompt-dialog) {
+  z-index: 110;
+}
+
 /* Stashes */
 .graph-cell .stash-node {
   fill: var(--bg);

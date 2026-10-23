@@ -76,7 +76,7 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
       case 'integer':
         return <TextControl {...props} />;
       case 'string':
-        return <TextControl {...props} browse={field.kind === 'executable'} />;
+        return <TextControl {...props} browse={field.kind} />;
       case 'appTool':
         return <AppToolPicker {...props} kind={field.tool} detected={detected.data} confirm={confirm} />;
       case 'gitTool':

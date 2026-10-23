@@ -4,6 +4,7 @@ import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useAppState } from '../state';
 import { GitCliStatus } from './GitCliStatus';
+import { NewRepoDialog, type NewRepoKind } from './NewRepoDialog';
 
 const MINUTE = 60_000;
 const units: Array<[limit: number, size: number, unit: Intl.RelativeTimeFormatUnit]> = [
@@ -37,6 +38,7 @@ export function RepositoriesScreen({ run, onOpened, onClose }: RepositoriesScree
   const openTabs = useAppState((s) => s.tabs.tabs);
   const [scan, setScan] = useState<{ folder: string; running: boolean; found: string[]; error?: string } | null>(null);
   const [now] = useState(() => Date.now());
+  const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const rootRef = useRef<HTMLElement>(null);
   // Keyboard focus starts inside, so Escape reaches this screen first.
   useEffect(() => rootRef.current?.focus(), []);
@@ -114,6 +116,12 @@ export function RepositoriesScreen({ run, onOpened, onClose }: RepositoriesScree
         <button type="button" className="primary" onClick={() => void pickAndOpen()}>
           Open repository…
         </button>
+        <button type="button" onClick={() => setCreating('clone')}>
+          Clone…
+        </button>
+        <button type="button" onClick={() => setCreating('init')}>
+          New…
+        </button>
         <button type="button" onClick={() => void pickAndScan()} disabled={scan?.running}>
           Search a folder…
         </button>
@@ -153,6 +161,16 @@ export function RepositoriesScreen({ run, onOpened, onClose }: RepositoriesScree
           {recent.length === 0 ? <p className="empty-note">Repositories you open will appear here</p> : <ul className="repo-list">{recent.map((repo) => row(repo, 'recent'))}</ul>}
         </section>
       </div>
+      {creating && (
+        <NewRepoDialog
+          kind={creating}
+          onClose={() => setCreating(null)}
+          onOpened={() => {
+            setCreating(null);
+            onOpened();
+          }}
+        />
+      )}
     </section>
   );
 }

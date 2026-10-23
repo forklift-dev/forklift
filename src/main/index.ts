@@ -30,6 +30,7 @@ import { installAppMenu } from './menu';
 import { handleAppProtocol, registerAppScheme } from './protocol';
 import { pathFromArgv } from './repos/argv';
 import { LibraryFile } from './repos/libraryFile';
+import { RepoCreator } from './repos/create';
 import { RepoScanner } from './repos/scan';
 import { AutoFetch } from './repos/autoFetch';
 import { NetworkOps } from './repos/network';
@@ -132,7 +133,7 @@ async function start() {
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

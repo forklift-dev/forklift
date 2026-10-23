@@ -3,11 +3,12 @@ import { EMPTY_REPO_STATE, type AppInfo, type AppState, type AskPrompt, type Git
 import { librarySlice } from './librarySlice';
 import { reposSlice } from './reposSlice';
 import { settingsSlice } from './settingsSlice';
+import type { CloneActivity } from '../../shared/repos';
 import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [] } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -25,10 +26,13 @@ const appSlice = createSlice({
     promptRemoved: (state, action: PayloadAction<number>) => {
       state.prompts = state.prompts.filter((prompt) => prompt.id !== action.payload);
     },
+    cloneActivity: (state, action: PayloadAction<CloneActivity | null>) => {
+      state.clone = action.payload;
+    },
   },
 });
 
-export const { gitCliDetected, noticeAdded, noticesDismissed, promptAdded, promptRemoved } = appSlice.actions;
+export const { cloneActivity, gitCliDetected, noticeAdded, noticesDismissed, promptAdded, promptRemoved } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,
