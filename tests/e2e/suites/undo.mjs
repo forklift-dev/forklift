@@ -6,7 +6,8 @@ import { createRepo, launchApp } from '../harness.mjs';
 const undoButton = `document.querySelector('[aria-label="Undo"]')`;
 const redoButton = `document.querySelector('[aria-label="Redo"]')`;
 const idle = `!document.querySelector('.toolbar .spinner')`;
-const top = `document.querySelector('.commit-row[data-hash] .subject')?.textContent`;
+// The HEAD commit's subject (unrelated branch tips made in the same second may sort above it).
+const top = `document.querySelector('.commit-row[data-hash]:has(.ref.head) .subject')?.textContent`;
 
 export default async function ({ check }) {
   const { root, git, write } = createRepo();

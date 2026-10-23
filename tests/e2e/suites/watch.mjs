@@ -20,7 +20,7 @@ export default async function ({ check }) {
   const { page } = await launchApp();
   await page.invoke('repo:open', other.root);
   await page.invoke('repo:open', root);
-  await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Initial'`);
+  await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Initial')`);
 
   appendFileSync(join(root, 'a.txt'), 'two\n');
   check('an edit in another program appears', await page.waitFor(`${rows}.includes('a.txt')`, 5000));
@@ -37,7 +37,7 @@ export default async function ({ check }) {
 
   git('add', '.');
   git('commit', '-qm', 'Committed in a terminal');
-  check('a commit made with git in a terminal appears in the graph', await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Committed in a terminal'`, 5000));
+  check('a commit made with git in a terminal appears in the graph', await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Committed in a terminal')`, 5000));
   check('…and the changes are gone', await page.waitFor(`${rows} === ''`, 5000));
 
   git('checkout', '-qb', 'topic');

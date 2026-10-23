@@ -43,7 +43,7 @@ export default async function ({ check }) {
   check('the submodule is listed', await page.waitFor(`!!${submoduleRow('libs/lib')}`, 10000));
   check('it is staged with .gitmodules, marked as a submodule', await page.waitFor(`[...document.querySelectorAll('.change-row')].some(r => r.textContent.includes('libs/lib') && !!r.querySelector('.codicon-file-submodule')) && [...document.querySelectorAll('.change-row')].some(r => r.textContent.includes('.gitmodules'))`));
   await page.invoke('commit:create', root, 'Add lib\n', false);
-  await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Add lib'`);
+  await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Add lib')`);
 
   // New commits inside: a submodule change with a git-style diff.
   const inside = join(root, 'libs', 'lib');

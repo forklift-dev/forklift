@@ -44,7 +44,7 @@ export default async function ({ check }) {
   // Both fields as the user left them before submitting.
   await page.waitFor(`document.querySelector('.form-dialog input[name="message"]').value === 'Merge one, on purpose' && document.querySelector('.form-dialog select[name="mode"]').value === 'no-ff'`);
   await page.click(`document.querySelector('.form-dialog button[type=submit]')`);
-  const merged = await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Merge one, on purpose'`, 15000);
+  const merged = await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Merge one, on purpose')`, 15000);
   check('no-ff merge creates a merge commit with the message', merged && git('log', '-1', '--format=%P').split(' ').length === 2, git('log', '-1', '--format=%s'));
 
   // Squash: staged changes and git's prepared message in the commit form.
@@ -55,7 +55,7 @@ export default async function ({ check }) {
   const summary = await page.waitFor(`document.querySelector('.commit-summary')?.value`);
   check('squash stages the changes and prefills the message', /^Squashed commit of the following/.test(summary ?? '') && git('diff', '--cached', '--name-only') === 'two.txt', summary);
   await page.click(`document.querySelector('.commit-panel button[type=submit]')`);
-  check('…committed as one ordinary commit', await page.waitFor(`/Squashed commit/.test(document.querySelector('.commit-row[data-hash] .subject')?.textContent ?? '')`) && git('log', '-1', '--format=%P').split(' ').length === 1);
+  check('…committed as one ordinary commit', await page.waitFor(`/Squashed commit/.test(document.querySelector('.commit-row[data-hash]:has(.ref.head) .subject')?.textContent ?? '')`) && git('log', '-1', '--format=%P').split(' ').length === 1);
 
   // Drag "clash" onto the current branch: merge with a conflict, resolve, commit.
   await page.evaluate(`(() => {
@@ -83,6 +83,15 @@ export default async function ({ check }) {
   await page.waitFor(`${item('three')}.classList.contains('current')`);
   await contextMenu(page, item('main'));
   await page.click(menuItem('Rebase three onto main'));
+  const before = git('rev-parse', 'three');
   await page.click(modalButton('Rebase'));
-  check('rebase replays the branch on top', await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Work on three'`) && git('merge-base', '--is-ancestor', 'main', 'three') === '');
+  // Done when three has moved and the graph shows its new commit (with the HEAD label).
+  let rebased = false;
+  for (let i = 0; i < 100 && !rebased; i++) {
+    rebased = git('rev-parse', 'three') !== before;
+    if (!rebased) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const after = git('rev-parse', 'three');
+  const shown = await page.waitFor(`document.querySelector('.commit-row[data-hash]:has(.ref.head)')?.dataset.hash === ${JSON.stringify(after)}`);
+  check('rebase replays the branch on top', rebased && shown && git('merge-base', '--is-ancestor', 'main', 'three') === '');
 }

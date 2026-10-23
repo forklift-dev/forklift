@@ -121,6 +121,9 @@ export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false
     ...(inspectPort ? [`--inspect=${inspectPort}`] : []),
     '--ozone-platform=x11',
     `--window-size=${windowSize}`,
+    // Chromium refuses to start as root with its sandbox on; CI containers (GitVerse's cloud runner) run as
+    // root. Tests only: the app itself never turns the sandbox off.
+    ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
     ...args,
   ];
   const child = spawn(await electronBinary(), argv, { cwd: projectDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -262,10 +265,30 @@ export class CdpSession {
     }
   }
 
-  /** Clicks the centre of the element an expression yields, with real mouse events (Monaco ignores el.click()). */
+  /**
+   * Clicks the centre of the element an expression yields, with real mouse events (Monaco ignores el.click()).
+   * Waits until the element stays put for a frame and is the one under that point: layout that shifts as the
+   * page updates would otherwise send the click to a neighbour.
+   */
   async click(expression) {
-    const box = await this.evaluate(`(() => { const el = (${expression}); if (!(el instanceof Element)) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-    if (!box || !Number.isFinite(box.x)) throw new Error(`not found: ${expression}`);
+    let box = null;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      box = await this.evaluate(`(async () => {
+        const el = (${expression});
+        if (!(el instanceof Element)) return null;
+        el.scrollIntoView({ block: 'nearest' });
+        const rect = () => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; };
+        const first = rect();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const second = rect();
+        const hit = document.elementFromPoint(second.x, second.y);
+        const ready = first.x === second.x && first.y === second.y && hit !== null && (el === hit || el.contains(hit));
+        return { ...second, ready };
+      })()`);
+      if (!box || !Number.isFinite(box.x)) throw new Error(`not found: ${expression}`);
+      if (box.ready) break;
+      await sleep(50);
+    }
     await this.clickAt(box.x, box.y);
   }
 

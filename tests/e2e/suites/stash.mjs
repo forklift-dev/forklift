@@ -83,7 +83,7 @@ export default async function ({ check }) {
   await sleep(1100);
   write('a.txt', 'committed meanwhile\n');
   git('commit', '-qam', 'Meanwhile');
-  await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Meanwhile'`, 5000);
+  await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Meanwhile')`, 5000);
   await sleep(1100);
   await page.click(toolbarButton('Pop'));
   const notice = await page.waitFor(`document.querySelector('.notices')?.textContent`);

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,8 +59,13 @@ describe('LfsService', () => {
     expect(info.installed === null).toBe(!hasLfs);
   });
 
-  it.skipIf(hasLfs)('explains that git-lfs is missing when it is needed', async () => {
-    const service = new LfsService(git, noRemote);
+  it('explains that git-lfs is missing when it is needed', async () => {
+    // A PATH with git alone: git-lfs is not found even where it is installed.
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    symlinkSync(execFileSync('which', ['git']).toString().trim(), join(bin, 'git'));
+    const service = new LfsService(new GitCli(directRunner({ ...env, PATH: bin })), noRemote);
+    expect((await service.info(root, [])).installed).toBeNull();
     await expect(service.track(root, '*.psd')).rejects.toThrow(/git-lfs is not installed/);
     await expect(service.download(root, true, { signal: new AbortController().signal, onProgress: () => {} })).rejects.toThrow(/git-lfs is not installed/);
   });

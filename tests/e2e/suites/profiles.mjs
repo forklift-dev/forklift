@@ -68,7 +68,7 @@ export default async function ({ check }) {
   await page.fill(`document.querySelector('.commit-summary')`, 'Signed work');
   await page.waitFor(`!${button(`document.querySelector('.commit-panel')`, 'Commit 1 file')}?.disabled`);
   await page.click(button(`document.querySelector('.commit-panel')`, 'Commit 1 file'));
-  await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Signed work'`, 10000);
+  await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Signed work')`, 10000);
   check('the commit is by the profile', execFileSync('git', ['log', '-1', '--format=%an <%ae>'], { cwd: root }).toString().trim() === 'Ada Work <ada@work.example>');
   await page.click(`document.querySelector('.commit-row[data-hash]')`);
   const signature = await page.waitFor(`document.querySelector('.signature')?.textContent`, 10000);

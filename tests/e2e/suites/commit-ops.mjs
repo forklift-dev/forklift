@@ -7,7 +7,8 @@ import { createRepo, launchApp } from '../harness.mjs';
 const row = (subject) => `[...document.querySelectorAll('.commit-row[data-hash]')].find(r => r.querySelector('.subject').textContent === ${JSON.stringify(subject)})`;
 const menuItem = (label) => `[...document.querySelectorAll('.context-menu button')].find(b => b.textContent.startsWith(${JSON.stringify(label)}))`;
 const modalButton = (label) => `[...document.querySelectorAll('.modal button')].find(b => b.textContent === ${JSON.stringify(label)})`;
-const top = `document.querySelector('.commit-row[data-hash] .subject')?.textContent`;
+// The HEAD commit's subject (unrelated branch tips made in the same second may sort above it).
+const top = `document.querySelector('.commit-row[data-hash]:has(.ref.head) .subject')?.textContent`;
 
 async function menu(page, subject, label) {
   await page.waitFor(`!!${row(subject)}`);

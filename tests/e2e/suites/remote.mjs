@@ -8,7 +8,8 @@ import { createRepo, defer, GIT_IDENTITY, launchApp, tempDir } from '../harness.
 
 const toolbarButton = (label) => `[...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === ${JSON.stringify(label)})`;
 const promptText = `document.querySelector('.prompt-dialog .prompt-text')?.textContent`;
-const top = `document.querySelector('.commit-row[data-hash] .subject')?.textContent`;
+// The HEAD commit's subject (unrelated branch tips made in the same second may sort above it).
+const top = `document.querySelector('.commit-row[data-hash]:has(.ref.head) .subject')?.textContent`;
 
 async function answer(page, kind, text) {
   const seen = await page.waitFor(`/${kind}/i.test(${promptText} ?? '') && ${promptText}`, 10000);

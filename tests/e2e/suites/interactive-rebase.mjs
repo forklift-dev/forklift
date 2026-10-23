@@ -39,5 +39,5 @@ export default async function ({ check }) {
   const log = git('log', '--format=%s', 'HEAD~3..HEAD').split('\n');
   check('rebased: four first, one reworded, two+three squashed, five dropped', JSON.stringify(log) === JSON.stringify(['Two and three together', 'One, said better', 'Add four']), JSON.stringify(log));
   check('the squashed commit holds both changes', git('show', '--name-only', '--format=', 'HEAD').split('\n').sort().join() === 'three.txt,two.txt');
-  check('the graph shows the new history', await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Two and three together'`));
+  check('the graph shows the new history', await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Two and three together')`));
 }

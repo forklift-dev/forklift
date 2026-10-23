@@ -38,6 +38,6 @@ export default async function ({ check }) {
 
   await page.click(`document.querySelector('.commit-panel [name="skipHooks"]')`);
   await page.click(commitButton);
-  check('"Skip hooks" commits without running it', await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Change a'`, 10000) && git('log', '-1', '--format=%s') === 'Change a');
+  check('"Skip hooks" commits without running it', await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Change a')`, 10000) && git('log', '-1', '--format=%s') === 'Change a');
   check('the choice does not stick', await page.waitFor(`document.querySelector('.commit-panel [name="skipHooks"]')?.checked === false`));
 }
