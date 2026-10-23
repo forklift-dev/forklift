@@ -59,6 +59,13 @@ export function createGitService(): GitService {
         readPreparedMessage(repo),
       ]);
       const pullRebase = await readPullRebase(repo, branch.head);
+      const remoteUrls: RepoData['remoteUrls'] = {};
+      for (const name of remotes) {
+        const remote = await Remote.lookup(repo, name).catch(() => null);
+        if (!remote) continue;
+        const push = remote.pushurl();
+        remoteUrls[name] = { fetch: remote.url(), ...(push && push !== remote.url() && { push }) };
+      }
       return {
         root,
         name: basename(root),
@@ -67,6 +74,7 @@ export function createGitService(): GitService {
         remoteBranches: refs.remoteBranches,
         tags: refs.tags,
         remotes: [...remotes].sort(),
+        remoteUrls,
         stashes,
         operation,
         preparedMessage,
@@ -212,8 +220,12 @@ async function readRefs(repo: Repository, head: Reference | null): Promise<Refs>
   const headName = head && !repo.headDetached() ? head.name() : null;
   if (head && headName === null) add(head.target().tostrS(), 'HEAD');
 
+  // getReferences returns symbolic refs already resolved (refs/remotes/origin/HEAD, which git 2.48+
+  // creates on fetch, comes back as origin/main): skip names seen before.
+  const seen = new Set<string>();
   for (const ref of await repo.getReferences()) {
-    if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag())) continue;
+    if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag()) || seen.has(ref.name())) continue;
+    seen.add(ref.name());
     const name = ref.shorthand();
     if (ref.isTag()) {
       // Annotated tags point at a tag object; peel to the commit it labels. Tags of trees or blobs are skipped.

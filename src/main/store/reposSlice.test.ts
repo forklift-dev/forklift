@@ -14,6 +14,7 @@ const data = (root: string): RepoData => ({
       remoteBranches: [],
       tags: [],
       remotes: [],
+      remoteUrls: {},
       stashes: [],
       operation: null,
       preparedMessage: null,

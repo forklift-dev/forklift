@@ -60,6 +60,12 @@ export interface Commands {
    * A rejected push fails with a message starting "Rejected:"; `force` retries with --force-with-lease.
    */
   'remote:push': { args: [repo: string, remote: string | null, force: boolean]; result: void };
+  'remote:add': { args: [repo: string, name: string, url: string]; result: void };
+  'remote:rename': { args: [repo: string, from: string, to: string]; result: void };
+  /** Fetch URL, or with `push` the separate push URL ('' removes it). */
+  'remote:setUrl': { args: [repo: string, name: string, url: string, push: boolean]; result: void };
+  /** Removes a remote and its remote-tracking branches. */
+  'remote:remove': { args: [repo: string, name: string]; result: void };
   /** Cancels the tab's running fetch/pull/push. */
   'remote:cancel': { args: [repo: string]; result: void };
   /** Answers a credential prompt (`null`: cancel). The answer is passed to git and kept nowhere. */
@@ -152,6 +158,10 @@ const commandChannelSet = {
   'remote:pull': true,
   'remote:push': true,
   'remote:cancel': true,
+  'remote:add': true,
+  'remote:rename': true,
+  'remote:setUrl': true,
+  'remote:remove': true,
   'askpass:answer': true,
   'conflict:file': true,
   'conflict:save': true,

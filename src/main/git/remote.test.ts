@@ -121,3 +121,34 @@ describe('RemoteService', () => {
     expect(Date.now() - started).toBeLessThan(5000);
   });
 });
+
+describe('remote management and background fetch', () => {
+  it('adds, renames, changes URLs and removes remotes', async () => {
+    await service.addRemote(mine, 'upstream', theirs);
+    expect(sh(mine, 'remote', 'get-url', 'upstream')).toBe(theirs);
+    await expect(service.addRemote(mine, 'bad name', theirs)).rejects.toThrow('not a valid remote name');
+    await expect(service.addRemote(mine, 'x', '--upload-pack=evil')).rejects.toThrow('URL');
+    await expect(service.addRemote(mine, 'upstream', theirs)).rejects.toThrow(/already exists/);
+    await service.renameRemote(mine, 'upstream', 'theirs');
+    await service.setRemoteUrl(mine, 'theirs', origin, false);
+    await service.setRemoteUrl(mine, 'theirs', join(dir, 'push-here.git'), true);
+    expect(sh(mine, 'remote', 'get-url', '--push', 'theirs')).toBe(join(dir, 'push-here.git'));
+    await service.setRemoteUrl(mine, 'theirs', '', true);
+    expect(sh(mine, 'remote', 'get-url', '--push', 'theirs')).toBe(origin);
+    const data = await git.read(mine);
+    expect(data.remoteUrls).toEqual({ origin: { fetch: origin }, theirs: { fetch: origin } });
+    await service.removeRemote(mine, 'theirs');
+    expect(sh(mine, 'remote')).toBe('origin');
+  });
+
+  it('background fetch never opens an askpass session', async () => {
+    let sessions = 0;
+    const counting = new RemoteService(new GitCli(directRunner(env)), { session: () => (sessions++, { env: {}, dispose: () => {} }) });
+    theirCommit('t.txt', 'x\n', 'theirs');
+    await counting.fetch(mine, null, false, run(), false);
+    expect(sessions).toBe(0);
+    expect(sh(mine, 'rev-parse', 'origin/main')).toBe(sh(theirs, 'rev-parse', 'HEAD'));
+    await counting.fetch(mine, null, false, run());
+    expect(sessions).toBe(1);
+  });
+});

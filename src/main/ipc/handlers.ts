@@ -8,7 +8,8 @@ import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
-import type { RemoteProgress, RemoteService } from '../git/remote';
+import type { RemoteRun, RemoteService } from '../git/remote';
+import type { NetworkKind, NetworkOps } from '../repos/network';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
@@ -21,7 +22,7 @@ import { noticeAdded, noticesDismissed, type AppStore } from '../store';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
-import { loadRepo, remoteActivity, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
+import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 
@@ -40,6 +41,9 @@ export interface HandlerDeps {
   conflicts: ConflictService;
   commitOps: CommitOps;
   remotes: RemoteService;
+  networkOps: NetworkOps;
+  /** Told about fetches done by hand (they reset the auto-fetch clock). */
+  onFetched?(root: string): void;
   /** Hands a credential answer to the waiting git process. */
   answerPrompt(id: number, answer: string | null): void;
 }
@@ -156,7 +160,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -183,32 +187,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     if (result.message) store.dispatch(noticeAdded(result.message));
   };
 
-  // One network operation per tab: its cancel handle, and progress updates at most every 100 ms.
-  const running = new Map<string, AbortController>();
-  const network = async <T>(root: string, kind: 'fetch' | 'pull' | 'push', work: (run: { signal: AbortSignal; onProgress(p: RemoteProgress): void }) => Promise<T>): Promise<T> => {
-    if (running.has(root)) throw new Error('A fetch, pull or push is already running in this repository');
-    const controller = new AbortController();
-    running.set(root, controller);
-    let last = 0;
-    store.dispatch(remoteActivity({ id: root, activity: { kind, phase: null, percent: null } }));
-    try {
-      return await work({
-        signal: controller.signal,
-        onProgress: ({ phase, percent }) => {
-          const now = Date.now();
-          if (now - last < 100 && percent !== 100) return;
-          last = now;
-          store.dispatch(remoteActivity({ id: root, activity: { kind, phase, percent } }));
-        },
-      });
-    } catch (error) {
-      if (controller.signal.aborted) throw new Error(`The ${kind} was cancelled`, { cause: error });
-      throw error;
-    } finally {
-      running.delete(root);
-      store.dispatch(remoteActivity({ id: root, activity: null }));
-    }
-  };
+  const network = <T>(root: string, kind: NetworkKind, work: (run: RemoteRun) => Promise<T>) => networkOps.run(root, kind, work);
 
   const stashName = (root: string, sha: string) => {
     const stash = repoData(root)?.stashes.find((s) => s.sha === sha);
@@ -257,12 +236,15 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (remote !== null) parseName(remote, 'remote');
       if (typeof prune !== 'boolean') throw new TypeError('prune must be a boolean');
       await thenRefresh(root, () => network(root, 'fetch', (run) => remotes.fetch(root, remote, prune, run)));
+      onFetched?.(root);
     },
 
     async 'remote:pull'(_ctx, repo, rebase) {
       const root = tab(repo);
       if (typeof rebase !== 'boolean') throw new TypeError('rebase must be a boolean');
-      return thenRefresh(root, () => network(root, 'pull', (run) => remotes.pull(root, rebase, run)));
+      const result = await thenRefresh(root, () => network(root, 'pull', (run) => remotes.pull(root, rebase, run)));
+      onFetched?.(root);
+      return result;
     },
 
     async 'remote:push'(_ctx, repo, remote, force) {
@@ -278,8 +260,29 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       }
     },
 
+    async 'remote:add'(_ctx, repo, name, url) {
+      const root = tab(repo);
+      await thenRefresh(root, () => remotes.addRemote(root, parseName(name, 'remote'), String(url)));
+    },
+
+    async 'remote:rename'(_ctx, repo, from, to) {
+      const root = tab(repo);
+      await thenRefresh(root, () => remotes.renameRemote(root, parseName(from, 'remote'), parseName(to, 'remote')));
+    },
+
+    async 'remote:setUrl'(_ctx, repo, name, url, push) {
+      const root = tab(repo);
+      if (typeof push !== 'boolean' || typeof url !== 'string') throw new TypeError('url must be text and push a boolean');
+      await thenRefresh(root, () => remotes.setRemoteUrl(root, parseName(name, 'remote'), url, push));
+    },
+
+    async 'remote:remove'(_ctx, repo, name) {
+      const root = tab(repo);
+      await thenRefresh(root, () => remotes.removeRemote(root, parseName(name, 'remote')));
+    },
+
     async 'remote:cancel'(_ctx, repo) {
-      running.get(tab(repo))?.abort();
+      networkOps.cancel(tab(repo));
     },
 
     async 'askpass:answer'(_ctx, id, answer) {

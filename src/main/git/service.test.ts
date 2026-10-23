@@ -113,3 +113,22 @@ describe('GitService', () => {
     expect(changes).toEqual([{ path: 'c.txt', kind: 'conflicted', staged: false, unstaged: true }]);
   });
 });
+
+describe('GitService refs', () => {
+  it('lists a remote branch once even with refs/remotes/<remote>/HEAD', async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-test-')));
+    try {
+      sh(root, 'init', '--initial-branch=main');
+      writeFileSync(join(root, 'a.txt'), 'a\n');
+      sh(root, 'add', '.');
+      sh(root, 'commit', '-m', 'a');
+      sh(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+      sh(root, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+      const data = await createGitService().read(root);
+      expect(data.remoteBranches.map((b) => b.name)).toEqual(['origin/main']);
+      expect(Object.values(data.refs).flat().filter((label) => label === 'origin/main')).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

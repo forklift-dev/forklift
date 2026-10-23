@@ -39,6 +39,7 @@ function setup(repos: string[]) {
       remoteBranches: [],
       tags: [],
       remotes: [],
+      remoteUrls: {},
       stashes: [],
       operation: null,
       preparedMessage: null,

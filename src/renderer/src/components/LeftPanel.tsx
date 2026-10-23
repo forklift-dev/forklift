@@ -140,13 +140,42 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
           ))}
         </Section>
 
-        <Section id="remote" title="Remote" count={data.remoteBranches.length} collapsed={Boolean(collapsed['remote'])} onToggle={toggle}>
+        <Section
+          id="remote"
+          title="Remote"
+          count={data.remoteBranches.length}
+          collapsed={Boolean(collapsed['remote'])}
+          onToggle={toggle}
+          action={
+            <button type="button" className="icon-button" aria-label="Add remote" title="Add remote" onClick={actions.addRemote}>
+              <span className="codicon codicon-add" aria-hidden="true" />
+            </button>
+          }
+        >
           {remotes.map((name) => {
             const branches = remote.filter((branch) => branch.remote === name);
             const key = `remote:${name}`;
             return (
               <li key={key} className="ref-group">
-                <button type="button" className="ref-group-toggle" aria-expanded={!collapsed[key]} onClick={() => toggle(key)}>
+                <button
+                  type="button"
+                  className="ref-group-toggle"
+                  data-remote={name}
+                  title={data.remoteUrls[name]?.fetch ?? name}
+                  aria-expanded={!collapsed[key]}
+                  onClick={() => toggle(key)}
+                  onContextMenu={(event) =>
+                    openMenu(event, [
+                      { label: `Fetch ${name}`, onSelect: () => actions.fetchRemote(name) },
+                      'separator',
+                      { label: 'Edit URL…', onSelect: () => actions.editRemote(name) },
+                      { label: 'Rename…', onSelect: () => actions.renameRemote(name) },
+                      { label: 'Remove…', danger: true, onSelect: () => actions.removeRemote(name) },
+                      'separator',
+                      { label: 'Copy URL', onSelect: () => copyText(data.remoteUrls[name]?.fetch ?? '') },
+                    ])
+                  }
+                >
                   <span className={`codicon ${collapsed[key] ? 'codicon-chevron-right' : 'codicon-chevron-down'}`} aria-hidden="true" />
                   <span className="codicon codicon-cloud" aria-hidden="true" />
                   {name}

@@ -56,6 +56,21 @@ export const SETTING_FIELDS = {
     label: 'Reopen repositories at startup',
     description: 'Open the tabs that were open when Forklift was last closed.',
   },
+  'general.autoFetch': {
+    section: 'general',
+    type: 'boolean',
+    default: true,
+    label: 'Fetch automatically',
+    description: 'Fetch the open repository in the background while Forklift is in use. It never asks for passwords: only stored credentials are used.',
+  },
+  'general.autoFetchMinutes': { section: 'general', type: 'integer', default: 10, min: 1, max: 120, label: 'Auto-fetch every (minutes)' },
+  'general.fetchPrune': {
+    section: 'general',
+    type: 'boolean',
+    default: false,
+    label: 'Prune when fetching',
+    description: 'Remove remote branches that were deleted on the remote (git fetch --prune).',
+  },
   'git.executable': {
     section: 'git',
     type: 'string',

@@ -45,11 +45,64 @@ export class RemoteService {
     private readonly queue = new RepoQueue(),
   ) {}
 
-  /** `remote` null fetches every remote. */
-  fetch(root: string, remote: string | null, prune: boolean, run: RemoteRun): Promise<void> {
+  /**
+   * `remote` null fetches every remote. Not `interactive` (auto-fetch): nobody is asked for credentials —
+   * stored ones (credential helper, ssh-agent) work, anything else fails quietly.
+   */
+  fetch(root: string, remote: string | null, prune: boolean, run: RemoteRun, interactive = true): Promise<void> {
     if (remote !== null) assertName(remote, 'remote');
     const args = ['fetch', '--progress', ...(prune ? ['--prune'] : []), ...(remote ? [remote] : ['--all'])];
-    return this.network(root, args, run).then(() => {});
+    return this.network(root, args, run, interactive).then(() => {});
+  }
+
+  addRemote(root: string, name: string, url: string): Promise<void> {
+    return this.queue.run(root, async () => {
+      await this.assertRemoteName(root, name);
+      await this.admin(root, ['remote', 'add', name, parseUrl(url)]);
+    });
+  }
+
+  renameRemote(root: string, from: string, to: string): Promise<void> {
+    return this.queue.run(root, async () => {
+      assertName(from, 'remote');
+      await this.assertRemoteName(root, to);
+      await this.admin(root, ['remote', 'rename', from, to]);
+    });
+  }
+
+  /** Changes the fetch URL, or with `push` only the push URL (an empty push URL removes it again). */
+  setRemoteUrl(root: string, name: string, url: string, push: boolean): Promise<void> {
+    return this.queue.run(root, async () => {
+      assertName(name, 'remote');
+      if (push && url === '') {
+        await this.git.exec(['config', '--unset-all', `remote.${name}.pushurl`], { cwd: root, allowedExitCodes: [5] });
+        return;
+      }
+      await this.admin(root, ['remote', 'set-url', ...(push ? ['--push'] : []), name, parseUrl(url)]);
+    });
+  }
+
+  /** Removes the remote and its remote-tracking branches (local branches are untouched). */
+  removeRemote(root: string, name: string): Promise<void> {
+    return this.queue.run(root, async () => {
+      assertName(name, 'remote');
+      await this.admin(root, ['remote', 'remove', name]);
+    });
+  }
+
+  private async assertRemoteName(root: string, name: string): Promise<void> {
+    assertName(name, 'remote');
+    const { exitCode } = await this.git.exec(['check-ref-format', `refs/remotes/${name}/x`], { cwd: root, readOnly: true, allowedExitCodes: [1] });
+    if (exitCode !== 0 || name.includes('/')) throw new RemoteError(`"${name}" is not a valid remote name`);
+  }
+
+  private async admin(root: string, args: string[]): Promise<void> {
+    try {
+      await this.git.exec(args, { cwd: root });
+    } catch (error) {
+      if (error instanceof GitCliError) throw new RemoteError(error.message.replace(/^git .*? failed: (error: |fatal: )?/, ''));
+      throw error;
+    }
   }
 
   /**
@@ -90,8 +143,11 @@ export class RemoteService {
     await this.network(root, args, run);
   }
 
-  private async network(root: string, args: string[], run: RemoteRun): Promise<string> {
-    const session = this.askpass.session(root);
+  private async network(root: string, args: string[], run: RemoteRun, interactive = true): Promise<string> {
+    // In the background nothing may ask: an empty askpass fails at once, and ssh is told never to ask.
+    const session = interactive
+      ? this.askpass.session(root)
+      : { env: { GIT_ASKPASS: '', SSH_ASKPASS: '', SSH_ASKPASS_REQUIRE: 'never' }, dispose: () => {} };
     // Cancelling the operation also withdraws its open credential prompts.
     run.signal.addEventListener('abort', () => session.dispose(), { once: true });
     try {
@@ -116,6 +172,13 @@ export class RemoteService {
       session.dispose();
     }
   }
+}
+
+function parseUrl(url: string): string {
+  if (typeof url !== 'string' || !url.trim() || url.length > 4096 || /[\0\r\n]/.test(url) || url.trim().startsWith('-')) {
+    throw new RemoteError('Enter a repository URL or path');
+  }
+  return url.trim();
 }
 
 function assertName(name: string, what: string): void {

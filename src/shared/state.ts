@@ -86,6 +86,8 @@ export interface RepoData {
   remoteBranches: RemoteBranch[];
   tags: TagInfo[];
   remotes: string[];
+  /** Fetch and push URLs by remote name (`push` only when it differs). */
+  remoteUrls: Record<string, { fetch: string; push?: string }>;
   /** Newest first. */
   stashes: StashInfo[];
   operation: RepoOperation | null;

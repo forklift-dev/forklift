@@ -25,6 +25,8 @@ import { handleAppProtocol, registerAppScheme } from './protocol';
 import { pathFromArgv } from './repos/argv';
 import { LibraryFile } from './repos/libraryFile';
 import { RepoScanner } from './repos/scan';
+import { AutoFetch } from './repos/autoFetch';
+import { NetworkOps } from './repos/network';
 import { RepoSession } from './repos/session';
 import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
@@ -100,10 +102,14 @@ async function start() {
   app.on('will-quit', () => void askpass.stop());
   const remotes = new RemoteService(gitCli, askpass, repoQueue);
   const answerPrompt = (id: number, answer: string | null) => waiting.get(id)?.(answer);
+  const networkOps = new NetworkOps(store);
+  const autoFetch = new AutoFetch({ store, settings, networkOps, remotes, isFocused: () => BrowserWindow.getFocusedWindow() !== null });
+  autoFetch.start();
+  app.on('will-quit', () => autoFetch.stop());
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -149,7 +155,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

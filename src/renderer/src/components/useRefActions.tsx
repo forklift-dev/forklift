@@ -28,6 +28,11 @@ export interface RefActions {
   merge(ref: string, label: string): void;
   /** Rebase the current branch onto a branch/commit (confirmation). */
   rebase(onto: string, label: string): void;
+  addRemote(): void;
+  editRemote(name: string): void;
+  renameRemote(name: string): void;
+  removeRemote(name: string): void;
+  fetchRemote(name: string): void;
   createBranch(sha: string, from: string): void;
   createTag(sha: string, from: string): void;
   renameBranch(name: string): void;
@@ -206,6 +211,51 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
         });
         if (ok) await run(() => invoke('branch:rebase', repo, onto));
       })(),
+
+    addRemote: () =>
+      void form({
+        title: 'Add remote',
+        fields: [
+          { name: 'name', label: 'Name', initial: data.remotes.includes('origin') ? '' : 'origin', placeholder: 'upstream' },
+          { name: 'url', label: 'URL', placeholder: 'https://github.com/owner/repo.git or git@host:owner/repo.git' },
+        ],
+        confirmLabel: 'Add remote',
+        validate: async (values) => (!String(values['name']).trim() ? 'Enter a name' : !String(values['url']).trim() ? 'Enter a URL' : null),
+        submit: (values) => attempt(() => invoke('remote:add', repo, String(values['name']).trim(), String(values['url']).trim())),
+      }),
+
+    editRemote: (name) =>
+      void form({
+        title: `Edit ${name}`,
+        fields: [
+          { name: 'url', label: 'Fetch URL', initial: data.remoteUrls[name]?.fetch ?? '' },
+          { name: 'push', label: 'Push URL (empty: same as fetch)', initial: data.remoteUrls[name]?.push ?? '' },
+        ],
+        confirmLabel: 'Save',
+        validate: async (values) => (!String(values['url']).trim() ? 'Enter a URL' : null),
+        submit: (values) =>
+          attempt(async () => {
+            await invoke('remote:setUrl', repo, name, String(values['url']).trim(), false);
+            await invoke('remote:setUrl', repo, name, String(values['push']).trim(), true);
+          }),
+      }),
+
+    renameRemote: (name) =>
+      void form({
+        title: `Rename ${name}`,
+        fields: [{ name: 'name', label: 'New name', initial: name }],
+        confirmLabel: 'Rename',
+        validate: async (values) => (String(values['name']).trim() === name ? 'Enter a different name' : null),
+        submit: (values) => attempt(() => invoke('remote:rename', repo, name, String(values['name']).trim())),
+      }),
+
+    removeRemote: (name) =>
+      void (async () => {
+        const ok = await confirm({ title: `Remove remote ${name}?`, detail: 'Its remote branches disappear from this repository; nothing changes on the server.', confirmLabel: 'Remove', danger: true });
+        if (ok) await run(() => invoke('remote:remove', repo, name));
+      })(),
+
+    fetchRemote: (name) => void run(() => invoke('remote:fetch', repo, name, false)),
 
     dialogs: (
       <>
