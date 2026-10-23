@@ -5,6 +5,7 @@ import { BUILTIN_THEMES } from '../../shared/themes';
 import { invoke } from './api';
 import { OPEN_COMMANDS_EVENT, startShortcuts, useCommandHandlers } from './commands';
 import { CommandPalette } from './components/CommandPalette';
+import { ProfileSwitcher } from './components/ProfileSwitcher';
 import type { NewRepoKind } from './components/NewRepoDialog';
 import { Preferences } from './components/preferences/Preferences';
 import { RepositoriesScreen } from './components/RepositoriesScreen';
@@ -76,6 +77,7 @@ export function App() {
   };
   const [dropping, setDropping] = useState(false);
   const [palette, setPalette] = useState<string | null>(null);
+  const [switchingProfile, setSwitchingProfile] = useState(false);
   const [preferencesSection, setPreferencesSection] = useState<SettingsSection | undefined>(undefined);
   const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const userThemes = useAppState((s) => s.app.userThemes.themes);
@@ -150,6 +152,7 @@ export function App() {
     'app.preferences': { run: () => openPreferences() },
     'app.keybindings': { run: () => openPreferences('keys') },
     'theme.choose': { run: () => openPreferences('ui') },
+    'profile.switch': { run: () => setSwitchingProfile(true) },
     'app.repositories': { run: () => setScreen('repositories') },
     'repo.clone': { run: () => openCreate('clone') },
     'repo.init': { run: () => openCreate('init') },
@@ -259,6 +262,7 @@ export function App() {
       )}
       {screen === 'preferences' && <Preferences key={preferencesSection ?? ''} repo={data} section={preferencesSection} onClose={() => setScreen('repo')} />}
       {palette !== null && <CommandPalette query={palette} onQuery={setPalette} onClose={() => setPalette(null)} />}
+      {switchingProfile && <ProfileSwitcher repo={screen === 'repo' ? tabs.activeId : null} run={run} onClose={() => setSwitchingProfile(false)} onEdit={() => openPreferences('profiles')} />}
       {screen !== 'preferences' && showRepositories && (
         <RepositoriesScreen
           run={run}

@@ -1349,6 +1349,142 @@ select {
   resize: vertical;
 }
 
+/* Profiles and keys */
+.setting-row[data-setting='profiles.list'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.profiles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.profile-form legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-ok {
+  color: var(--success);
+  font-size: 12px;
+}
+
+.ssh-keys {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin-top: 8px;
+}
+
+.ssh-keys h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ssh-keys .hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.ssh-key-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ssh-key-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ssh-key-name {
+  font-weight: 600;
+}
+
+.ssh-key-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.ssh-generate {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.ssh-generate .profile-actions {
+  grid-column: 1 / -1;
+}
+
+.commit-identity {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-profile {
+  color: var(--accent);
+}
+
+.signature.good {
+  color: var(--success);
+}
+
+.signature.warn {
+  color: var(--warning);
+}
+
+.signature.bad {
+  color: var(--danger-fg);
+}
+
+.signature-hint {
+  color: var(--fg-muted);
+}
+
 /* Command palette and finder */
 .palette-backdrop {
   align-items: flex-start;

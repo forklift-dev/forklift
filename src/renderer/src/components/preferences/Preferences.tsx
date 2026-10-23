@@ -15,6 +15,7 @@ import { useConfirm } from '../ConfirmDialog';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
 import { KeybindingsEditor } from './KeybindingsEditor';
+import { ProfilesEditor } from './Profiles';
 import { ThemePicker, UserThemesNote } from './ThemePicker';
 import { AppToolPicker, GitToolPicker } from './ToolPickers';
 
@@ -88,6 +89,8 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
         return <GitToolPicker {...props} kind={field.tool} detected={detected.data} confirm={confirm} />;
       case 'keybindings':
         return <KeybindingsEditor {...props} />;
+      case 'profiles':
+        return <ProfilesEditor {...props} />;
     }
   };
 

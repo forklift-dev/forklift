@@ -53,6 +53,7 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'history.goToHead', title: 'Go to HEAD', category: 'History' },
   { id: 'history.showAll', title: 'Show all branches in the graph', category: 'History' },
   { id: 'theme.choose', title: 'Choose a theme…', category: 'View' },
+  { id: 'profile.switch', title: 'Switch profile…', category: 'Profiles' },
   { id: 'repo.close', title: 'Close the open view (diff, file history…)', category: 'View', hidden: true },
 ];
 

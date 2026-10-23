@@ -306,6 +306,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               repo={repo}
               stagedCount={stagedCount}
               headSha={data.branch.oid}
+              loadedAt={data.loadedAt}
               onCommit={(message, amend) => run(() => invoke('commit:create', repo, message, amend))}
             />
           </>

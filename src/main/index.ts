@@ -31,6 +31,7 @@ import { handleAppProtocol, registerAppScheme } from './protocol';
 import { pathFromArgv } from './repos/argv';
 import { LibraryFile } from './repos/libraryFile';
 import { RepoCreator } from './repos/create';
+import { ProfileService } from './profiles/service';
 import { listFiles } from './git/files';
 import { RepoScanner } from './repos/scan';
 import { AutoFetch } from './repos/autoFetch';
@@ -136,9 +137,19 @@ async function start() {
   autoFetch.start();
   app.on('will-quit', () => autoFetch.stop());
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
+  const profiles = new ProfileService({ git: gitCli, runner, askpass, allowedSignersFile: join(app.getPath('userData'), 'allowed_signers') });
+  // SSH signatures made with a profile's key verify without extra setup.
+  let signers = settings.values['profiles.list'];
+  const writeSigners = () => void profiles.writeAllowedSigners(signers).catch((error: unknown) => console.error('[profiles] could not write allowed signers:', error));
+  writeSigners();
+  store.subscribe(() => {
+    if (settings.values['profiles.list'] === signers) return;
+    signers = settings.values['profiles.list'];
+    writeSigners();
+  });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

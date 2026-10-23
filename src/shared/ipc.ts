@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
@@ -143,6 +144,19 @@ export interface Commands {
   'settings:dismissProblems': { args: []; result: void };
   /** Shows a file picker for a program; resolves to its path or null when cancelled. */
   'settings:browseExecutable': { args: []; result: string | null };
+  /** Writes a saved profile to git config: of the repository, or globally (`repo` null). */
+  'profile:apply': { args: [profileId: string, repo: string | null]; result: void };
+  /** The identity in effect for the repository (or globally) and which profile it matches. */
+  'profile:current': { args: [repo: string | null]; result: ProfileApplied };
+  /** SSH keys in ~/.ssh, the ssh-agent, and OpenPGP secret keys. */
+  'keys:list': { args: []; result: KeysInfo };
+  /** Creates an ed25519 key in ~/.ssh. */
+  'keys:generateSsh': { args: [name: string, comment: string, passphrase: string]; result: SshKeyInfo };
+  /** Loads a key into the ssh-agent (its passphrase is asked in the app). */
+  'keys:addToAgent': { args: [path: string]; result: void };
+  'keys:publicKey': { args: [path: string]; result: string };
+  /** Whether a commit is signed and by whom (slow: runs gpg or ssh-keygen). */
+  'commit:signature': { args: [repo: string, sha: string]; result: CommitSignature };
   /** Opens userData/themes in the file manager. */
   'themes:openFolder': { args: []; result: void };
   /** Editors, terminals and git diff/merge tools found on this machine (git config as seen from `repo`). */
@@ -241,6 +255,13 @@ const commandChannelSet = {
   'settings:dismissProblems': true,
   'settings:browseExecutable': true,
   'themes:openFolder': true,
+  'profile:apply': true,
+  'profile:current': true,
+  'keys:list': true,
+  'keys:generateSsh': true,
+  'keys:addToAgent': true,
+  'keys:publicKey': true,
+  'commit:signature': true,
   'tools:detect': true,
   'tools:test': true,
   'tools:writeGitConfig': true,

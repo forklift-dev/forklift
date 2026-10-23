@@ -1,5 +1,7 @@
 import { useState, type KeyboardEvent } from 'react';
 import { invoke } from '../api';
+import { useAppState } from '../state';
+import { useCommand } from '../useCommand';
 
 interface CommitPanelProps {
   repo: string;
@@ -9,9 +11,37 @@ interface CommitPanelProps {
   onCommit(message: string, amend: boolean): Promise<boolean>;
   /** A message git prepared (merge, squash): the form starts with it. */
   preparedMessage?: string | null;
+  /** Changes when the repository was read again (the identity may have changed). */
+  loadedAt?: number;
 }
 
-export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMessage }: CommitPanelProps) {
+/** Who the commit will be by (and whether it is signed), naming the profile when it matches one. */
+function CommitIdentity({ repo, reloadKey }: { repo: string; reloadKey: unknown }) {
+  const profiles = useAppState((s) => s.settings.values['profiles.list']);
+  const { data } = useCommand('profile:current', [repo], { reloadKey: [reloadKey, profiles], keepPrevious: true });
+  if (!data) return null;
+  const profile = profiles.find((p) => p.id === data.current);
+  return (
+    <p className="commit-identity" title="Change it with a profile: Preferences → Profiles and keys, or “Switch profile…” in the command palette">
+      {data.userName || data.email ? (
+        <>
+          as {data.userName || '(no name)'} &lt;{data.email || 'no email'}&gt;
+          {profile && <span className="commit-profile"> · {profile.label}</span>}
+          {data.signing && (
+            <span className="commit-signing">
+              {' '}
+              · <span className="codicon codicon-verified" aria-hidden="true" /> signed
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="setting-error">No name and email for commits: set them in Preferences → Git or with a profile</span>
+      )}
+    </p>
+  );
+}
+
+export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMessage, loadedAt }: CommitPanelProps) {
   const [prepared = '', ...preparedBody] = (preparedMessage ?? '').split('\n');
   const [summary, setSummary] = useState(prepared);
   const [description, setDescription] = useState(preparedBody.join('\n').trim());
@@ -76,6 +106,7 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
         onChange={(event) => setDescription(event.target.value)}
         onKeyDown={onKeyDown}
       />
+      <CommitIdentity repo={repo} reloadKey={loadedAt} />
       <div className="commit-actions">
         <label title={headSha ? 'Replace the last commit' : 'Nothing to amend yet'}>
           <input type="checkbox" checked={amend} disabled={!headSha} onChange={(event) => void toggleAmend(event.target.checked)} /> Amend

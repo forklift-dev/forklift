@@ -30,6 +30,7 @@ import { cloneActivity, noticeAdded, noticesDismissed, type AppStore } from '../
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
+import type { ProfileService } from '../profiles/service';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
@@ -56,6 +57,7 @@ export interface HandlerDeps {
   fileHistory: FileHistory;
   terminals: TerminalService;
   creator: RepoCreator;
+  profiles: ProfileService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -192,7 +194,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -742,6 +744,42 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'settings:browseExecutable'({ sender }) {
       return showOpenDialog(sender, { title: 'Choose program', properties: ['openFile', 'dontAddToRecent'] });
+    },
+
+    async 'profile:apply'(_ctx, profileId, repo) {
+      const profile = settings.values['profiles.list'].find((p) => p.id === profileId);
+      if (!profile) throw new Error('There is no such profile');
+      const root = optionalTab(repo);
+      await profiles.apply(profile, root);
+      // The commit form shows who commits; read the repository again.
+      const shown = root ?? store.getState().repos.view.activeId;
+      if (shown) await store.dispatch(loadRepo(shown));
+    },
+
+    async 'profile:current'(_ctx, repo) {
+      return profiles.current(optionalTab(repo), settings.values['profiles.list']);
+    },
+
+    async 'keys:list'() {
+      return profiles.keys();
+    },
+
+    async 'keys:generateSsh'(_ctx, name, comment, passphrase) {
+      return profiles.generateSshKey(name, comment, passphrase);
+    },
+
+    async 'keys:addToAgent'(_ctx, path) {
+      await profiles.addToAgent(path);
+    },
+
+    async 'keys:publicKey'(_ctx, path) {
+      return profiles.publicKey(path);
+    },
+
+    async 'commit:signature'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      return profiles.signature(root, sha);
     },
 
     async 'themes:openFolder'() {

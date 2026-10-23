@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { CommitFile, FileChangeStatus } from '../../../shared/diff';
+import type { SignatureStatus } from '../../../shared/profiles';
 import { useCommand } from '../useCommand';
 
 const STATUS_LABEL: Record<FileChangeStatus, string> = {
@@ -31,6 +32,36 @@ interface CommitDetailsPanelProps {
   /** Extra header content: actions for a stash. */
   actions?: ReactNode;
   onFileHistory?(path: string): void;
+}
+
+const SIGNATURE_TEXT: Record<SignatureStatus, string> = {
+  good: 'Verified',
+  untrusted: 'Valid, key not trusted',
+  expired: 'Valid, signature expired',
+  'expired-key': 'Valid, key expired',
+  revoked: 'Key revoked',
+  bad: 'Bad signature',
+  unverifiable: 'Cannot be checked',
+  none: '',
+};
+
+/** The commit's signature, checked in the background (gpg or ssh-keygen can take a moment). */
+function Signature({ repo, sha }: { repo: string; sha: string }) {
+  const { data } = useCommand('commit:signature', [repo, sha]);
+  if (!data || data.status === 'none') return null;
+  const ok = data.status === 'good';
+  const warn = data.status === 'untrusted' || data.status === 'expired' || data.status === 'expired-key';
+  const format = data.format === 'ssh' ? 'SSH' : data.format === 'x509' ? 'X.509' : 'GPG';
+  return (
+    <>
+      <dt>Signed</dt>
+      <dd className={`signature ${ok ? 'good' : warn ? 'warn' : 'bad'}`} data-status={data.status} title={data.key ? `${format} key ${data.key}` : undefined}>
+        <span className={`codicon ${ok ? 'codicon-verified-filled' : warn ? 'codicon-warning' : 'codicon-error'}`} aria-hidden="true" /> {SIGNATURE_TEXT[data.status]} · {format}
+        {data.signer && ` · ${data.signer}`}
+        {data.status === 'unverifiable' && data.format === 'ssh' && <span className="signature-hint"> (add the key to a profile or to gpg.ssh.allowedSignersFile)</span>}
+      </dd>
+    </>
+  );
 }
 
 export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory }: CommitDetailsPanelProps) {
@@ -69,6 +100,7 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
             </dd>
           </>
         )}
+        <Signature repo={repo} sha={sha} />
         {data.parents.length > 0 && (
           <>
             <dt>{data.parents.length > 1 ? 'Parents' : 'Parent'}</dt>
