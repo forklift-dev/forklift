@@ -1,12 +1,14 @@
-import { Repository, type Revwalk } from '@axosoft/nodegit';
+import { Reference, Repository, type Revwalk } from '@axosoft/nodegit';
 import { GraphLayout } from '../../shared/graph';
-import type { HistoryPage, HistoryRow } from '../../shared/history';
+import type { HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
+import type { GitCli } from '../git/cli';
 import { SORT } from '../git/libgit2';
 import { historyVersion, readStashes, WALK_GLOBS } from '../git/service';
 
 /** Commits read per walk step; the first page of a large repository costs the topological sort anyway. */
 const CHUNK = 2000;
 export const MAX_PAGE = 1000;
+const MAX_MATCHES = 2000;
 
 /** git's summary: the first paragraph of the message on one line. */
 export function summary(message: string): string {
@@ -16,12 +18,17 @@ export function summary(message: string): string {
 /** One repository's history at one version: walked lazily, laid out as it grows. */
 class HistoryCache {
   readonly rows: HistoryRow[] = [];
+  /** Row index by commit sha. */
+  readonly index = new Map<string, number>();
   complete = false;
   private readonly layout = new GraphLayout();
   private queue: Promise<void> = Promise.resolve();
 
   constructor(
     readonly version: string,
+    readonly filterKey: string,
+    /** The revisions walked, for `git log` searches over exactly the same commits. */
+    readonly revisions: string[],
     private readonly walk: Revwalk,
     /** Stash rows by the commit they were made on; each is placed right above it. */
     private readonly stashesByBase: Map<string, HistoryRow[]> = new Map(),
@@ -34,8 +41,10 @@ class HistoryCache {
         const commits = await this.walk.commitWalk(CHUNK, { returnPlainObjects: true });
         for (const commit of commits) {
           for (const stash of this.stashesByBase.get(commit.sha) ?? []) {
+            this.index.set(stash.hash, this.rows.length);
             this.rows.push({ ...stash, graph: this.layout.next(stash.hash, stash.parents) });
           }
+          this.index.set(commit.sha, this.rows.length);
           this.rows.push({
             hash: commit.sha,
             parents: commit.parents,
@@ -62,20 +71,52 @@ class HistoryCache {
 export class HistoryService {
   private readonly caches = new Map<string, Promise<HistoryCache>>();
 
+  constructor(private readonly git?: GitCli) {}
+
   /**
    * Rows `start…start+count` of the repository's history. `version` is what the window last saw in
    * RepoData; a different cached version is rebuilt (the page then reports the version it was built for).
    */
-  async page(root: string, version: string, start: number, count: number): Promise<HistoryPage> {
-    let pending = this.caches.get(root);
-    let cache = pending ? await pending.catch(() => null) : null;
-    if (!cache || cache.version !== version) {
-      pending = this.build(root);
-      this.caches.set(root, pending);
-      cache = await pending;
-    }
+  async page(root: string, version: string, start: number, count: number, filter: HistoryFilter = { solo: [], hidden: [] }): Promise<HistoryPage> {
+    const cache = await this.cache(root, version, filter);
     await cache.ensure(start + count);
     return { version: cache.version, start, rows: cache.rows.slice(start, start + count), loaded: cache.rows.length, complete: cache.complete };
+  }
+
+  /** Row index of a commit (walking as far as needed), or -1 when it is not in this history. */
+  async locate(root: string, version: string, filter: HistoryFilter, sha: string): Promise<number> {
+    const cache = await this.cache(root, version, filter);
+    while (!cache.index.has(sha) && !cache.complete) await cache.ensure(cache.rows.length + 5000);
+    return cache.index.get(sha) ?? -1;
+  }
+
+  /** Commits matching a search, as row indices of the same history (message, author, file and content via git log). */
+  async search(root: string, version: string, filter: HistoryFilter, query: HistorySearch): Promise<SearchResult> {
+    const cache = await this.cache(root, version, filter);
+    await cache.ensure(Infinity);
+    const text = query.text.trim();
+    if (!text) return { indices: [], truncated: false };
+    let shas: string[];
+    if (query.field === 'sha') {
+      const prefix = text.toLowerCase();
+      shas = cache.rows.filter((row) => row.hash.startsWith(prefix)).map((row) => row.hash);
+    } else {
+      if (!this.git) throw new Error('Searching needs the git CLI');
+      const pseudo = cache.revisions.filter((rev) => rev.startsWith('--'));
+      const refs = cache.revisions.filter((rev) => !rev.startsWith('--'));
+      // With no revisions at all, git log would fall back to HEAD.
+      if (!pseudo.length && !refs.length) return { indices: [], truncated: false };
+      const args = ['log', '--format=%H', ...pseudo, '--stdin'];
+      if (query.field === 'message') args.push('-i', '--fixed-strings', `--grep=${text}`);
+      else if (query.field === 'author') args.push('-i', '--fixed-strings', `--author=${text}`);
+      else if (query.field === 'content') args.push(`-S${text}`);
+      args.push('--');
+      if (query.field === 'file') args.push(`:(icase,glob)**/*${text.replace(/[*?[\]]/g, '\\$&')}*`);
+      const { stdout } = await this.git.exec(args, { cwd: root, readOnly: true, input: refs.length ? `${refs.join('\n')}\n` : '', timeoutMs: 120_000 });
+      shas = stdout.split('\n').filter(Boolean);
+    }
+    const indices = shas.map((sha) => cache.index.get(sha)).filter((index): index is number => index !== undefined).sort((a, b) => a - b);
+    return { indices: indices.slice(0, MAX_MATCHES), truncated: indices.length > MAX_MATCHES };
   }
 
   /** Drops a closed repository's history. */
@@ -83,10 +124,20 @@ export class HistoryService {
     this.caches.delete(root);
   }
 
-  private async build(root: string): Promise<HistoryCache> {
+  private async cache(root: string, version: string, filter: HistoryFilter): Promise<HistoryCache> {
+    const filterKey = JSON.stringify([[...filter.solo].sort(), [...filter.hidden].sort()]);
+    let pending = this.caches.get(root);
+    const cache = pending ? await pending.catch(() => null) : null;
+    if (cache && cache.version === version && cache.filterKey === filterKey) return cache;
+    pending = this.build(root, filter, filterKey);
+    this.caches.set(root, pending);
+    return pending;
+  }
+
+  private async build(root: string, filter: HistoryFilter, filterKey: string): Promise<HistoryCache> {
     const repo = await Repository.open(root);
-    const stashes = await readStashes(repo);
-    const version = await historyVersion(repo, stashes);
+    const stashes = filter.solo.length ? [] : await readStashes(repo);
+    const version = await historyVersion(repo);
     const stashesByBase = new Map<string, HistoryRow[]>();
     for (const stash of stashes) {
       const commit = await repo.getCommit(stash.sha);
@@ -106,9 +157,37 @@ export class HistoryService {
     }
     const walk = repo.createRevWalk();
     walk.sorting(SORT.TOPOLOGICAL, SORT.TIME);
-    // A detached HEAD is not under any ref. Globs without matches (a new repository) push nothing.
-    if (!repo.headUnborn()) walk.pushHead();
-    for (const glob of WALK_GLOBS) walk.pushGlob(glob);
-    return new HistoryCache(version, walk, stashesByBase);
+    const revisions: string[] = [];
+    const push = (name: string) => {
+      walk.pushRef(name);
+      revisions.push(name);
+    };
+    if (filter.solo.length) {
+      for (const name of filter.solo) {
+        if (await Reference.lookup(repo, name).then(() => true, () => false)) push(name);
+      }
+    } else if (filter.hidden.length) {
+      // Each ref but the hidden ones: commits only they reach drop out, shared history stays.
+      const hidden = new Set(filter.hidden);
+      for (const ref of await repo.getReferences()) {
+        if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag()) || hidden.has(ref.name()) || revisions.includes(ref.name())) continue;
+        push(ref.name());
+      }
+      const headRef = repo.headUnborn() ? null : await repo.head();
+      if (headRef && (repo.headDetached() || !hidden.has(headRef.name()))) {
+        walk.pushHead();
+        revisions.push('HEAD');
+      }
+    } else {
+      // A detached HEAD is not under any ref. Globs without matches (a new repository) push nothing.
+      if (!repo.headUnborn()) {
+        walk.pushHead();
+        revisions.push('HEAD');
+      }
+      for (const glob of WALK_GLOBS) walk.pushGlob(glob);
+      // Pseudo-options go on the command line (see search), the explicit revisions through stdin.
+      revisions.push('--branches', '--remotes', '--tags');
+    }
+    return new HistoryCache(version, filterKey, revisions, walk, stashesByBase);
   }
 }

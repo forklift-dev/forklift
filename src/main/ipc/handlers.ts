@@ -2,6 +2,7 @@ import { isAbsolute } from 'node:path';
 import { BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from 'electron';
 import type { CheckoutTarget } from '../../shared/branches';
 import type { DiffTarget } from '../../shared/diff';
+import type { HistoryFilter, HistorySearch } from '../../shared/history';
 import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
 import type { BranchService, SwitchResult } from '../git/branches';
@@ -153,6 +154,20 @@ function parseCheckoutTarget(value: unknown): CheckoutTarget {
     return { kind: 'commit', sha: raw['sha'] };
   }
   throw new TypeError('target.kind must be branch, remote or commit');
+}
+
+function assertVersion(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.length > 64) throw new TypeError('version must be a history version');
+}
+
+function parseFilter(value: unknown): HistoryFilter {
+  const raw = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+  const refs = (list: unknown) => {
+    if (list === undefined) return [];
+    if (!Array.isArray(list) || list.length > 1000 || !list.every((ref) => typeof ref === 'string' && /^refs\/[^\s]{1,250}$/.test(ref))) throw new TypeError('filter refs must be full ref names');
+    return list as string[];
+  };
+  return { solo: refs(raw['solo']), hidden: refs(raw['hidden']) };
 }
 
 function assertAbsolutePath(value: unknown, name: string): asserts value is string {
@@ -476,12 +491,28 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       return thenRefresh(root, () => recorder.commit(root, `${amend ? 'amend' : 'commit'} “${subject}”`, () => staging.commit(root, message, amend)));
     },
 
-    async 'history:rows'(_ctx, repo, version, start, count) {
+    async 'history:rows'(_ctx, repo, version, start, count, filter) {
       const root = tab(repo);
-      if (typeof version !== 'string' || version.length > 64) throw new TypeError('version must be a history version');
+      assertVersion(version);
       if (!Number.isInteger(start) || start < 0) throw new TypeError('start must be a non-negative integer');
       if (!Number.isInteger(count) || count < 1 || count > MAX_PAGE) throw new TypeError(`count must be 1 to ${MAX_PAGE}`);
-      return history.page(root, version, start, count);
+      return history.page(root, version, start, count, parseFilter(filter));
+    },
+
+    async 'history:locate'(_ctx, repo, version, filter, sha) {
+      const root = tab(repo);
+      assertVersion(version);
+      assertSha(sha);
+      return history.locate(root, version, parseFilter(filter), sha);
+    },
+
+    async 'history:search'(_ctx, repo, version, filter, query) {
+      const root = tab(repo);
+      assertVersion(version);
+      const raw = (typeof query === 'object' && query !== null ? query : {}) as Record<string, unknown>;
+      if (!['message', 'author', 'sha', 'file', 'content'].includes(raw['field'] as string)) throw new TypeError('unknown search field');
+      if (typeof raw['text'] !== 'string' || raw['text'].length > 1000 || /[\0\n]/.test(raw['text'])) throw new TypeError('search text must be one line');
+      return history.search(root, version, parseFilter(filter), { field: raw['field'] as HistorySearch['field'], text: raw['text'] });
     },
 
     async 'commit:details'(_ctx, repo, sha) {

@@ -24,3 +24,25 @@ export interface HistoryPage {
   /** The whole history has been walked: `loaded` is the total. */
   complete: boolean;
 }
+
+/** Which branches the graph shows: `solo` non-empty shows only those refs; `hidden` leaves refs out. Full ref names. */
+export interface HistoryFilter {
+  solo: string[];
+  hidden: string[];
+}
+
+export const NO_FILTER: HistoryFilter = { solo: [], hidden: [] };
+
+export type SearchField = 'message' | 'author' | 'sha' | 'file' | 'content';
+
+export interface HistorySearch {
+  field: SearchField;
+  text: string;
+}
+
+export interface SearchResult {
+  /** Row indices of matching commits in the history list (same version and filter), ascending. */
+  indices: number[];
+  /** More matches exist than were returned. */
+  truncated: boolean;
+}

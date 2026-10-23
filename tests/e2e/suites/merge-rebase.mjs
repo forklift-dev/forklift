@@ -41,8 +41,11 @@ export default async function ({ check }) {
   await page.click(menuItem('Merge one into main'));
   await page.selectOption(`document.querySelector('.form-dialog select[name="mode"]')`, 'no-ff');
   await page.fill(`document.querySelector('.form-dialog input[name="message"]')`, 'Merge one, on purpose');
+  // Both fields as the user left them before submitting.
+  await page.waitFor(`document.querySelector('.form-dialog input[name="message"]').value === 'Merge one, on purpose' && document.querySelector('.form-dialog select[name="mode"]').value === 'no-ff'`);
   await page.click(`document.querySelector('.form-dialog button[type=submit]')`);
-  check('no-ff merge creates a merge commit with the message', await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Merge one, on purpose'`) && git('log', '-1', '--format=%P').split(' ').length === 2);
+  const merged = await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent === 'Merge one, on purpose'`, 15000);
+  check('no-ff merge creates a merge commit with the message', merged && git('log', '-1', '--format=%P').split(' ').length === 2, git('log', '-1', '--format=%s'));
 
   // Squash: staged changes and git's prepared message in the commit form.
   await contextMenu(page, item('two'));

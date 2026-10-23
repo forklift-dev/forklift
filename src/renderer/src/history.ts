@@ -1,4 +1,4 @@
-import type { HistoryRow } from '../../shared/history';
+import type { HistoryFilter, HistoryRow } from '../../shared/history';
 import { invoke } from './api';
 
 export const PAGE_SIZE = 200;
@@ -22,6 +22,7 @@ export class HistoryPages {
   constructor(
     readonly repo: string,
     readonly version: string,
+    readonly filter: HistoryFilter,
     previous: HistoryPages | null = null,
   ) {
     // Skip a previous store that never got its own rows: no chain of stale stores builds up.
@@ -58,7 +59,7 @@ export class HistoryPages {
       if (this.pages.has(page) || this.pending.has(page)) continue;
       if (this.complete && page * PAGE_SIZE >= this.loaded) continue;
       this.pending.add(page);
-      invoke('history:rows', this.repo, this.version, page * PAGE_SIZE, PAGE_SIZE).then(
+      invoke('history:rows', this.repo, this.version, page * PAGE_SIZE, PAGE_SIZE, this.filter).then(
         (result) => {
           this.pending.delete(page);
           this.pages.set(page, result.rows);
@@ -100,10 +101,14 @@ const latest = new Map<string, HistoryPages>();
  * The page store for a repository's current history version. A new version starts a new store that
  * shows the previous one's rows until its own arrive. Idempotent, so it is safe to call while rendering.
  */
-export function historyPages(repo: string, version: string): HistoryPages {
+export function historyPages(repo: string, version: string, filter: HistoryFilter): HistoryPages {
   const previous = latest.get(repo);
-  if (previous?.version === version) return previous;
-  const next = new HistoryPages(repo, version, previous ?? null);
+  if (previous?.version === version && filterKey(previous.filter) === filterKey(filter)) return previous;
+  // A new filter shows a different list: no rows of the old one meanwhile.
+  const sameList = previous && filterKey(previous.filter) === filterKey(filter);
+  const next = new HistoryPages(repo, version, filter, sameList ? previous : null);
   latest.set(repo, next);
   return next;
 }
+
+export const filterKey = (filter: HistoryFilter) => JSON.stringify([[...filter.solo].sort(), [...filter.hidden].sort()]);

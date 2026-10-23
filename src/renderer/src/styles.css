@@ -1627,3 +1627,62 @@ select {
   color: var(--fg);
   resize: vertical;
 }
+
+/* History search and filter */
+.history-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-search input {
+  width: 260px;
+}
+
+.search-count {
+  min-width: 80px;
+  color: var(--fg-muted);
+}
+
+.filter-status {
+  display: flex;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.go-head {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.commit-row.match {
+  box-shadow: inset 3px 0 0 #e2b33c;
+}
+
+.commit-row.match .subject {
+  font-weight: 600;
+}
+
+.commit-row.dimmed {
+  opacity: 0.45;
+}
+
+.ref-item.hidden-in-graph .ref-name {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.ref-item.solo .ref-name {
+  color: var(--accent);
+}

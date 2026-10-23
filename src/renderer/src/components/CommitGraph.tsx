@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from 'react';
 import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
-import type { HistoryRow } from '../../../shared/history';
+import type { HistoryFilter, HistoryRow } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
 import { historyPages } from '../history';
 
@@ -62,14 +62,19 @@ interface CommitGraphProps {
   selectedHash: string | null;
   onSelect(hash: string | null): void;
   onContextMenu?(event: MouseEvent, row: HistoryRow): void;
+  filter: HistoryFilter;
+  /** Rows matching the search, highlighted. */
+  matches?: ReadonlySet<number>;
+  /** Scroll to this row and select it once it is loaded (`nonce` repeats the same row). */
+  reveal?: { index: number; nonce: number } | null;
 }
 
 /**
  * The history list with its graph, virtualized: only rows in view are rendered and history pages are
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
-export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu }: CommitGraphProps) {
-  const pages = historyPages(repo, data.historyVersion);
+export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
+  const pages = historyPages(repo, data.historyVersion, filter);
   useSyncExternalStore(pages.subscribe, pages.getSnapshot);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -109,6 +114,32 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu 
   };
 
   const selectedIndex = selectedHash ? pages.indexOf(selectedHash) + offset : wip ? 0 : -1;
+
+  // A row revealed by index (search results, a branch located in main): scroll there, select once loaded.
+  const pendingReveal = useRef<{ index: number; nonce: number } | null>(null);
+  useEffect(() => {
+    if (!reveal) return;
+    pendingReveal.current = reveal;
+    const element = scrollRef.current;
+    if (element) element.scrollTop = Math.max(0, (reveal.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+  }, [reveal, offset]);
+  useEffect(() => {
+    const target = pendingReveal.current;
+    if (!target) return;
+    const row = pages.row(target.index);
+    const element = scrollRef.current;
+    if (!row) {
+      // Not loaded yet (and the list may not be that long yet): fetch its page; scroll again once it grows.
+      pages.request(target.index, target.index);
+      if (element && (target.index + offset) * ROW_HEIGHT < element.scrollHeight) {
+        element.scrollTop = Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+      }
+      return;
+    }
+    pendingReveal.current = null;
+    if (element) element.scrollTop = Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+    if (row.hash !== selectedHash) onSelect(row.hash);
+  });
 
   // A commit selected from elsewhere (a branch in the left panel) is scrolled into view once.
   const revealed = useRef<string | null>(null);
@@ -175,7 +206,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu 
         key={row.hash}
         role="row"
         aria-selected={selected}
-        className={`commit-row${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}`}
+        className={`commit-row${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}`}
         style={style}
         data-hash={row.hash}
         onClick={() => onSelect(row.hash)}

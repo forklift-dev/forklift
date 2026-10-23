@@ -3,7 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
-import type { HistoryPage } from './history';
+import type { HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
 
@@ -18,7 +18,11 @@ export interface Commands {
   /** Commits the index (hooks run); returns the new commit hash. */
   'commit:create': { args: [repo: string, message: string, amend: boolean]; result: string };
   /** Rows `start…start+count` of the commit history with graph layout; `version` is RepoData.historyVersion. */
-  'history:rows': { args: [repo: string, version: string, start: number, count: number]; result: HistoryPage };
+  'history:rows': { args: [repo: string, version: string, start: number, count: number, filter: HistoryFilter]; result: HistoryPage };
+  /** Row index of a commit in the history (same version and filter), or -1. */
+  'history:locate': { args: [repo: string, version: string, filter: HistoryFilter, sha: string]; result: number };
+  /** Matching commits as row indices: message, author, sha prefix, file name or content (pickaxe). */
+  'history:search': { args: [repo: string, version: string, filter: HistoryFilter, query: HistorySearch]; result: SearchResult };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
   /** Both versions of one file for the built-in diff view. */
@@ -145,6 +149,8 @@ const commandChannelSet = {
   'commit:create': true,
   'commit:details': true,
   'history:rows': true,
+  'history:locate': true,
+  'history:search': true,
   'diff:file': true,
   'ref:validateName': true,
   'branch:create': true,

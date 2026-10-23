@@ -1,4 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
+import type { HistoryFilter } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
 import { copyText, type MenuItem } from './ContextMenu';
 import { headLabel, type RefActions } from './useRefActions';
@@ -9,6 +10,8 @@ interface LeftPanelProps {
   openMenu(event: MouseEvent, items: MenuItem[]): void;
   /** Shows a commit in the graph. */
   onSelectCommit(sha: string): void;
+  graphFilter: HistoryFilter;
+  onFilter(filter: HistoryFilter): void;
 }
 
 type SectionId = 'local' | 'remote' | 'tags' | 'stashes';
@@ -40,7 +43,20 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
 }
 
 /** Left panel as in GitKraken: local branches, remote branches by remote, tags; filter and context actions. */
-export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanelProps) {
+export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter, onFilter }: LeftPanelProps) {
+  /** Graph filter entries for a ref (full name). */
+  const filterItems = (ref: string): MenuItem[] => {
+    const hidden = graphFilter.hidden.includes(ref);
+    const solo = graphFilter.solo.includes(ref);
+    return [
+      solo
+        ? { label: 'Show all branches in the graph', onSelect: () => onFilter({ solo: [], hidden: [] }) }
+        : { label: 'Show only this in the graph', onSelect: () => onFilter({ solo: [ref], hidden: [] }) },
+      hidden
+        ? { label: 'Show in the graph', onSelect: () => onFilter({ ...graphFilter, hidden: graphFilter.hidden.filter((r) => r !== ref) }) }
+        : { label: 'Hide in the graph', disabled: graphFilter.solo.length > 0, onSelect: () => onFilter({ solo: [], hidden: [...graphFilter.hidden, ref] }) },
+    ];
+  };
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setCollapsed((current) => ({ ...current, [id]: !current[id] }));
@@ -97,7 +113,7 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
           {local.map((branch) => (
             <li
               key={branch.name}
-              className={`ref-item${branch.current ? ' current' : ''}`}
+              className={`ref-item${branch.current ? ' current' : ''}${graphFilter.hidden.includes(`refs/heads/${branch.name}`) ? ' hidden-in-graph' : ''}${graphFilter.solo.includes(`refs/heads/${branch.name}`) ? ' solo' : ''}`}
               data-ref={branch.name}
               title={branch.upstream ? `${branch.name} → ${branch.upstream}` : branch.name}
               onClick={() => onSelectCommit(branch.sha)}
@@ -120,6 +136,8 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
                   'separator',
                   { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
                   { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },
+                  'separator',
+                  ...filterItems(`refs/heads/${branch.name}`),
                   'separator',
                   { label: 'Rename…', onSelect: () => actions.renameBranch(branch.name) },
                   { label: 'Delete…', danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
@@ -201,6 +219,8 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
                             'separator',
                             { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
                             { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },
+                            'separator',
+                            ...filterItems(`refs/remotes/${branch.name}`),
                             'separator',
                             { label: 'Copy branch name', onSelect: () => copyText(branch.name) },
                           ])

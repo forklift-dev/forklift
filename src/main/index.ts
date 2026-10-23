@@ -120,7 +120,7 @@ async function start() {
   app.on('will-quit', () => autoFetch.stop());
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
-  const history = new HistoryService();
+  const history = new HistoryService(gitCli);
   registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).

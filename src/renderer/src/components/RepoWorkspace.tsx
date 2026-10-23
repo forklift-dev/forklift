@@ -1,4 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NO_FILTER, type HistoryFilter } from '../../../shared/history';
+import { useCommand } from '../useCommand';
+import { HistoryBar, type SearchState } from './HistoryBar';
 import type { DiffTarget } from '../../../shared/diff';
 import type { RepoData } from '../../../shared/state';
 import { invoke } from '../api';
@@ -31,6 +34,53 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const [conflictPath, setConflictPath] = useState<string | null>(null);
   const [rebaseBase, setRebaseBase] = useState<string | null>(null);
+  const [filter, setFilterState] = useState<HistoryFilter>(() => loadFilter(data.root));
+  const setFilter = (next: HistoryFilter) => {
+    setFilterState(next);
+    saveFilter(data.root, next);
+  };
+  const [search, setSearchState] = useState<SearchState>({ open: false, field: 'message', text: '' });
+  const [query, setQuery] = useState(search);
+  // -1: results shown but none visited yet; the first Enter goes to the first match.
+  const [matchIndex, setMatchIndex] = useState(-1);
+  const [reveal, setReveal] = useState<{ index: number; nonce: number } | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setSearch = (next: SearchState) => {
+    setSearchState(next);
+    setMatchIndex(-1);
+    // Searching waits for a pause in typing.
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => setQuery(next), next.text === search.text ? 0 : 250);
+  };
+  const searching = query.open && query.text.trim() !== '';
+  const found = useCommand(searching ? 'history:search' : null, [repo, data.historyVersion, filter, { field: query.field, text: query.text }]);
+  const matches = useMemo(() => new Set(found.data?.indices ?? []), [found.data]);
+  const nonce = useRef(0);
+  const revealIndex = (index: number) => setReveal({ index, nonce: ++nonce.current });
+  const step = (direction: 1 | -1) => {
+    const indices = found.data?.indices ?? [];
+    if (!indices.length) return;
+    const next = matchIndex < 0 ? (direction === 1 ? 0 : indices.length - 1) : (matchIndex + direction + indices.length) % indices.length;
+    setMatchIndex(next);
+    revealIndex(indices[next]!);
+  };
+  /** Selects a commit and scrolls to it, wherever it is in the history. */
+  const showCommit = (sha: string) => {
+    setSelectedCommit(sha);
+    void invoke('history:locate', repo, data.historyVersion, filter, sha).then((index) => index >= 0 && revealIndex(index));
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'f' || !(event.ctrlKey || event.metaKey) || event.defaultPrevented) return;
+      // The diff and conflict editors have their own find.
+      if ((event.target as HTMLElement | null)?.closest('.monaco-editor')) return;
+      event.preventDefault();
+      setSearchState((current) => ({ ...current, open: true }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
   const { open: openMenu, menu } = useContextMenu();
@@ -67,7 +117,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   return (
     <main className="workspace">
-      <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={setSelectedCommit} />
+      <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
       {rebaseBase ? (
@@ -102,9 +152,24 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           }
         />
       ) : (
+        <>
+        <HistoryBar
+          filter={filter}
+          onShowAll={() => setFilter(NO_FILTER)}
+          onGoToHead={() => data.branch.oid && showCommit(data.branch.oid)}
+          search={search}
+          onSearch={setSearch}
+          results={searching ? (found.data ? { count: found.data.indices.length, truncated: found.data.truncated } : null) : null}
+          current={Math.max(0, matchIndex)}
+          onStep={step}
+          error={found.error}
+        />
         <CommitGraph
           repo={repo}
           data={data}
+          filter={filter}
+          matches={searching && found.data ? matches : undefined}
+          reveal={reveal}
           selectedHash={selectedCommit}
           onSelect={setSelectedCommit}
           onContextMenu={(event, row) => {
@@ -142,6 +207,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             ]);
           }}
         />
+        </>
       )}
       </div>
       <aside className="side">
@@ -212,4 +278,26 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       {menu}
     </main>
   );
+}
+
+const FILTER_KEY = (root: string) => `forklift.historyFilter:${root}`;
+
+/** The branch filter is a view preference of this window, kept per repository. */
+function loadFilter(root: string): HistoryFilter {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FILTER_KEY(root)) ?? 'null') as HistoryFilter | null;
+    if (raw && Array.isArray(raw.solo) && Array.isArray(raw.hidden)) return { solo: raw.solo, hidden: raw.hidden };
+  } catch {
+    // unavailable storage: no filter
+  }
+  return NO_FILTER;
+}
+
+function saveFilter(root: string, filter: HistoryFilter) {
+  try {
+    if (filter.solo.length || filter.hidden.length) localStorage.setItem(FILTER_KEY(root), JSON.stringify(filter));
+    else localStorage.removeItem(FILTER_KEY(root));
+  } catch {
+    // storage unavailable: the filter lasts for this session
+  }
 }

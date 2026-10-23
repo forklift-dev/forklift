@@ -71,7 +71,7 @@
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-030](tasks/stage-3-history/T-030-graph-search.md) | Поиск и фильтрация в истории | todo |
+| [T-030](tasks/stage-3-history/T-030-graph-search.md) | Поиск и фильтрация в истории | review |
 | [T-031](tasks/stage-3-history/T-031-file-history-blame.md) | История файла и blame | todo |
 | [T-032](tasks/stage-3-history/T-032-commit-ops.md) | Cherry-pick, revert, reset, checkout коммита | review |
 | [T-033](tasks/stage-3-history/T-033-merge-rebase.md) | Merge и rebase веток | review |
