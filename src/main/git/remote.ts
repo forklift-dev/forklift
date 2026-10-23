@@ -147,8 +147,13 @@ export class RemoteService {
    * Clones `url` into `target` (a new or empty folder inside `parent`). Credential prompts belong to no tab.
    * On failure or cancellation git removes what it created; the caller cleans up after a killed git.
    */
-  async clone(parent: string, url: string, target: string, run: RemoteRun): Promise<void> {
-    await this.network(parent, ['clone', '--progress', '--', parseUrl(url), target], run, true, null);
+  async clone(parent: string, url: string, target: string, run: RemoteRun, recurseSubmodules = false): Promise<void> {
+    await this.network(parent, ['clone', '--progress', ...(recurseSubmodules ? ['--recurse-submodules'] : []), '--', parseUrl(url), target], run, true, null);
+  }
+
+  /** Any git command that talks to remotes (e.g. `submodule update`), with progress, cancelling and credentials. */
+  networkCommand(root: string, args: string[], run: RemoteRun): Promise<string> {
+    return this.network(root, args, run);
   }
 
   private async network(root: string, args: string[], run: RemoteRun, interactive = true, promptRepo: string | null = root): Promise<string> {

@@ -1349,6 +1349,23 @@ select {
   resize: vertical;
 }
 
+/* Submodules */
+.submodule-state {
+  margin-left: auto;
+  padding-left: 6px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ref-item.submodule.uninitialized .ref-name {
+  color: var(--fg-muted);
+}
+
+.ref-item.submodule.conflict .submodule-state {
+  color: var(--danger-fg);
+}
+
 /* Avatars */
 .avatar {
   flex: none;

@@ -13,6 +13,8 @@ export interface CloneRequest {
   parent: string;
   /** Name of the new folder. */
   name: string;
+  /** Also clone its submodules (recursively). */
+  recurseSubmodules?: boolean;
 }
 
 export interface InitRequest {

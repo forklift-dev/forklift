@@ -284,10 +284,22 @@ function toFileChange(file: StatusFile): FileChange {
   const staged = !conflicted && (bits & INDEX_MASK) !== 0;
   const unstaged = conflicted || (bits & WORKTREE_MASK) !== 0;
   const change: FileChange = { path: file.path(), kind: changeKind(bits), staged, unstaged };
+  if (isGitlink(file)) change.submodule = true;
 
   if (bits & STATUS.INDEX_RENAMED) change.origPath = file.headToIndex().oldFile().path();
   else if (bits & STATUS.WT_RENAMED) change.origPath = file.indexToWorkdir().oldFile().path();
   return change;
+}
+
+const GITLINK = 0o160000;
+
+/** A submodule entry (gitlink) on either side of either delta. */
+function isGitlink(file: StatusFile): boolean {
+  for (const delta of [file.headToIndex(), file.indexToWorkdir()]) {
+    if (!delta) continue;
+    if (delta.newFile().mode() === GITLINK || delta.oldFile().mode() === GITLINK) return true;
+  }
+  return false;
 }
 
 function changeKind(bits: number): ChangeKind {

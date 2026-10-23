@@ -1,6 +1,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import type { HistoryFilter } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
+import { useCommand } from '../useCommand';
 import { copyText, type MenuItem } from './ContextMenu';
 import { headLabel, type RefActions } from './useRefActions';
 
@@ -14,7 +15,7 @@ interface LeftPanelProps {
   onFilter(filter: HistoryFilter): void;
 }
 
-type SectionId = 'local' | 'remote' | 'tags' | 'stashes';
+type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules';
 
 const REF_MIME = 'application/x-forklift-ref';
 
@@ -70,6 +71,8 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
   const remote = data.remoteBranches.filter((branch) => match(branch.name));
   const tags = data.tags.filter((tag) => match(tag.name));
   const stashes = data.stashes.filter((stash) => match(stash.message));
+  const submoduleList = useCommand('submodule:list', [data.root], { reloadKey: data.loadedAt, keepPrevious: true });
+  const submodules = (submoduleList.data ?? []).filter((submodule) => match(submodule.path));
   const remotes = data.remotes.length ? data.remotes : [...new Set(data.remoteBranches.map((branch) => branch.remote))];
 
   /** What dropping branch `dragged` on local branch `target` can do: git merges and rebases the checked-out branch. */
@@ -304,6 +307,50 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
               >
                 <span className="codicon codicon-archive" aria-hidden="true" />
                 <span className="ref-name">{stash.message.replace(/^(WIP on|On) [^:]+: /, '')}</span>
+              </li>
+            );
+          })}
+        </Section>
+
+        <Section
+          id="submodules"
+          title="Submodules"
+          count={submoduleList.data?.length ?? 0}
+          collapsed={Boolean(collapsed['submodules'])}
+          onToggle={toggle}
+          action={
+            <button type="button" className="icon-button" aria-label="Add a submodule" title="Add a submodule" onClick={actions.addSubmodule}>
+              <span className="codicon codicon-add" aria-hidden="true" />
+            </button>
+          }
+        >
+          {submodules.map((submodule) => {
+            const ready = submodule.state !== 'uninitialized';
+            const note = { uninitialized: 'not initialized', current: '', moved: 'at another commit', conflict: 'conflict' }[submodule.state];
+            return (
+              <li
+                key={submodule.path}
+                className={`ref-item submodule ${submodule.state}`}
+                data-submodule={submodule.path}
+                title={`${submodule.path} — ${submodule.url}${note ? ` (${note})` : ''}${submodule.dirty ? ', changed inside' : ''}`}
+                onDoubleClick={() => (ready ? actions.openSubmodule(submodule.path) : actions.updateSubmodules(submodule.path))}
+                onContextMenu={(event) =>
+                  openMenu(event, [
+                    { label: 'Open in a new tab', disabled: !ready, onSelect: () => actions.openSubmodule(submodule.path) },
+                    { label: ready ? 'Update' : 'Initialize and update', onSelect: () => actions.updateSubmodules(submodule.path) },
+                    { label: 'Update all submodules', onSelect: () => actions.updateSubmodules(null) },
+                    { label: 'Sync URLs from .gitmodules', onSelect: actions.syncSubmodules },
+                    'separator',
+                    { label: 'Copy path', onSelect: () => copyText(submodule.path) },
+                    { label: 'Copy URL', onSelect: () => copyText(submodule.url) },
+                    'separator',
+                    { label: 'Remove submodule…', danger: true, onSelect: () => actions.removeSubmodule(submodule.path) },
+                  ])
+                }
+              >
+                <span className={`codicon ${ready ? 'codicon-file-submodule' : 'codicon-cloud-download'}`} aria-hidden="true" />
+                <span className="ref-name">{submodule.path}</span>
+                {(note || submodule.dirty) && <span className="submodule-state">{[note, submodule.dirty && 'changed'].filter(Boolean).join(', ')}</span>}
               </li>
             );
           })}

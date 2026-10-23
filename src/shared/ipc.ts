@@ -6,6 +6,7 @@ import type { RebaseCommit, RebaseStep } from './rebase';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
+import type { SubmoduleInfo } from './submodules';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -165,6 +166,14 @@ export interface Commands {
   'log:clear': { args: []; result: void };
   /** Saves the log as text where the user chooses; resolves to the file, or null when cancelled. */
   'log:export': { args: []; result: string | null };
+  'submodule:list': { args: [repo: string]; result: SubmoduleInfo[] };
+  /** Clones `url` into `path` as a submodule (recorded in the index, to be committed). */
+  'submodule:add': { args: [repo: string, url: string, path: string]; result: void };
+  /** `submodule update --init --recursive` for `paths`, or all of them (null). */
+  'submodule:update': { args: [repo: string, paths: string[] | null]; result: void };
+  'submodule:sync': { args: [repo: string]; result: void };
+  /** Removes a submodule (staged, to be committed) and its clone in .git/modules. */
+  'submodule:remove': { args: [repo: string, path: string]; result: void };
   /** Gravatar pictures (data: URLs) by email; empty unless the setting is on. */
   'avatars:get': { args: [emails: string[]]; result: Record<string, string> };
   /** Opens userData/themes in the file manager. */
@@ -267,6 +276,11 @@ const commandChannelSet = {
   'settings:browseExecutable': true,
   'themes:openFolder': true,
   'avatars:get': true,
+  'submodule:list': true,
+  'submodule:add': true,
+  'submodule:update': true,
+  'submodule:sync': true,
+  'submodule:remove': true,
   'log:entries': true,
   'log:operation': true,
   'log:clear': true,

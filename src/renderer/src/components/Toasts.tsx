@@ -32,6 +32,10 @@ const DONE: Record<string, string> = {
   'profile:apply': 'Profile applied',
   'remote:add': 'Remote added',
   'remote:remove': 'Remote removed',
+  'submodule:add': 'Submodule added',
+  'submodule:update': 'Submodules updated',
+  'submodule:sync': 'Submodule URLs synced',
+  'submodule:remove': 'Submodule removed',
 };
 
 interface Toast {
@@ -86,7 +90,7 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
   const progress = [
     remote && {
       key: 'remote',
-      text: `${{ fetch: 'Fetching', pull: 'Pulling', push: 'Pushing' }[remote.kind]} ${repoName}`,
+      text: `${{ fetch: 'Fetching', pull: 'Pulling', push: 'Pushing', submodules: 'Updating submodules of' }[remote.kind]} ${repoName}`,
       phase: remote.phase,
       percent: remote.percent,
       cancel: () => repo && void invoke('remote:cancel', repo),

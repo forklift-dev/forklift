@@ -21,6 +21,7 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
   const [license, setLicense] = useState('');
   const [holder, setHolder] = useState('');
   const [initialCommit, setInitialCommit] = useState(true);
+  const [recurseSubmodules, setRecurseSubmodules] = useState(true);
   // The folder check's answer, for the inputs (and attempt) it was asked about.
   const [checked, setChecked] = useState<{ key: string; problem: string | null } | null>(null);
   // Bumped after a failed attempt, so the folder is checked again.
@@ -35,9 +36,10 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
     void invoke('repo:createDefaults').then((loaded) => {
       if (!current) return;
       setDefaults(loaded);
-      setParent(loaded.parent);
-      setBranch(loaded.branch);
-      setHolder(loaded.holder);
+      // What the user already typed wins over defaults that arrive late.
+      setParent((typed) => typed || loaded.parent);
+      setBranch((typed) => (typed === 'main' ? loaded.branch : typed));
+      setHolder((typed) => typed || loaded.holder);
     });
     firstRef.current?.focus();
     return () => {
@@ -81,7 +83,7 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
     setBusy(true);
     setError(null);
     try {
-      if (kind === 'clone') await invoke('repo:clone', { url: url.trim(), parent, name: folder });
+      if (kind === 'clone') await invoke('repo:clone', { url: url.trim(), parent, name: folder, recurseSubmodules });
       else await invoke('repo:init', { parent, name: folder, branch: branch.trim(), gitignore, license: license || null, holder, initialCommit });
       onOpened();
     } catch (failure) {
@@ -150,6 +152,12 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
                   setName(event.target.value);
                 }}
               />
+            </label>
+          )}
+          {kind === 'clone' && (
+            <label className="checkbox-label">
+              <input type="checkbox" name="recurseSubmodules" checked={recurseSubmodules} onChange={(event) => setRecurseSubmodules(event.target.checked)} />
+              Clone submodules too
             </label>
           )}
           {kind === 'init' && (

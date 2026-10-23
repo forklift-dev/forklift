@@ -43,6 +43,13 @@ export interface RefActions {
   applyStash(sha: string): void;
   popStash(sha: string): void;
   dropStash(sha: string, label: string): void;
+  addSubmodule(): void;
+  /** One submodule, or all of them (null): init + update, recursively. */
+  updateSubmodules(path: string | null): void;
+  syncSubmodules(): void;
+  removeSubmodule(path: string): void;
+  /** Opens an initialized submodule in its own tab. */
+  openSubmodule(path: string): void;
   dialogs: ReactNode;
 }
 
@@ -256,6 +263,40 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       })(),
 
     fetchRemote: (name) => void run(() => invoke('remote:fetch', repo, name, false)),
+
+    addSubmodule: () =>
+      void form({
+        title: 'Add a submodule',
+        detail: 'The repository is cloned into the folder and recorded here; commit to keep it.',
+        fields: [
+          { name: 'url', label: 'Repository URL', placeholder: 'https://example.com/team/lib.git' },
+          { name: 'path', label: 'Folder (inside this repository)', placeholder: 'libs/lib' },
+        ],
+        confirmLabel: 'Add',
+        validate: async (values) => (!String(values['url']).trim() ? 'Enter the repository URL' : !String(values['path']).trim() ? 'Enter the folder' : null),
+        submit: (values) => attempt(() => invoke('submodule:add', repo, String(values['url']).trim(), String(values['path']).trim())),
+      }),
+
+    updateSubmodules: (path) => void run(() => invoke('submodule:update', repo, path === null ? null : [path])),
+
+    syncSubmodules: () => void run(() => invoke('submodule:sync', repo)),
+
+    removeSubmodule: (path) =>
+      void (async () => {
+        const ok = await confirm({
+          title: `Remove the submodule ${path}?`,
+          detail: 'Its folder and its clone in .git/modules are deleted, including changes not pushed from it. The removal is staged, to be committed.',
+          confirmLabel: 'Remove',
+          danger: true,
+        });
+        if (ok) await run(() => invoke('submodule:remove', repo, path));
+      })(),
+
+    openSubmodule: (path) => {
+      // The root uses the system's separator (backslashes on Windows); submodule paths always use "/".
+      const sep = repo.includes('\\') ? '\\' : '/';
+      void run(() => invoke('repo:open', `${repo}${sep}${path.replaceAll('/', sep)}`));
+    },
 
     dialogs: (
       <>

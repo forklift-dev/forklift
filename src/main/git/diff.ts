@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Diff, type Blob, type Commit, type IndexEntry, type Repository, type Tree } from '@axosoft/nodegit';
+import { Diff, Repository, type Blob, type Commit, type IndexEntry, type Tree } from '@axosoft/nodegit';
 import {
   MAX_DIFF_FILE_BYTES,
   type CommitDetails,
@@ -12,7 +12,7 @@ import {
   type FileVersion,
   type Signature,
 } from '../../shared/diff';
-import { DELTA, DIFF_FIND_RENAMES, DIFF_FLAG_BINARY } from './libgit2';
+import { DELTA, DIFF_FIND_RENAMES, DIFF_FLAG_BINARY, STATUS_OPT } from './libgit2';
 
 /** Above this many changed files line counts are skipped: computing them needs every patch. */
 const STATS_FILE_LIMIT = 2000;
@@ -161,7 +161,10 @@ export async function fromIndex(repo: Repository, path: string, stage: 0 | 1 | 2
     const key = stage === 1 ? 'ancestor_out' : stage === 2 ? 'our_out' : 'their_out';
     entry = conflict?.[key];
   }
-  return entry ? fromBlob(path, await repo.getBlob(entry.id)) : missing(path);
+  if (!entry) return missing(path);
+  // A submodule is recorded as the commit it points at, shown as git shows it.
+  if (entry.mode === 0o160000) return fromBytes(path, Buffer.from(`Subproject commit ${entry.id.tostrS()}\n`), false);
+  return fromBlob(path, await repo.getBlob(entry.id));
 }
 
 export async function fromWorkingTree(root: string, path: string): Promise<FileVersion> {
@@ -170,9 +173,24 @@ export async function fromWorkingTree(root: string, path: string): Promise<FileV
   if (!stats) return missing(path);
   // git stores a symlink as its target path, so compare that rather than the file it points to.
   if (stats.isSymbolicLink()) return fromBytes(path, Buffer.from(await readlink(fullPath)), false);
+  if (stats.isDirectory()) return fromSubmodule(fullPath, path);
   if (stats.size > MAX_DIFF_FILE_BYTES) return tooLarge(path, stats.size);
   const bytes = await readFile(fullPath);
   return fromBytes(path, bytes, bytes.subarray(0, BINARY_SNIFF_BYTES).includes(0));
+}
+
+/** A submodule's working tree: its checked-out commit, "-dirty" with changes inside (like `git diff`). */
+async function fromSubmodule(fullPath: string, path: string): Promise<FileVersion> {
+  const sub = await Repository.open(fullPath).catch(() => null);
+  if (!sub) return missing(path);
+  try {
+    if (sub.headUnborn()) return missing(path);
+    const head = (await sub.getHeadCommit()).sha();
+    const dirty = (await sub.getStatus({ flags: STATUS_OPT.INCLUDE_UNTRACKED })).length > 0;
+    return fromBytes(path, Buffer.from(`Subproject commit ${head}${dirty ? '-dirty' : ''}\n`), false);
+  } finally {
+    sub.cleanup();
+  }
 }
 
 async function headTree(repo: Repository): Promise<Tree | undefined> {

@@ -2,7 +2,7 @@ import type { RemoteProgress, RemoteRun } from '../git/remote';
 import type { AppStore } from '../store';
 import { remoteActivity } from '../store/reposSlice';
 
-export type NetworkKind = 'fetch' | 'pull' | 'push';
+export type NetworkKind = 'fetch' | 'pull' | 'push' | 'submodules';
 
 /**
  * Tracks the one network operation a tab may run at a time: its cancel handle and its progress in the
@@ -22,7 +22,7 @@ export class NetworkOps {
   }
 
   async run<T>(root: string, kind: NetworkKind, work: (run: RemoteRun) => Promise<T>): Promise<T> {
-    if (this.running.has(root)) throw new Error('A fetch, pull or push is already running in this repository');
+    if (this.running.has(root)) throw new Error('A fetch, pull, push or submodule update is already running in this repository');
     const controller = new AbortController();
     this.running.set(root, controller);
     let last = 0;
@@ -38,7 +38,7 @@ export class NetworkOps {
         },
       });
     } catch (error) {
-      if (controller.signal.aborted) throw new Error(`The ${kind} was cancelled`, { cause: error });
+      if (controller.signal.aborted) throw new Error(`The ${kind === 'submodules' ? 'submodule update' : kind} was cancelled`, { cause: error });
       throw error;
     } finally {
       this.running.delete(root);

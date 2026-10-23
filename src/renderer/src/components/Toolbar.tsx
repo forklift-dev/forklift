@@ -23,7 +23,7 @@ interface ToolbarProps {
   onRedo(): void;
 }
 
-const VERB = { fetch: 'Fetching', pull: 'Pulling', push: 'Pushing' } as const;
+const VERB = { fetch: 'Fetching', pull: 'Pulling', push: 'Pushing', submodules: 'Updating submodules' } as const;
 
 export function Toolbar(props: ToolbarProps) {
   const { repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences, onStash, onPop, remote, onPull, onPullMenu, onPush, onCancelRemote, undo, onUndo, onRedo } = props;

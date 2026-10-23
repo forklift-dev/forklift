@@ -38,6 +38,7 @@ export const QUIET_COMMANDS = new Set([
   'terminal:resize',
   'askpass:answer',
   'avatars:get',
+  'submodule:list',
   'app:dismissNotices',
 ]);
 

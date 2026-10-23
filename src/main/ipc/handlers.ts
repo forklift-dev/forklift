@@ -33,6 +33,7 @@ import type { RepoCreator } from '../repos/create';
 import type { ProfileService } from '../profiles/service';
 import type { OperationLog } from '../log/operationLog';
 import type { AvatarService } from '../avatars/service';
+import type { SubmoduleService } from '../git/submodules';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -63,6 +64,7 @@ export interface HandlerDeps {
   profiles: ProfileService;
   log: OperationLog;
   avatars: AvatarService;
+  submodules: SubmoduleService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -199,7 +201,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -488,13 +490,18 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const changes = new Map(repoData(root)?.changes.map((change) => [change.path, change]));
       const tracked: string[] = [];
       const untracked: string[] = [];
+      const moved: string[] = [];
       for (const path of parsePaths(paths)) {
-        const kind = changes.get(path)?.kind;
-        if (kind === undefined) throw new Error(`${path} has no changes to discard`);
-        if (kind === 'conflicted') throw new Error(`${path} is in conflict; resolve it instead of discarding`);
-        (kind === 'untracked' ? untracked : tracked).push(path);
+        const change = changes.get(path);
+        if (change === undefined) throw new Error(`${path} has no changes to discard`);
+        if (change.kind === 'conflicted') throw new Error(`${path} is in conflict; resolve it instead of discarding`);
+        (change.submodule ? moved : change.kind === 'untracked' ? untracked : tracked).push(path);
       }
-      await thenRefresh(root, () => recorder.discard(root, tracked, untracked, () => staging.discardFiles(root, tracked, untracked)));
+      await thenRefresh(root, async () => {
+        // A submodule goes back to the commit the repository records (changes inside it stay).
+        if (moved.length) await submodules.restore(root, moved);
+        if (tracked.length || untracked.length) await recorder.discard(root, tracked, untracked, () => staging.discardFiles(root, tracked, untracked));
+      });
     },
 
     async 'index:applyLines'(_ctx, repo, request) {
@@ -573,7 +580,8 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'repo:clone'(_ctx, request) {
       if (typeof request !== 'object' || request === null) throw new TypeError('request must be an object');
-      const { url, parent, name } = request as unknown as Record<string, unknown>;
+      const { url, parent, name, recurseSubmodules } = request as unknown as Record<string, unknown>;
+      if (recurseSubmodules !== undefined && typeof recurseSubmodules !== 'boolean') throw new TypeError('recurseSubmodules must be a boolean');
       assertString(url, 'url');
       assertAbsolutePath(parent, 'parent');
       assertString(name, 'name');
@@ -587,7 +595,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       });
       store.dispatch(cloneActivity({ url, target, phase: null, percent: null }));
       try {
-        const root = await creator.clone({ url, parent, name }, {
+        const root = await creator.clone({ url, parent, name, recurseSubmodules: recurseSubmodules === true }, {
           signal: controller.signal,
           onProgress: ({ phase, percent }) => {
             const now = Date.now();
@@ -808,6 +816,32 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (result.canceled || !result.filePath) return null;
       await writeFile(result.filePath, `${log.text()}\n`, { mode: 0o600 });
       return result.filePath;
+    },
+
+    async 'submodule:list'(_ctx, repo) {
+      return submodules.list(tab(repo));
+    },
+
+    async 'submodule:add'(_ctx, repo, url, path) {
+      const root = tab(repo);
+      await thenRefresh(root, () => network(root, 'submodules', (run) => submodules.add(root, url, path, run)));
+    },
+
+    async 'submodule:update'(_ctx, repo, paths) {
+      const root = tab(repo);
+      const list = paths === null ? null : parsePaths(paths);
+      await thenRefresh(root, () => network(root, 'submodules', (run) => submodules.update(root, list, true, run)));
+    },
+
+    async 'submodule:sync'(_ctx, repo) {
+      const root = tab(repo);
+      await thenRefresh(root, () => submodules.sync(root));
+    },
+
+    async 'submodule:remove'(_ctx, repo, path) {
+      const root = tab(repo);
+      assertString(path, 'path');
+      await thenRefresh(root, () => submodules.remove(root, path));
     },
 
     async 'avatars:get'(_ctx, emails) {

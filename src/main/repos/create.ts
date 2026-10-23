@@ -90,7 +90,7 @@ export class RepoCreator {
     const target = await this.cloneTarget(request.parent, request.name);
     const existed = (await folderState(target)) === 'empty';
     try {
-      await this.remotes.clone(request.parent, request.url, target, run);
+      await this.remotes.clone(request.parent, request.url, target, run, request.recurseSubmodules === true);
     } catch (error) {
       // A killed git cannot clean up; an empty folder the user chose stays (emptied).
       if (existed) for (const entry of await readdir(target).catch(() => [])) await rm(join(target, entry), { recursive: true, force: true });

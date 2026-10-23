@@ -20,6 +20,8 @@ export interface FileChange {
   kind: ChangeKind;
   staged: boolean;
   unstaged: boolean;
+  /** A submodule: its checked-out commit or contents changed (staged and discarded as a whole). */
+  submodule?: true;
 }
 
 export interface BranchInfo {
@@ -110,7 +112,7 @@ export interface RepoData {
 
 /** A fetch, pull or push running for a tab, with git's progress. */
 export interface RemoteActivity {
-  kind: 'fetch' | 'pull' | 'push';
+  kind: 'fetch' | 'pull' | 'push' | 'submodules';
   phase: string | null;
   percent: number | null;
 }

@@ -74,6 +74,7 @@ function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGro
                 onClick={() => actions.onShowDiff(change, staged)}
               >
                 <span className={`kind kind-${change.kind}`}>{KIND_LABEL[change.kind]}</span>
+                {change.submodule && <span className="codicon codicon-file-submodule" aria-label="submodule" title="Submodule: staged and discarded as a whole" />}
                 {change.path}
               </button>
               <span className="row-actions">
