@@ -1686,3 +1686,138 @@ select {
 .ref-item.solo .ref-name {
   color: var(--accent);
 }
+
+/* File history and blame */
+.file-history {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.center > .file-history {
+  flex: 1;
+}
+
+.file-history-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 32%) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.file-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+}
+
+.history-entry {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.history-entry.selected {
+  background: var(--selection);
+}
+
+.history-entry-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.history-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.file-history-body > .diff-view {
+  min-width: 0;
+  min-height: 0;
+}
+
+.blame-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.blame-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.monaco-editor .line-numbers {
+  white-space: pre;
+}
+
+.monaco-editor .blame-age {
+  width: 4px !important;
+  margin-left: 2px;
+}
+.monaco-editor .blame-age-0 {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.monaco-editor .blame-age-1 {
+  background: color-mix(in srgb, var(--accent) 19%, transparent);
+}
+
+.monaco-editor .blame-age-2 {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.monaco-editor .blame-age-3 {
+  background: color-mix(in srgb, var(--accent) 37%, transparent);
+}
+
+.monaco-editor .blame-age-4 {
+  background: color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+.monaco-editor .blame-age-5 {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.monaco-editor .blame-age-6 {
+  background: color-mix(in srgb, var(--accent) 64%, transparent);
+}
+
+.monaco-editor .blame-age-7 {
+  background: color-mix(in srgb, var(--accent) 73%, transparent);
+}
+
+.monaco-editor .blame-age-8 {
+  background: color-mix(in srgb, var(--accent) 82%, transparent);
+}
+
+.monaco-editor .blame-age-9 {
+  background: color-mix(in srgb, var(--accent) 91%, transparent);
+}
+
+
+.row-history {
+  flex: none;
+}
+
+.blame-editor .monaco-editor .line-numbers {
+  text-align: left;
+  color: var(--fg-muted);
+  cursor: pointer;
+}

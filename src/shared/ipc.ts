@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
@@ -109,6 +110,10 @@ export interface Commands {
   'repos:forget': { args: [path: string]; result: void };
   /** Opens a file of the repository (path relative to its root) in the external editor. */
   'file:openInEditor': { args: [repo: string, path: string, line?: number]; result: void };
+  /** Commits that changed a file (following renames), newest first. */
+  'file:history': { args: [repo: string, path: string]; result: FileHistoryEntry[] };
+  /** Line authorship at a commit, or of the working tree file (`rev` null). */
+  'file:blame': { args: [repo: string, path: string, rev: string | null]; result: BlameResult };
   /** Shows a file's changes in the external diff tool; resolves when its window closes. */
   'file:externalDiff': { args: [repo: string, path: string, staged: boolean]; result: void };
   /** Resolves a conflicted file in the external merge tool; resolves when its window closes. */
@@ -198,6 +203,8 @@ const commandChannelSet = {
   'repos:forget': true,
   'file:openInEditor': true,
   'file:externalDiff': true,
+  'file:history': true,
+  'file:blame': true,
   'file:externalMerge': true,
   'app:dismissNotices': true,
   'settings:update': true,

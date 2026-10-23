@@ -10,6 +10,7 @@ import { ConflictService } from './git/conflicts';
 import { CommitOps } from './git/commitOps';
 import { InteractiveRebase } from './git/interactiveRebase';
 import { UndoService } from './git/undo';
+import { FileHistory } from './git/fileHistory';
 import { RemoteService } from './git/remote';
 import { runAskpassClient } from './askpass/client';
 import { ASKPASS_FLAG } from './askpass/protocol';
@@ -121,7 +122,7 @@ async function start() {
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

@@ -11,6 +11,7 @@ import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
 import type { InteractiveRebase } from '../git/interactiveRebase';
 import type { UndoService } from '../git/undo';
+import type { FileHistory } from '../git/fileHistory';
 import { UndoRecorder } from '../git/undoRecorder';
 import type { RebaseStep } from '../../shared/rebase';
 import type { RemoteRun, RemoteService } from '../git/remote';
@@ -49,6 +50,7 @@ export interface HandlerDeps {
   networkOps: NetworkOps;
   interactiveRebase: InteractiveRebase;
   undo: UndoService;
+  fileHistory: FileHistory;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
   onFetched?(root: string): void;
   /** Hands a credential answer to the waiting git process. */
@@ -181,7 +183,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -592,6 +594,19 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       assertString(path, 'path');
       if (line !== undefined && (!Number.isInteger(line) || line < 1)) throw new TypeError('line must be a positive integer');
       await tools.openInEditor(await resolveInsideRepo(root, path), line, root, effective(root)['tools.editor']);
+    },
+
+    async 'file:history'(_ctx, repo, path) {
+      const root = tab(repo);
+      assertString(path, 'path');
+      return fileHistory.log(root, normalizeRepoRelative(path));
+    },
+
+    async 'file:blame'(_ctx, repo, path, rev) {
+      const root = tab(repo);
+      assertString(path, 'path');
+      if (rev !== null) assertSha(rev);
+      return fileHistory.blame(root, normalizeRepoRelative(path), rev);
     },
 
     async 'file:externalDiff'(_ctx, repo, path, staged) {

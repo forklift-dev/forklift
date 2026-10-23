@@ -20,6 +20,8 @@ export interface FileActions {
   onOpenInEditor(path: string): void;
   onExternalDiff(path: string, staged: boolean): void;
   onExternalMerge(path: string): void;
+  /** History and blame of a file that exists in some commit. */
+  onFileHistory(path: string): void;
 }
 
 function IconButton({ icon, label, onClick, danger }: { icon: string; label: string; onClick(): void; danger?: boolean }) {
@@ -76,6 +78,7 @@ function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGro
               </button>
               <span className="row-actions">
                 {change.kind !== 'deleted' && <IconButton icon="go-to-file" label="Open in editor" onClick={() => actions.onOpenInEditor(change.path)} />}
+                {change.kind !== 'untracked' && change.kind !== 'added' && <IconButton icon="history" label="File history and blame" onClick={() => actions.onFileHistory(change.path)} />}
                 {conflicted ? (
                   <IconButton icon="git-merge" label="Resolve in external merge tool" onClick={() => actions.onExternalMerge(change.path)} />
                 ) : (

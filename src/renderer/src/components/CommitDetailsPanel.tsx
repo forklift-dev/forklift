@@ -30,9 +30,10 @@ interface CommitDetailsPanelProps {
   onClose(): void;
   /** Extra header content: actions for a stash. */
   actions?: ReactNode;
+  onFileHistory?(path: string): void;
 }
 
-export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory }: CommitDetailsPanelProps) {
   const { data, error } = useCommand('commit:details', [repo, sha]);
 
   if (error) return <div className="changes commit-details diff-message error">{error}</div>;
@@ -92,6 +93,11 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
                 {file.path}
                 {file.sourceSha && <span className="untracked-note">untracked</span>}
               </button>
+              {onFileHistory && !file.sourceSha && (
+                <button type="button" className="icon-button row-history" aria-label={`History of ${file.path}`} title="File history and blame" onClick={() => onFileHistory(file.path)}>
+                  <span className="codicon codicon-history" aria-hidden="true" />
+                </button>
+              )}
               {!data.statsOmitted && !file.binary && (
                 <span className="line-stats">
                   <span className="kind-added">+{file.additions}</span> <span className="kind-deleted">−{file.deletions}</span>

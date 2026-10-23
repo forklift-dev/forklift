@@ -10,6 +10,7 @@ import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
 import { CommitGraph } from './CommitGraph';
 import { ConflictView } from './ConflictView';
+import { FileHistoryView } from './FileHistoryView';
 import { InteractiveRebaseView } from './InteractiveRebaseView';
 import { OperationBanner } from './OperationBanner';
 import { copyText, useContextMenu } from './ContextMenu';
@@ -34,6 +35,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const [conflictPath, setConflictPath] = useState<string | null>(null);
   const [rebaseBase, setRebaseBase] = useState<string | null>(null);
+  const [fileHistory, setFileHistory] = useState<{ path: string; mode: 'history' | 'blame' } | null>(null);
   const [filter, setFilterState] = useState<HistoryFilter>(() => loadFilter(data.root));
   const setFilter = (next: HistoryFilter) => {
     setFilterState(next);
@@ -120,7 +122,20 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
-      {rebaseBase ? (
+      {fileHistory ? (
+        <FileHistoryView
+          key={fileHistory.path}
+          repo={repo}
+          path={fileHistory.path}
+          mode={fileHistory.mode}
+          onMode={(mode) => setFileHistory({ ...fileHistory, mode })}
+          onShowCommit={(sha) => {
+            setFileHistory(null);
+            showCommit(sha);
+          }}
+          onClose={() => setFileHistory(null)}
+        />
+      ) : rebaseBase ? (
         <InteractiveRebaseView key={rebaseBase} repo={repo} base={rebaseBase} branch={data.branch.head ?? 'HEAD'} run={run} onClose={() => setRebaseBase(null)} />
       ) : conflictPath ? (
         <ConflictView key={conflictPath} repo={repo} path={conflictPath} run={run} runInBackground={runInBackground} onClose={() => setConflictPath(null)} />
@@ -220,6 +235,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             onOpenFile={(file) =>
               setDiffTarget({ kind: 'commit', sha: file.sourceSha ?? selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
             }
+            onFileHistory={(path) => setFileHistory({ path, mode: 'history' })}
             actions={selectedStash && (
               <>
                 <span className="stash-label">stash@{`{${selectedStash.index}}`}</span>
@@ -260,6 +276,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               onOpenInEditor={(path) => void run(() => invoke('file:openInEditor', repo, path))}
               onExternalDiff={(path, staged) => void runInBackground(() => invoke('file:externalDiff', repo, path, staged))}
               onExternalMerge={(path) => void runInBackground(() => invoke('file:externalMerge', repo, path))}
+              onFileHistory={(path) => setFileHistory({ path, mode: 'history' })}
             />
             <CommitPanel
               // A new prepared message (a merge or squash started) restarts the form with it.
