@@ -12,6 +12,7 @@ export const THEME_TOKEN_GROUPS = {
   diff: ['diff-added-bg', 'diff-removed-bg', 'diff-changed-bg'],
   conflicts: ['conflict-ours', 'conflict-theirs', 'conflict-base', 'conflict-marker'],
   controls: ['button-bg', 'button-border', 'input-border', 'scrollbar', 'scrollbar-hover'],
+  toolbar: ['toolbar-bg', 'toolbar-hover'],
   code: ['code-bg', 'code-fg', 'code-line-number', 'code-selection', 'code-comment', 'code-keyword', 'code-string', 'code-number', 'code-type', 'code-tag', 'blame'],
 } as const;
 
@@ -111,6 +112,8 @@ const forkliftDark: ThemeTokens = {
   'stat-added': '#5fcf80',
   'stat-removed': '#ff8080',
   'stat-modified': '#e8b955',
+  'toolbar-bg': '#272c38',
+  'toolbar-hover': '#1e222b',
   'button-bg': '#2a303d',
   'button-border': '#3d4556',
   'input-border': '#414a5c',
@@ -169,6 +172,8 @@ const forkliftLight: ThemeTokens = {
   'stat-added': '#1d7638',
   'stat-removed': '#b02222',
   'stat-modified': '#875700',
+  'toolbar-bg': '#eef1f5',
+  'toolbar-hover': '#e0e6ee',
   'button-bg': '#f3f5f8',
   'button-border': '#d3d9e2',
   'input-border': '#c9d0db',
@@ -231,6 +236,8 @@ const darkHighContrast: ThemeTokens = {
   'stat-added': '#66f28f',
   'stat-removed': '#ffa3a3',
   'stat-modified': '#ffd84a',
+  'toolbar-bg': '#0b0b0b',
+  'toolbar-hover': '#262626',
   'button-bg': '#121212',
   'button-border': '#a0a0a0',
   'input-border': '#a0a0a0',
@@ -293,6 +300,8 @@ const lightHighContrast: ThemeTokens = {
   'stat-added': '#00561b',
   'stat-removed': '#9e0000',
   'stat-modified': '#633f00',
+  'toolbar-bg': '#f2f2f2',
+  'toolbar-hover': '#dcdcdc',
   'button-bg': '#f6f6f6',
   'button-border': '#555555',
   'input-border': '#555555',
@@ -355,6 +364,8 @@ const polar: ThemeTokens = {
   'stat-added': '#b3cf9b',
   'stat-removed': '#f0a8ae',
   'stat-modified': '#ecd197',
+  'toolbar-bg': '#343a47',
+  'toolbar-hover': '#2a2f3a',
   'button-bg': '#39404e',
   'button-border': '#4e5769',
   'input-border': '#525b6e',
@@ -423,6 +434,8 @@ const sand: ThemeTokens = {
   'stat-added': '#4a651c',
   'stat-removed': '#9c321d',
   'stat-modified': '#7d5300',
+  'toolbar-bg': '#ece3d1',
+  'toolbar-hover': '#e0d5bf',
   'button-bg': '#ede5d5',
   'button-border': '#d2c5ab',
   'input-border': '#cbbd9f',
@@ -578,13 +591,14 @@ export interface ContrastPair {
 }
 
 const TEXT = ['fg', 'fg-muted', 'fg-dimmed', 'fg-bright', 'accent', 'success', 'warning', 'danger-fg', 'stat-added', 'stat-removed', 'stat-modified'] as const;
-const SURFACES = ['bg', 'bg-panel', 'bg-raised', 'bg-input'] as const;
+const SURFACES = ['bg', 'bg-panel', 'bg-raised', 'bg-input', 'toolbar-bg'] as const;
 const CODE_TEXT = ['code-fg', 'code-line-number', 'code-comment', 'code-keyword', 'code-string', 'code-number', 'code-type', 'code-tag'] as const;
 
 /** Text/background pairs that must stay readable in every built-in theme. */
 export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   ...TEXT.flatMap((fg) => SURFACES.map((bg) => ({ fg, bg }))),
-  ...(['fg', 'fg-muted'] as const).flatMap((fg) => (['selection', 'bg-hover'] as const).map((bg) => ({ fg, bg }))),
+  // Hovered: only enabled controls (fg and fg-muted text) light up.
+  ...(['fg', 'fg-muted'] as const).flatMap((fg) => (['selection', 'bg-hover', 'toolbar-hover'] as const).map((bg) => ({ fg, bg }))),
   { fg: 'fg', bg: 'ref-bg' },
   { fg: 'fg', bg: 'tag-bg' },
   { fg: 'fg', bg: 'button-bg' },

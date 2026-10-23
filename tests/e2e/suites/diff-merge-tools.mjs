@@ -53,8 +53,9 @@ export default async function ({ check }) {
 
   await page.evaluate(`[...document.querySelectorAll('.change-row')].find(r => r.textContent.includes('other.txt')).querySelector('[title="Open in external diff tool"]').click()`);
   await sleep(700); // the fake tool stays "open" for 2 s
-  const refreshEnabled = await page.evaluate(`!([...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Refresh').disabled)`);
-  check('UI stays usable while the diff tool is open', refreshEnabled === true);
+  // Busy commands disable Stash (there are changes): enabled means the UI is not waiting for the tool.
+  const usable = await page.evaluate(`!document.querySelector('.toolbar .spinner') && !([...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Stash').disabled)`);
+  check('UI stays usable while the diff tool is open', usable === true);
   const again = await page.invoke('file:externalDiff', root, 'other.txt', false);
   check('second diff of the same file refused', /already open/.test(JSON.stringify(again)), JSON.stringify(again));
   for (let i = 0; i < 60 && !existsSync(diffOut); i++) await sleep(100);

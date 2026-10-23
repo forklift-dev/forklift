@@ -48,6 +48,7 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'repo.discardAll', title: 'Discard all changes…', category: 'Changes' },
   { id: 'repo.focusCommit', title: 'Write the commit message', category: 'Changes', keys: ['Mod+Shift+M'] },
   { id: 'repo.createBranch', title: 'Create a branch at HEAD…', category: 'Branches', keys: ['Mod+B'] },
+  { id: 'branch.switch', title: 'Switch branch…', category: 'Branches' },
   { id: 'repo.createTag', title: 'Create a tag at HEAD…', category: 'Branches' },
   { id: 'history.search', title: 'Search commits', category: 'History', keys: ['Mod+F'] },
   { id: 'history.goToHead', title: 'Go to HEAD', category: 'History' },

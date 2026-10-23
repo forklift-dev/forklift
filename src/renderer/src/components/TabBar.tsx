@@ -1,5 +1,7 @@
 import { useState, type DragEvent } from 'react';
 import type { TabsState } from '../../../shared/state';
+import { useAppState } from '../state';
+import { useCommand } from '../useCommand';
 
 interface TabBarProps {
   tabs: TabsState;
@@ -9,6 +11,9 @@ interface TabBarProps {
   onClose(id: string): void;
   onMove(id: string, index: number): void;
   onNewTab(): void;
+  onShowLog(): void;
+  onPreferences(): void;
+  onProfiles(): void;
 }
 
 const TAB_MIME = 'application/x-forklift-tab';
@@ -20,8 +25,14 @@ function dropPosition(event: DragEvent<HTMLElement>, index: number): number {
 }
 
 /** Open repositories as tabs: click to switch, middle click or × to close, drag to reorder, + for the Repositories screen. */
-export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTab }: TabBarProps) {
+export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTab, onShowLog, onPreferences, onProfiles }: TabBarProps) {
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  // The profile in effect for the open repository (or globally), named as in Preferences.
+  const repo = tabs.activeId;
+  const loadedAt = useAppState((s) => s.repo.data?.loadedAt ?? 0);
+  const profiles = useAppState((s) => s.settings.values['profiles.list']);
+  const current = useCommand('profile:current', [repo], { reloadKey: [loadedAt, profiles], keepPrevious: true });
+  const profile = profiles.find((p) => p.id === current.data?.current)?.label ?? (current.data?.userName || 'Profiles');
 
   return (
     <nav className="tab-bar" aria-label="Open repositories">
@@ -95,6 +106,21 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
       >
         <span className="codicon codicon-add" aria-hidden="true" />
       </button>
+      {/* As in GitKraken: app-wide things at the right end of the tab row. The profile name loads later and
+          changes width, so it comes first and the icons keep their place at the edge. */}
+      <div className="tab-bar-end">
+        <button type="button" className="profile-button" title="Switch profile" onClick={onProfiles}>
+          <span className="codicon codicon-account" aria-hidden="true" />
+          <span className="profile-name">{profile}</span>
+          <span className="codicon codicon-chevron-down" aria-hidden="true" />
+        </button>
+        <button type="button" className="icon-button" aria-label="Operation log" title="Operation log" onClick={onShowLog}>
+          <span className="codicon codicon-bell" aria-hidden="true" />
+        </button>
+        <button type="button" className="icon-button" aria-label="Preferences" title="Preferences (Ctrl+,)" onClick={onPreferences}>
+          <span className="codicon codicon-settings-gear" aria-hidden="true" />
+        </button>
+      </div>
     </nav>
   );
 }

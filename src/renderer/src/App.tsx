@@ -5,7 +5,7 @@ import { BUILTIN_THEMES } from '../../shared/themes';
 import { invoke, logIdOf } from './api';
 import { LogView } from './components/LogView';
 import { Toasts } from './components/Toasts';
-import { OPEN_COMMANDS_EVENT, startShortcuts, useCommandHandlers } from './commands';
+import { OPEN_COMMANDS_EVENT, runCommand, startShortcuts, useCommandHandlers } from './commands';
 import { CommandPalette } from './components/CommandPalette';
 import { ProfileSwitcher } from './components/ProfileSwitcher';
 import type { NewRepoKind } from './components/NewRepoDialog';
@@ -84,6 +84,7 @@ export function App() {
   const [preferencesSection, setPreferencesSection] = useState<SettingsSection | undefined>(undefined);
   const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const userThemes = useAppState((s) => s.app.userThemes.themes);
+  const library = useAppState((s) => s.library);
 
   const reportError = (error: unknown) => setActionError({ message: error instanceof Error ? error.message : String(error), logId: logIdOf(error) });
   const showLog = (id: number | null) => {
@@ -229,6 +230,9 @@ export function App() {
     >
       <TabBar
         tabs={tabs}
+        onShowLog={() => showLog(null)}
+        onPreferences={() => openPreferences()}
+        onProfiles={() => setSwitchingProfile(true)}
         managerOpen={showRepositories && screen !== 'preferences'}
         onActivate={activate}
         onClose={closeTab}
@@ -238,11 +242,8 @@ export function App() {
       <Toolbar
         repo={showRepositories ? null : data}
         busy={busy}
-        onOpen={() => setScreen('repositories')}
-        onRefresh={() => activeId && run(() => invoke('repo:refresh', activeId))}
-        onClose={() => activeId && closeTab(activeId)}
         onOpenTerminal={toggleTerminal}
-        onPreferences={() => openPreferences()}
+        onCreateBranch={() => runCommand('repo.createBranch')}
         onStash={() => activeId && run(() => invoke('stash:push', activeId, { message: '', includeUntracked: true, stagedOnly: false }))}
         onPop={() => activeId && data?.stashes[0] && run(() => invoke('stash:pop', activeId, data.stashes[0]!.sha))}
         remote={showRepositories ? null : (repo.remote ?? null)}
@@ -253,6 +254,24 @@ export function App() {
         undo={showRepositories ? null : (repo.undo ?? null)}
         onUndo={() => activeId && run(() => invoke('undo:undo', activeId))}
         onRedo={() => activeId && run(() => invoke('undo:redo', activeId))}
+        onRepoMenu={(event) =>
+          openMenu(event, [
+            ...library.recent
+              .filter((entry) => entry.path !== activeId)
+              .slice(0, 8)
+              .map((entry) => ({ label: entry.name, onSelect: () => void run(() => invoke('repo:open', entry.path)).then((ok) => ok && setScreen('repo')) })),
+            ...(library.recent.some((entry) => entry.path !== activeId) ? (['separator'] as const) : []),
+            { label: 'Open a repository…', onSelect: () => setScreen('repositories') },
+            { label: 'Clone a repository…', onSelect: () => openCreate('clone') },
+            { label: 'Create a repository…', onSelect: () => openCreate('init') },
+            'separator',
+            { label: 'Refresh', disabled: !activeId, onSelect: () => activeId && void run(() => invoke('repo:refresh', activeId)) },
+            { label: 'Close tab', disabled: !activeId, onSelect: () => activeId && closeTab(activeId) },
+          ])
+        }
+        onSwitchBranch={() => runCommand('branch.switch')}
+        onActions={() => setPalette('')}
+        onSearch={() => runCommand('palette.find')}
       />
       {notices.length > 0 && (
         <div className="error-banner notices" role="alert">

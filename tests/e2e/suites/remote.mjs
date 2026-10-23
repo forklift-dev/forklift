@@ -78,6 +78,7 @@ export default async function ({ check }) {
   await page.click(toolbarButton('Pull'));
   await page.waitFor(`/Username/.test(${promptText} ?? '')`, 10000);
   check('progress and Cancel shown in the toolbar while it runs', /Pulling/.test((await page.evaluate(`document.querySelector('.remote-activity')?.textContent`)) ?? ''));
+  check('a progress bar runs along the toolbar, and Pull shows it is busy', await page.evaluate(`!!document.querySelector('.toolbar-progress-bar') && ${toolbarButton('Pull')}.disabled && !!${toolbarButton('Pull')}.querySelector('.spinner')`));
   await page.click(`[...document.querySelectorAll('.prompt-dialog button')].find(b => b.textContent === 'Cancel')`);
   check('cancelling the prompt stops the pull', await page.waitFor(`!document.querySelector('.prompt-dialog') && !document.querySelector('.remote-activity')`, 10000));
 

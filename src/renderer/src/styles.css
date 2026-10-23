@@ -65,34 +65,206 @@ button:disabled {
 }
 
 .toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 8px 12px;
+  /* As in GitKraken: repository › branch on the left, the actions in the middle, palette and search on the right. */
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  height: 48px;
+  padding: 0 6px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
+  background: var(--toolbar-bg);
 }
 
 .toolbar-repo {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: stretch;
   min-width: 0;
 }
 
-.branch {
+.crumb {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  max-width: 280px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.crumb:hover {
+  background: var(--toolbar-hover);
+}
+
+.crumb-label {
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--fg-muted);
 }
 
+.crumb-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: 14px;
+  color: var(--fg-bright);
+  white-space: nowrap;
+}
+
+.crumb-value > strong,
+.crumb-value > .branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumb-value .codicon {
+  flex: none;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.crumb-separator {
+  align-self: center;
+  color: var(--fg-dimmed);
+}
+
+.branch {
+  color: var(--fg-bright);
+}
+
 .ahead-behind {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.toolbar-busy {
+  align-self: center;
   margin-left: 8px;
 }
 
 .toolbar-actions {
   display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.toolbar-end {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.tool-button {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 4px;
+  width: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+}
+
+.tool-button:hover:not(:disabled) {
+  background: var(--toolbar-hover);
+}
+
+.tool-caption {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--fg-muted);
+}
+
+.tool-button .codicon {
+  font-size: 18px;
+}
+
+.tool-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.tool-split {
+  display: flex;
+}
+
+.tool-split-arrow {
+  width: 14px;
+  margin-left: -8px;
+  padding: 16px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg-muted);
+}
+
+.tool-split:hover > button:not(:disabled) {
+  background: var(--toolbar-hover);
+}
+
+.tool-split-arrow .codicon {
+  font-size: 12px;
+}
+
+.tool-separator {
+  width: 1px;
+  margin: 8px 6px;
+  background: var(--border);
+}
+
+.toolbar-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  overflow: hidden;
+}
+
+.toolbar-progress-bar {
+  height: 100%;
+  background: var(--warning);
+  transition: width 0.2s ease;
+}
+
+.toolbar-progress-bar.indeterminate {
+  width: 30%;
+  animation: toolbar-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes toolbar-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* Narrow windows: icons only. */
+@media (max-width: 1180px) {
+  .tool-caption,
+  .crumb-label {
+    display: none;
+  }
+
+  .tool-button {
+    width: 40px;
+  }
+
+  .tool-split-arrow {
+    padding-top: 0;
+  }
 }
 
 .spinner {
@@ -1053,6 +1225,37 @@ select {
 .tab.active .tab-close,
 .tab-close:focus-visible {
   visibility: visible;
+}
+
+.tab-bar-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0 6px;
+}
+
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.profile-button:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.profile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .new-tab {
@@ -2251,26 +2454,17 @@ select {
 }
 
 /* Network operations and prompts */
-.split-button {
-  display: inline-flex;
-}
-
-.split-button > button:first-child {
-  border-radius: 6px 0 0 6px;
-}
-
-.split-button > .split-arrow {
-  border-radius: 0 6px 6px 0;
-  border-left: none;
-  padding: 4px 6px;
-}
-
 .remote-activity {
   display: inline-flex;
+  align-self: center;
   align-items: center;
   gap: 8px;
+  margin-right: 8px;
+  overflow: hidden;
   color: var(--fg-muted);
   font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .prompt-text {

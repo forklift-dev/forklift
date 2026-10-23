@@ -6,6 +6,7 @@ import type { DiffTarget } from '../../../shared/diff';
 import type { FileChange, RepoData } from '../../../shared/state';
 import { useCommandHandlers } from '../commands';
 import { FinderPalette } from './FinderPalette';
+import { BranchSwitcher } from './BranchSwitcher';
 import { LfsDialog } from './LfsDialog';
 import { useGitflow } from './useGitflow';
 import { flowBranch } from '../../../shared/gitflow';
@@ -122,6 +123,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   };
 
   const [finding, setFinding] = useState(false);
+  const [switchingBranch, setSwitchingBranch] = useState(false);
   const [lfsOpen, setLfsOpen] = useState(false);
   const [lfsWarningHidden, setLfsWarningHidden] = useState(false);
   const lfsInfo = useCommand('lfs:info', [repo, data.changes.slice(0, 2000).map((c) => c.path)], { reloadKey: data.loadedAt, keepPrevious: true });
@@ -133,6 +135,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const stagedPaths = data.changes.filter((c) => c.staged).map((c) => c.path);
   useCommandHandlers({
     'palette.find': { run: () => setFinding(true) },
+    'branch.switch': { run: () => setSwitchingBranch(true) },
     'repo.stageAll': { run: () => void run(() => invoke('index:stage', repo, unstagedPaths)), enabled: () => unstagedPaths.length > 0 },
     'repo.unstageAll': { run: () => void run(() => invoke('index:unstage', repo, stagedPaths)), enabled: () => stagedPaths.length > 0 },
     'repo.discardAll': { run: () => void discardFiles(data.changes.map((c) => c.path)), enabled: () => data.changes.length > 0 && data.operation === null },
@@ -345,6 +348,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       {refActions.dialogs}
       {gitflow.dialogs}
       {menu}
+      {switchingBranch && (
+        <BranchSwitcher
+          data={data}
+          onClose={() => setSwitchingBranch(false)}
+          onCheckout={refActions.checkout}
+          onCreate={() => head && refActions.createBranch(head, data.branch.head ?? head.slice(0, 7))}
+        />
+      )}
       {lfsOpen && <LfsDialog repo={repo} info={lfsInfo.data} onClose={() => setLfsOpen(false)} />}
       {finding && (
         <FinderPalette
