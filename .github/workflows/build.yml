@@ -1,0 +1,208 @@
+# Beta builds on GitHub's hosted runners: checks on Linux, then packages for Linux, Windows and macOS (x64 and
+# arm64). Native modules (nodegit, node-pty, nsfw) cannot be cross-compiled, so every OS/CPU builds on its own
+# runner. Packages are not signed yet (T-004): macOS asks to open the app with right-click → Open, Windows
+# SmartScreen shows "More info → Run anyway".
+#
+# Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.1.0-beta.1): then the packages are
+# also attached to a draft pre-release.
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      arm64:
+        description: Also build Linux and Windows for arm64 (macOS is always built for both Apple silicon and Intel)
+        type: boolean
+        default: true
+      e2e:
+        description: Run the end-to-end tests too (about 15 minutes more)
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  check:
+    name: Checks (Linux)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential python3 perl libkrb5-dev git git-lfs xvfb xauth \
+            libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 libsecret-1-0 libnotify4
+          git lfs install
+
+      # OpenSSL for nodegit, built once per runner image and lock file (see scripts/rebuild-native.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/forklift-openssl
+          key: openssl-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install
+        env:
+          FORKLIFT_OPENSSL_CACHE: ${{ runner.temp }}/forklift-openssl
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node node_modules/electron/install.js
+          node scripts/rebuild-native.mjs
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # tests/e2e/run.mjs starts its own xvfb.
+      - if: ${{ inputs.e2e || startsWith(github.ref, 'refs/tags/') }}
+        run: npm run test:e2e
+
+  # Which packages to build: arm64 ones can be left out of a manual run.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - id: plan
+        env:
+          ARM64: ${{ github.event_name != 'workflow_dispatch' || inputs.arm64 }}
+        run: |
+          targets='[
+            {"name":"linux-x64","runner":"ubuntu-22.04","os":"linux","arch":"x64"},
+            {"name":"windows-x64","runner":"windows-2022","os":"win","arch":"x64"},
+            {"name":"macos-arm64","runner":"macos-15","os":"mac","arch":"arm64"},
+            {"name":"macos-x64","runner":"macos-15-intel","os":"mac","arch":"x64"}'
+          if [ "$ARM64" = "true" ]; then
+            targets="$targets"',
+            {"name":"linux-arm64","runner":"ubuntu-22.04-arm","os":"linux","arch":"arm64"},
+            {"name":"windows-arm64","runner":"windows-11-arm","os":"win","arch":"arm64"}'
+          fi
+          echo "targets=$(echo "$targets]" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package ${{ matrix.name }}
+    needs: [check, plan]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.targets) }}
+    env:
+      # Unsigned beta builds: electron-builder must not look for signing identities.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # node-gyp needs Python; 3.12 as in scripts/build-windows.ps1.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Toolchain (Linux)
+        if: ${{ matrix.os == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential perl libkrb5-dev
+
+      # nodegit's build asks for Visual Studio's Spectre-mitigated libraries; the runner image may lack them.
+      - name: Toolchain (Windows)
+        if: ${{ matrix.os == 'win' }}
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products * -version '[17.0,18.0)' -property installationPath
+          $spectre = if ('${{ matrix.arch }}' -eq 'arm64') { 'Microsoft.VisualStudio.Component.VC.Runtimes.ARM64.Spectre' } else { 'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre' }
+          $tools = if ('${{ matrix.arch }}' -eq 'arm64') { 'Microsoft.VisualStudio.Component.VC.Tools.ARM64' } else { 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }
+          if (-not (& $vswhere -latest -products * -version '[17.0,18.0)' -requires $spectre $tools -property installationPath)) {
+            $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vs_installer.exe'
+            $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @('modify', '--installPath', "`"$vs`"", '--add', $spectre, '--add', $tools, '--quiet', '--norestart', '--nocache')
+            if (@(0, 3010) -notcontains $process.ExitCode) { throw "Visual Studio Installer failed ($($process.ExitCode))" }
+          }
+          "GYP_MSVS_VERSION=2022" >> $env:GITHUB_ENV
+          "GYP_MSVS_OVERRIDE_PATH=$vs" >> $env:GITHUB_ENV
+
+      # OpenSSL for nodegit, built once per runner image and lock file (see scripts/rebuild-native.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/forklift-openssl
+          key: openssl-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      # Without install scripts: nodegit's own would build it for plain Node (and npm often fails with EBUSY on
+      # Windows); scripts/rebuild-native.mjs builds every native module for Electron instead.
+      - name: Install
+        shell: bash
+        env:
+          FORKLIFT_OPENSSL_CACHE: ${{ runner.temp }}/forklift-openssl
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node node_modules/electron/install.js
+          node scripts/rebuild-native.mjs
+
+      - name: Load the native modules in Electron
+        shell: bash
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+        run: npx electron -e "for (const m of ['@axosoft/nodegit', 'node-pty', 'nsfw', 'find-git-repositories']) { require(m); console.log('OK', m); }"
+
+      - name: Package
+        shell: bash
+        run: |
+          case "${{ matrix.os }}" in
+            linux) targets=(--linux AppImage) ;;
+            win) targets=(--win nsis zip) ;;
+            mac) targets=(--mac dmg zip) ;;
+          esac
+          npm run dist -- "${targets[@]}" --${{ matrix.arch }} --publish never
+
+      - name: Check fuses of the packaged app
+        run: node scripts/check-fuses.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forklift-${{ matrix.name }}
+          path: |
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.exe
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # A tag v* gets a draft pre-release with every package (published by hand after a look).
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - name: Draft pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft --prerelease --title "Forklift $GITHUB_REF_NAME" --generate-notes

@@ -39,6 +39,7 @@
 | [T-003](tasks/stage-0-foundation/T-003-ci-matrix.md) | CI: сборка и тесты на 6 платформах | blocked |
 | [T-004](tasks/stage-0-foundation/T-004-signing-notarization.md) | Подпись и нотаризация дистрибутивов | draft |
 | [T-005](tasks/stage-0-foundation/T-005-e2e-harness.md) | Сквозные проверки в репозитории | review |
+| [T-069](tasks/stage-0-foundation/T-069-github-beta-builds.md) | Бета-сборки на GitHub Actions (Linux, Windows, macOS) | review |
 
 ### Этап 1 — Процессы и внешние программы
 
