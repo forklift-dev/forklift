@@ -1,25 +1,29 @@
 # App icon
 
 Three layers, each a 1024×1024 PNG with a transparent background, composed by `scripts/build-icon.py`
-(Pillow) into `build/icon.png`, `build/icon.ico` and `build/icons/<size>x<size>.png`, which electron-builder
-and the Linux window use.
+(Pillow) into `build/icon.png`, `build/icon.ico`, `build/icons/<size>x<size>.png` (electron-builder) and
+`build/window.png` (the Linux window).
+
+Two variants (`compose.json` → `variants`): **large** (128 px and up) — the forklift and its load on the tile;
+**small** (64 px and below, and the window icon) — no tile, the forklift and its load fill the square, so they
+stay readable on a taskbar. The `.ico` takes each size from the right variant.
 
 | Layer | File | What |
 |---|---|---|
-| background | `layers/background.png` | Rounded-square tile with a warehouse backdrop; outside the tile transparent (it also clips the other layers) |
+| background | `layers/background.png` | Plain rounded-square tile, blue-slate gradient (drawn with Pillow, no details: they made the icon unreadable when small); outside it transparent; `clip` keeps the other layers inside it |
 | forklift | `layers/forklift.png` | The forklift, strict side view facing right, forks empty |
 | load | `layers/git.png` | The git badge that sits on the forks |
 
-`compose.json` places them, first at the bottom: `scale` (around the layer's top-left corner), `x`, `y`;
+Each variant places its layers, first at the bottom: `scale` (around the layer's top-left corner), `x`, `y`;
 `solidify` makes the nearly opaque inside of generated pictures fully opaque and drops faint halos; `shadow`
-adds a soft contact shadow under the layer.
+adds a soft contact shadow under the layer; `clip` cuts everything to that layer's shape.
 
 ## Changing a layer
 
 1. Replace the file (same size, transparent background).
-2. Adjust its entry in `compose.json`. For a new forklift, measure where its forks are and put the load on them:
-   in the current one the fork tops are at y = 460, x ≈ 715–915 of the layer; the load's lowest point
-   lands at (`load.y` + 870 × `load.scale`), which should equal (`forklift.y` + 460 × `forklift.scale`).
+2. Adjust its entries in both variants of `compose.json`. For a new forklift, measure where its forks are and
+   put the load on them: in the current one the fork tops are at y = 460, x ≈ 715–915 of the layer; the load's
+   lowest point lands at (`load.y` + 870 × `load.scale`), which should equal (`forklift.y` + 460 × `forklift.scale`).
 3. `python3 scripts/build-icon.py`, then look at `build/icon.png` and the small sizes in `build/icons/`.
 
 ## How the layers were made
@@ -39,7 +43,7 @@ one layer in the same style (pass the other layers with `-i … --` as a style r
   soft highlight upper-left; on its face in white a git branch glyph (a vertical line with nodes at both ends
   and a branch to a third node upper right), thick strokes, no text. Same style as the forklift layer,
   transparent background, ~70% of the canvas height."
-- **background** — "an app-icon tile: a macOS-style squircle (corner radius ~22%) inset 50px from each edge,
+- **background** (the first version; replaced by a plain tile, see above — it is in git history) — "an app-icon tile: a macOS-style squircle (corner radius ~22%) inset 50px from each edge,
   outside fully transparent; deep blue-slate gradient (#2E3A55 → #1B2232), soft radial glow behind the upper
   middle, a subtle warehouse floor band across the lower quarter, very subtle low-contrast shelves in the back.
   No forklift, no git symbol, no text."

@@ -23,7 +23,7 @@ files:
 
 # The window icon on Linux (the app icon itself comes from build/icon.png, see assets/icon).
 extraResources:
-  - from: build/icons/512x512.png
+  - from: build/window.png
     to: icon.png
 
 asar: true

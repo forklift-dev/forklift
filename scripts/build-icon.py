@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Builds the app icon from its layers (assets/icon/compose.json) into build/icon.png and build/icons/*.png.
 
-Each layer is a 1024x1024 RGBA picture with a transparent background. compose.json places them in order
-(first at the bottom): `scale` shrinks a layer around its top-left corner, `x`/`y` move it; `solidify` makes
-nearly opaque pixels fully opaque (generated pictures are often 95% opaque inside) and drops a faint halo;
-`shadow` puts a soft contact shadow under the layer. Replace a layer's file and run this again.
+Each layer is a 1024x1024 RGBA picture with a transparent background. compose.json has variants (the
+"small" one, up to its `maxSize`, is for taskbars and small icons; "large" for the rest); each places its
+layers in order (first at the bottom): `scale` around the layer's top-left corner, `x`/`y` move it; `solidify`
+makes nearly opaque pixels fully opaque (generated pictures are often 95% opaque inside) and drops a faint
+halo; `shadow` puts a soft contact shadow under the layer; `clip` keeps everything inside that layer's shape.
+Replace a layer's file and run this again.
 
 Needs Pillow: python3 -m pip install pillow
 """
@@ -42,10 +44,10 @@ def contact_shadow(layer: Image.Image) -> Image.Image:
     return shadow
 
 
-def compose(config: dict) -> Image.Image:
-    size = config['size']
+def compose(size: int, layers: list) -> Image.Image:
     canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    for spec in config['layers']:
+    clip = None
+    for spec in layers:
         layer = Image.open(ICON / spec['file']).convert('RGBA')
         if spec.get('solidify'):
             layer = solidify(layer)
@@ -54,25 +56,35 @@ def compose(config: dict) -> Image.Image:
             layer = layer.resize((round(layer.width * scale), round(layer.height * scale)), Image.LANCZOS)
         placed = Image.new('RGBA', (size, size), (0, 0, 0, 0))
         placed.paste(layer, (spec.get('x', 0), spec.get('y', 0)), layer)
+        if spec.get('clip'):
+            clip = placed.getchannel('A')
         if spec.get('shadow'):
             canvas = Image.alpha_composite(canvas, contact_shadow(placed))
         canvas = Image.alpha_composite(canvas, placed)
-    # Nothing outside the background tile.
-    tile = Image.open(ICON / config['layers'][0]['file']).convert('RGBA').resize((size, size)).getchannel('A')
-    canvas.putalpha(Image.composite(canvas.getchannel('A'), Image.new('L', (size, size), 0), tile))
+    if clip is not None:
+        canvas.putalpha(Image.composite(canvas.getchannel('A'), Image.new('L', (size, size), 0), clip))
     return canvas
 
 
 def main() -> None:
     config = json.loads((ICON / 'compose.json').read_text())
-    icon = compose(config)
+    size = config['size']
+    large = compose(size, config['variants']['large']['layers'])
+    small = compose(size, config['variants']['small']['layers'])
+    small_max = config['variants']['small'].get('maxSize', 64)
+    pick = lambda s: (small if s <= small_max else large).resize((s, s), Image.LANCZOS)
     out = ROOT / 'build'
     (out / 'icons').mkdir(parents=True, exist_ok=True)
-    icon.save(out / 'icon.png')
-    for size in SIZES:
-        icon.resize((size, size), Image.LANCZOS).save(out / 'icons' / f'{size}x{size}.png')
-    icon.save(out / 'icon.ico', sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
-    print(f'wrote {out / "icon.png"}, {out / "icon.ico"} and {len(SIZES)} sizes in {out / "icons"}', file=sys.stderr)
+    large.save(out / 'icon.png')
+    for s in SIZES:
+        pick(s).save(out / 'icons' / f'{s}x{s}.png')
+    # The Linux window icon: taskbars draw it small.
+    small.resize((256, 256), Image.LANCZOS).save(out / 'window.png')
+    # Windows takes each size from the .ico: small ones without the tile.
+    sizes = (16, 24, 32, 48, 64, 128, 256)
+    frames = [pick(s) for s in sizes]
+    frames[-1].save(out / 'icon.ico', sizes=[(s, s) for s in sizes], append_images=frames[:-1])
+    print(f'wrote {out / "icon.png"}, {out / "icon.ico"}, {out / "window.png"} and {len(SIZES)} sizes in {out / "icons"}', file=sys.stderr)
 
 
 if __name__ == '__main__':

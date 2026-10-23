@@ -1,29 +1,21 @@
 {
   "size": 1024,
-  "layers": [
-    {
-      "name": "background",
-      "file": "layers/background.png",
-      "scale": 1,
-      "x": 0,
-      "y": 0
+  "variants": {
+    "large": {
+      "comment": "128 px and up: on the tile",
+      "layers": [
+        { "name": "background", "file": "layers/background.png", "scale": 1, "x": 0, "y": 0, "clip": true },
+        { "name": "forklift", "file": "layers/forklift.png", "scale": 0.98, "x": -22, "y": 60, "solidify": true, "shadow": true },
+        { "name": "load", "file": "layers/git.png", "scale": 0.387, "x": 597, "y": 174, "solidify": true }
+      ]
     },
-    {
-      "name": "forklift",
-      "file": "layers/forklift.png",
-      "scale": 0.86,
-      "x": 28,
-      "y": 175,
-      "solidify": true,
-      "shadow": true
-    },
-    {
-      "name": "load",
-      "file": "layers/git.png",
-      "scale": 0.34,
-      "x": 571,
-      "y": 275,
-      "solidify": true
+    "small": {
+      "comment": "64 px and below, and the window icon: no tile, the forklift and its load fill the square",
+      "maxSize": 64,
+      "layers": [
+        { "name": "forklift", "file": "layers/forklift.png", "scale": 1.162, "x": -121, "y": -24, "solidify": true },
+        { "name": "load", "file": "layers/git.png", "scale": 0.459, "x": 613, "y": 111, "solidify": true }
+      ]
     }
-  ]
+  }
 }

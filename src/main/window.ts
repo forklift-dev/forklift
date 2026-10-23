@@ -11,8 +11,9 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    // Linux shows this in the taskbar and window switcher (macOS and Windows take the packaged app's icon).
-    ...(process.platform === 'linux' && { icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'icons', '512x512.png') }),
+    // Linux shows this in the taskbar and window switcher (macOS and Windows take the packaged app's icon):
+    // the variant without the tile, which stays readable when drawn small.
+    ...(process.platform === 'linux' && { icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'window.png') }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
