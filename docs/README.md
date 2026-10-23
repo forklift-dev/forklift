@@ -88,7 +88,7 @@
 | [T-042](tasks/stage-4-repositories/T-042-remotes.md) | Удалённые репозитории и auto-fetch | review |
 | [T-043](tasks/stage-4-repositories/T-043-submodules.md) | Подмодули | review |
 | [T-044](tasks/stage-4-repositories/T-044-worktrees.md) | Worktrees | review |
-| [T-045](tasks/stage-4-repositories/T-045-lfs.md) | Git LFS | todo |
+| [T-045](tasks/stage-4-repositories/T-045-lfs.md) | Git LFS | review |
 | [T-046](tasks/stage-4-repositories/T-046-gitflow.md) | Gitflow | todo |
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | todo |
 

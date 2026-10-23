@@ -6,6 +6,7 @@ import type { DiffTarget } from '../../../shared/diff';
 import type { FileChange, RepoData } from '../../../shared/state';
 import { useCommandHandlers } from '../commands';
 import { FinderPalette } from './FinderPalette';
+import { LfsDialog } from './LfsDialog';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
@@ -118,6 +119,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   };
 
   const [finding, setFinding] = useState(false);
+  const [lfsOpen, setLfsOpen] = useState(false);
+  const [lfsWarningHidden, setLfsWarningHidden] = useState(false);
+  const lfsInfo = useCommand('lfs:info', [repo, data.changes.slice(0, 2000).map((c) => c.path)], { reloadKey: data.loadedAt, keepPrevious: true });
+  const lfsPaths = useMemo(() => new Set(lfsInfo.data?.paths ?? []), [lfsInfo.data]);
+  const lfsMissing = Boolean(lfsInfo.data && lfsInfo.data.patterns.length > 0 && !lfsInfo.data.installed);
   const head = data.branch.oid;
   const centerFree = !fileHistory && !rebaseBase && !conflictPath && !diffTarget;
   const unstagedPaths = data.changes.filter((c) => c.unstaged).map((c) => c.path);
@@ -142,6 +148,9 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     },
     'history.goToHead': { run: () => head && showCommit(head), enabled: () => Boolean(head) },
     'history.showAll': { run: () => setFilter(NO_FILTER), enabled: () => filter.solo.length > 0 || filter.hidden.length > 0 },
+    'lfs.manage': { run: () => setLfsOpen(true) },
+    'lfs.pull': { run: () => void run(() => invoke('lfs:download', repo, true)), enabled: () => Boolean(lfsInfo.data?.installed) },
+    'lfs.fetch': { run: () => void run(() => invoke('lfs:download', repo, false)), enabled: () => Boolean(lfsInfo.data?.installed) },
   });
 
   const stagedCount = data.changes.filter((c) => c.staged).length;
@@ -152,6 +161,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
+      {lfsMissing && !lfsWarningHidden && (
+        <div className="error-banner notices lfs-missing" role="alert">
+          This repository uses Git LFS, but git-lfs is not installed: LFS files show as pointers, and new ones would be committed as normal files. Install it from https://git-lfs.com and run “git lfs install” once.
+          <button type="button" onClick={() => setLfsWarningHidden(true)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {fileHistory ? (
         <FileHistoryView
           key={fileHistory.path}
@@ -291,6 +308,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               changes={data.changes}
               selected={worktreeDiff && { path: worktreeDiff.path, staged: worktreeDiff.staged }}
               onShowDiff={openChange}
+              lfsPaths={lfsPaths}
               onStage={(paths) => void run(() => invoke('index:stage', repo, paths))}
               onUnstage={(paths) => void run(() => invoke('index:unstage', repo, paths))}
               onDiscard={(paths) => void discardFiles(paths)}
@@ -315,6 +333,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       {dialog}
       {refActions.dialogs}
       {menu}
+      {lfsOpen && <LfsDialog repo={repo} info={lfsInfo.data} onClose={() => setLfsOpen(false)} />}
       {finding && (
         <FinderPalette
           data={data}

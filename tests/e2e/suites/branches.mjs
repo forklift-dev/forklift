@@ -35,7 +35,7 @@ export default async function ({ check }) {
   const { page } = await launchApp();
   await page.invoke('repo:open', root);
   await page.waitFor(`!!${item('feature')}`);
-  const names = await page.evaluate(`[...document.querySelectorAll('.ref-item')].map(r => r.dataset.ref).join(',')`);
+  const names = await page.evaluate(`[...document.querySelectorAll('.ref-item[data-ref]')].map(r => r.dataset.ref).join(',')`);
   check('left panel lists local and remote branches', names === 'feature,main,origin/review', names);
   check('current branch marked', await page.evaluate(`${item('main')}.classList.contains('current')`));
 

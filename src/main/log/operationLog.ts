@@ -40,6 +40,7 @@ export const QUIET_COMMANDS = new Set([
   'avatars:get',
   'submodule:list',
   'worktree:list',
+  'lfs:info',
   'app:dismissNotices',
 ]);
 

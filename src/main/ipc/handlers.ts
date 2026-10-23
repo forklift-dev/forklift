@@ -35,6 +35,7 @@ import type { OperationLog } from '../log/operationLog';
 import type { AvatarService } from '../avatars/service';
 import type { SubmoduleService } from '../git/submodules';
 import type { WorktreeService } from '../git/worktrees';
+import type { LfsService } from '../git/lfs';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -67,6 +68,7 @@ export interface HandlerDeps {
   avatars: AvatarService;
   submodules: SubmoduleService;
   worktrees: WorktreeService;
+  lfs: LfsService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -203,7 +205,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -844,6 +846,26 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       assertString(path, 'path');
       await thenRefresh(root, () => submodules.remove(root, path));
+    },
+
+    async 'lfs:info'(_ctx, repo, paths) {
+      return lfs.info(tab(repo), paths);
+    },
+
+    async 'lfs:track'(_ctx, repo, pattern) {
+      const root = tab(repo);
+      await thenRefresh(root, () => lfs.track(root, pattern));
+    },
+
+    async 'lfs:untrack'(_ctx, repo, pattern) {
+      const root = tab(repo);
+      await thenRefresh(root, () => lfs.untrack(root, pattern));
+    },
+
+    async 'lfs:download'(_ctx, repo, checkout) {
+      const root = tab(repo);
+      if (typeof checkout !== 'boolean') throw new TypeError('checkout must be a boolean');
+      await thenRefresh(root, () => network(root, checkout ? 'pull' : 'fetch', (run) => lfs.download(root, checkout, run)));
     },
 
     async 'worktree:list'(_ctx, repo) {

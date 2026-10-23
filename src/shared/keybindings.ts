@@ -55,6 +55,9 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'theme.choose', title: 'Choose a theme…', category: 'View' },
   { id: 'profile.switch', title: 'Switch profile…', category: 'Profiles' },
   { id: 'app.log', title: 'Show the operation log', category: 'Help' },
+  { id: 'lfs.manage', title: 'Track or untrack files…', category: 'LFS' },
+  { id: 'lfs.pull', title: 'Pull LFS objects', category: 'LFS' },
+  { id: 'lfs.fetch', title: 'Fetch LFS objects', category: 'LFS' },
   { id: 'repo.close', title: 'Close the open view (diff, file history…)', category: 'View', hidden: true },
 ];
 

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstat, readFile, readlink } from 'node:fs/promises';
+import { lstat, readFile, readlink, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Diff, Repository, type Blob, type Commit, type IndexEntry, type Tree } from '@axosoft/nodegit';
 import {
@@ -12,6 +12,7 @@ import {
   type FileVersion,
   type Signature,
 } from '../../shared/diff';
+import { parseLfsPointer } from '../../shared/lfs';
 import { DELTA, DIFF_FIND_RENAMES, DIFF_FLAG_BINARY, STATUS_OPT } from './libgit2';
 
 /** Above this many changed files line counts are skipped: computing them needs every patch. */
@@ -198,7 +199,27 @@ async function headTree(repo: Repository): Promise<Tree | undefined> {
   return (await repo.getHeadCommit()).getTree();
 }
 
+/**
+ * An LFS pointer is shown as the file it stands for when that object is in .git/lfs/objects (git-lfs keeps
+ * them there; reading needs no git-lfs); otherwise the pointer stays, marked as not downloaded.
+ */
+async function withLfs(repo: Repository, version: FileVersion): Promise<FileVersion> {
+  const pointer = version.binary ? null : parseLfsPointer(version.text);
+  if (!pointer) return version;
+  const object = join(repo.commondir(), 'lfs', 'objects', pointer.oid.slice(0, 2), pointer.oid.slice(2, 4), pointer.oid);
+  const info = await stat(object).catch(() => null);
+  if (!info?.isFile()) return { ...version, lfs: { ...pointer, downloaded: false } };
+  if (info.size > MAX_DIFF_FILE_BYTES) return { ...tooLarge(version.path, info.size), lfs: { ...pointer, downloaded: true } };
+  const bytes = await readFile(object);
+  return { ...fromBytes(version.path, bytes, bytes.subarray(0, BINARY_SNIFF_BYTES).includes(0)), lfs: { ...pointer, downloaded: true } };
+}
+
 export async function readFileDiff(repo: Repository, root: string, target: DiffTarget): Promise<FileDiff> {
+  const { original, modified } = await readVersions(repo, root, target);
+  return { original: await withLfs(repo, original), modified: await withLfs(repo, modified) };
+}
+
+async function readVersions(repo: Repository, root: string, target: DiffTarget): Promise<FileDiff> {
   const originalPath = target.oldPath ?? target.path;
   if (target.kind === 'commit') {
     const commit = await repo.getCommit(target.sha);

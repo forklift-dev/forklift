@@ -53,6 +53,8 @@ export interface FileVersion {
   lossy: boolean;
   /** SHA-256 of `text`; lets main check that a view's line changes refer to the current content. */
   hash: string | null;
+  /** Stored in Git LFS: `text` is the content when the object is in .git/lfs, else the pointer. */
+  lfs?: { oid: string; size: number; downloaded: boolean };
 }
 
 export interface FileDiff {

@@ -37,9 +37,11 @@ interface ChangeGroupProps extends FileActions {
   staged: boolean;
   changes: FileChange[];
   selected: { path: string; staged: boolean } | null;
+  /** Files stored in Git LFS. */
+  lfsPaths?: ReadonlySet<string>;
 }
 
-function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGroupProps) {
+function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }: ChangeGroupProps) {
   if (changes.length === 0) return null;
   const paths = changes.map((c) => c.path);
   const discardable = changes.filter((c) => c.kind !== 'conflicted').map((c) => c.path);
@@ -76,6 +78,7 @@ function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGro
                 <span className={`kind kind-${change.kind}`}>{KIND_LABEL[change.kind]}</span>
                 {change.submodule && <span className="codicon codicon-file-submodule" aria-label="submodule" title="Submodule: staged and discarded as a whole" />}
                 {change.path}
+                {lfsPaths?.has(change.path) && <span className="lfs-badge" title="Stored in Git LFS">LFS</span>}
               </button>
               <span className="row-actions">
                 {change.kind !== 'deleted' && <IconButton icon="go-to-file" label="Open in editor" onClick={() => actions.onOpenInEditor(change.path)} />}
@@ -105,6 +108,7 @@ function ChangeGroup({ title, staged, changes, selected, ...actions }: ChangeGro
 interface ChangesPanelProps extends FileActions {
   changes: FileChange[];
   selected: { path: string; staged: boolean } | null;
+  lfsPaths?: ReadonlySet<string>;
 }
 
 export function ChangesPanel({ changes, ...rest }: ChangesPanelProps) {

@@ -1349,6 +1349,34 @@ select {
   resize: vertical;
 }
 
+/* Git LFS */
+.lfs-badge {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.lfs-patterns {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lfs-patterns li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.lfs-note .codicon {
+  vertical-align: middle;
+}
+
 /* Submodules */
 .submodule-state {
   margin-left: auto;

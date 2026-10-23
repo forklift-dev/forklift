@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { LfsInfo } from './lfs';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
@@ -175,6 +176,12 @@ export interface Commands {
   'submodule:sync': { args: [repo: string]; result: void };
   /** Removes a submodule (staged, to be committed) and its clone in .git/modules. */
   'submodule:remove': { args: [repo: string, path: string]; result: void };
+  /** git-lfs version, LFS patterns, and which of `paths` are in LFS. */
+  'lfs:info': { args: [repo: string, paths: string[]]; result: LfsInfo };
+  'lfs:track': { args: [repo: string, pattern: string]; result: void };
+  'lfs:untrack': { args: [repo: string, pattern: string]; result: void };
+  /** `git lfs pull` (`checkout`) or `git lfs fetch`. */
+  'lfs:download': { args: [repo: string, checkout: boolean]; result: void };
   'worktree:list': { args: [repo: string]; result: WorktreeInfo[] };
   /** Creates a working tree and opens it in a tab; resolves to its tab id. */
   'worktree:add': { args: [repo: string, request: WorktreeAddRequest]; result: string };
@@ -284,6 +291,10 @@ const commandChannelSet = {
   'settings:browseExecutable': true,
   'themes:openFolder': true,
   'avatars:get': true,
+  'lfs:info': true,
+  'lfs:track': true,
+  'lfs:untrack': true,
+  'lfs:download': true,
   'worktree:list': true,
   'worktree:add': true,
   'worktree:remove': true,

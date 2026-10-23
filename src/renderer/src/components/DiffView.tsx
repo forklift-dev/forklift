@@ -107,6 +107,7 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
   let blocked: string | null = null;
   if (editing && data) {
     if (reason) blocked = 'Use the whole-file actions for this file';
+    else if (data.original.lfs || data.modified.lfs) blocked = 'Stored in Git LFS: use the whole-file actions';
     else if (data.original.lossy || data.modified.lossy) blocked = 'The file is not valid UTF-8; use the whole-file actions';
     else if (!data.modified.exists) blocked = 'The file is deleted; use the whole-file actions';
     else if (prefs.ignoreWhitespace) blocked = 'Turn off "Ignore whitespace" to work with lines';
@@ -218,6 +219,12 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
       )}
       {error && <div className="diff-message error">{error}</div>}
       {!error && !data && loading && <div className="diff-message">Loading…</div>}
+      {data && (data.original.lfs || data.modified.lfs) && (
+        <div className="diff-hint lfs-note" role="note">
+          <span className="codicon codicon-database" aria-hidden="true" /> Stored in Git LFS
+          {[data.original, data.modified].some((v) => v.lfs && !v.lfs.downloaded) ? ' — the object is not downloaded, so the pointer is shown (LFS: Pull downloads it)' : ''}
+        </div>
+      )}
       {data && reason && <div className="diff-message">{reason}</div>}
       {data && !reason && (
         // Monaco's diff is the engine for every layout, so all of them show the same changes; for Hunks and
