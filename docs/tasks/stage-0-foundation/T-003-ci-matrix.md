@@ -47,7 +47,7 @@ updated: 2026-10-22
   и arm64 — только локальные раннеры (`act_runner`, метки с `:host` для запуска без Docker).
 - 2026-10-23: поэтому два workflow (файлы `.gitverse/workflows/ci.yaml`, `release.yaml`, `scripts/check-fuses.mjs`,
   правка `scripts/rebuild-native.mjs`):
-  - `ci.yaml` — на каждый push в облаке: toolchain и библиотеки Electron через apt, `npm ci` (сборка нативных
+  - `ci.yaml` — в облаке (сначала на каждый push; с 2026-10-23 — только вручную, см. ниже): toolchain и библиотеки Electron через apt, `npm ci` (сборка нативных
     модулей; OpenSSL кешируется вне node_modules через `FORKLIFT_OPENSSL_CACHE`), typecheck, lint, test, test:e2e;
   - `release.yaml` — вручную (`workflow_dispatch`), матрица из 6 целей на локальных раннерах с метками
     `linux_x64`, `linux_arm64`, `macos_arm64`, `macos_x64`, `windows_x64`, `windows_arm64`: проверки,
@@ -60,6 +60,10 @@ updated: 2026-10-22
   локальный раннер). Кеш (`actions/cache`) и `actions/upload-artifact` в документации GitVerse не описаны.
   Локально проверено: `check-fuses.mjs` на `dist/linux-unpacked` (все 8 fuses как в electron-builder.yml), e2e на
   упакованной сборке — 33/33 (2 пропущены: нужен инспектор main), YAML валиден.
+- 2026-10-23: проект запушен на GitVerse (`gitverse.ru/akryll/forklift`, приватный, по просьбе владельца); push
+  сам запустил `ci.yaml` (было `on: push`/`pull_request`) — первый облачный прогон идёт. Решение владельца:
+  `ci.yaml` — **только вручную** (`workflow_dispatch`), чтобы не тратить 500 минут в месяц приватного
+  репозитория на каждый push.
 
 ## Промт
 

@@ -1,10 +1,9 @@
-# Checks on every push, on GitVerse's cloud runner: an ubuntu Docker container (the only cloud runner),
+# Checks, started by hand (owner's decision 2026-10-23: the private repository's 500 minutes a month are not
+# spent on every push), on GitVerse's cloud runner: an ubuntu Docker container (the only cloud runner),
 # 30 minutes per job at most. Other platforms need local runners: see release.yaml.
 name: CI
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
