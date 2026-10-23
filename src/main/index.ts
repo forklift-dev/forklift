@@ -9,6 +9,7 @@ import { StashService } from './git/stash';
 import { ConflictService } from './git/conflicts';
 import { CommitOps } from './git/commitOps';
 import { InteractiveRebase } from './git/interactiveRebase';
+import { UndoService } from './git/undo';
 import { RemoteService } from './git/remote';
 import { runAskpassClient } from './askpass/client';
 import { ASKPASS_FLAG } from './askpass/protocol';
@@ -34,6 +35,7 @@ import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
 import { createAppStore, gitCliDetected, noticeAdded, promptAdded, promptRemoved } from './store';
+import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
 
@@ -104,13 +106,22 @@ async function start() {
   const remotes = new RemoteService(gitCli, askpass, repoQueue);
   const answerPrompt = (id: number, answer: string | null) => waiting.get(id)?.(answer);
   const networkOps = new NetworkOps(store);
+  const undo = new UndoService({
+    git: gitCli,
+    branches,
+    staging,
+    stashes,
+    queue: repoQueue,
+    saveDir: join(app.getPath('temp'), `forklift-undo-${process.pid}`),
+    changed: (root, labels) => store.dispatch(undoChanged({ id: root, ...labels })),
+  });
   const autoFetch = new AutoFetch({ store, settings, networkOps, remotes, isFocused: () => BrowserWindow.getFocusedWindow() !== null });
   autoFetch.start();
   app.on('will-quit', () => autoFetch.stop());
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -156,7 +167,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch, undo } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

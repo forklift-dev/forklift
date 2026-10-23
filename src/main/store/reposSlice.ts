@@ -66,6 +66,10 @@ export const reposSlice = createSlice({
       const repo = state.byId[action.payload.id];
       if (repo) repo.remote = action.payload.activity;
     },
+    undoChanged: (state, action: PayloadAction<{ id: string; undo: string | null; redo: string | null }>) => {
+      const repo = state.byId[action.payload.id];
+      if (repo) repo.undo = { undo: action.payload.undo, redo: action.payload.redo };
+    },
     tabMoved: (state, action: PayloadAction<{ id: string; index: number }>) => {
       const from = state.view.tabs.findIndex((t) => t.id === action.payload.id);
       if (from < 0) return;
@@ -112,4 +116,4 @@ export const reposSlice = createSlice({
   },
 });
 
-export const { tabOpened, tabActivated, tabClosed, tabMoved, remoteActivity } = reposSlice.actions;
+export const { tabOpened, tabActivated, tabClosed, tabMoved, remoteActivity, undoChanged } = reposSlice.actions;

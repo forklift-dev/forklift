@@ -9,6 +9,8 @@ import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
 import type { InteractiveRebase } from '../git/interactiveRebase';
+import type { UndoService } from '../git/undo';
+import { UndoRecorder } from '../git/undoRecorder';
 import type { RebaseStep } from '../../shared/rebase';
 import type { RemoteRun, RemoteService } from '../git/remote';
 import type { NetworkKind, NetworkOps } from '../repos/network';
@@ -45,6 +47,7 @@ export interface HandlerDeps {
   remotes: RemoteService;
   networkOps: NetworkOps;
   interactiveRebase: InteractiveRebase;
+  undo: UndoService;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
   onFetched?(root: string): void;
   /** Hands a credential answer to the waiting git process. */
@@ -163,7 +166,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -190,6 +193,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     if (result.message) store.dispatch(noticeAdded(result.message));
   };
 
+  const recorder = new UndoRecorder(undo);
   const network = <T>(root: string, kind: NetworkKind, work: (run: RemoteRun) => Promise<T>) => networkOps.run(root, kind, work);
 
   const stashName = (root: string, sha: string) => {
@@ -206,32 +210,34 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'commit:cherryPick'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
-      return thenRefresh(root, () => commitOps.cherryPick(root, sha));
+      return thenRefresh(root, () => recorder.history(root, `cherry-pick of ${sha.slice(0, 7)}`, () => commitOps.cherryPick(root, sha)));
     },
 
     async 'commit:revert'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
-      return thenRefresh(root, () => commitOps.revert(root, sha));
+      return thenRefresh(root, () => recorder.history(root, `revert of ${sha.slice(0, 7)}`, () => commitOps.revert(root, sha)));
     },
 
     async 'commit:reset'(_ctx, repo, sha, mode) {
       const root = tab(repo);
       assertSha(sha);
       if (mode !== 'soft' && mode !== 'mixed' && mode !== 'hard') throw new TypeError('mode must be soft, mixed or hard');
-      await thenRefresh(root, () => commitOps.reset(root, sha, mode));
+      await thenRefresh(root, () => recorder.reset(root, mode, () => commitOps.reset(root, sha, mode)));
     },
 
     async 'branch:merge'(_ctx, repo, ref, mode, message) {
       const root = tab(repo);
       if (!['default', 'no-ff', 'ff-only', 'squash'].includes(mode as string)) throw new TypeError('unknown merge mode');
       if (message !== null && (typeof message !== 'string' || message.length > 100_000)) throw new TypeError('message must be text or null');
-      return thenRefresh(root, () => commitOps.merge(root, parseName(ref, 'ref'), mode, message));
+      const name = parseName(ref, 'ref');
+      return thenRefresh(root, () => recorder.history(root, `merge of ${name.length === 40 ? name.slice(0, 7) : name}`, () => commitOps.merge(root, name, mode, message)));
     },
 
     async 'branch:rebase'(_ctx, repo, onto) {
       const root = tab(repo);
-      return thenRefresh(root, () => commitOps.rebase(root, parseName(onto, 'ref')));
+      const name = parseName(onto, 'ref');
+      return thenRefresh(root, () => recorder.history(root, `rebase onto ${name.length === 40 ? name.slice(0, 7) : name}`, () => commitOps.rebase(root, name)));
     },
 
     async 'remote:fetch'(_ctx, repo, remote, prune) {
@@ -245,7 +251,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'remote:pull'(_ctx, repo, rebase) {
       const root = tab(repo);
       if (typeof rebase !== 'boolean') throw new TypeError('rebase must be a boolean');
-      const result = await thenRefresh(root, () => network(root, 'pull', (run) => remotes.pull(root, rebase, run)));
+      const result = await thenRefresh(root, () => recorder.history(root, 'pull', () => network(root, 'pull', (run) => remotes.pull(root, rebase, run))));
       onFetched?.(root);
       return result;
     },
@@ -284,6 +290,16 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       await thenRefresh(root, () => remotes.removeRemote(root, parseName(name, 'remote')));
     },
 
+    async 'undo:undo'(_ctx, repo) {
+      const root = tab(repo);
+      return thenRefresh(root, () => undo.undo(root));
+    },
+
+    async 'undo:redo'(_ctx, repo) {
+      const root = tab(repo);
+      return thenRefresh(root, () => undo.redo(root));
+    },
+
     async 'remote:cancel'(_ctx, repo) {
       networkOps.cancel(tab(repo));
     },
@@ -311,7 +327,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         if (raw['message'] !== undefined && (typeof raw['message'] !== 'string' || raw['message'].length > 100_000)) throw new TypeError('message must be text');
         return { sha: raw['sha'], action: raw['action'] as RebaseStep['action'], ...(raw['message'] !== undefined && { message: raw['message'] as string }) };
       });
-      return thenRefresh(root, () => interactiveRebase.run(root, base, parsed));
+      return thenRefresh(root, () => recorder.history(root, 'interactive rebase', () => interactiveRebase.run(root, base, parsed)));
     },
 
     async 'conflict:file'(_ctx, repo, path) {
@@ -351,7 +367,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const { message, includeUntracked, stagedOnly } = options as Record<string, unknown>;
       if (typeof message !== 'string' || message.length > 10_000 || /[\0\r\n]/.test(message)) throw new TypeError('message must be one line of text');
       if (typeof includeUntracked !== 'boolean' || typeof stagedOnly !== 'boolean') throw new TypeError('flags must be booleans');
-      const sha = await thenRefresh(root, () => stashes.push(root, { message, includeUntracked, stagedOnly }));
+      const sha = await thenRefresh(root, () => recorder.stashPush(root, () => stashes.push(root, { message, includeUntracked, stagedOnly })));
       return sha !== null;
     },
 
@@ -372,7 +388,8 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'stash:drop'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
-      await thenRefresh(root, () => stashes.drop(root, sha));
+      const stash = repoData(root)?.stashes.find((s) => s.sha === sha);
+      await thenRefresh(root, () => recorder.stashDrop(root, sha, stash?.message ?? 'Restored stash', () => stashes.drop(root, sha)));
     },
 
     async 'ref:validateName'(_ctx, repo, kind, name) {
@@ -384,35 +401,41 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       if (typeof checkout !== 'boolean') throw new TypeError('checkout must be a boolean');
       assertSha(sha);
-      report(await thenRefresh(root, () => branches.create(root, parseName(name, 'branch'), sha, checkout)));
+      const branch = parseName(name, 'branch');
+      report(await thenRefresh(root, () => recorder.createBranch(root, branch, sha, checkout, () => branches.create(root, branch, sha, checkout))));
     },
 
     async 'branch:checkout'(_ctx, repo, target) {
       const root = tab(repo);
-      report(await thenRefresh(root, () => branches.checkout(root, parseCheckoutTarget(target))));
+      const parsed = parseCheckoutTarget(target);
+      report(await thenRefresh(root, () => recorder.checkout(root, parsed, () => branches.checkout(root, parsed))));
     },
 
     async 'branch:rename'(_ctx, repo, from, to) {
       const root = tab(repo);
-      await thenRefresh(root, () => branches.rename(root, parseName(from, 'branch'), parseName(to, 'branch')));
+      const [a, b] = [parseName(from, 'branch'), parseName(to, 'branch')];
+      await thenRefresh(root, () => recorder.renameBranch(root, a, b, () => branches.rename(root, a, b)));
     },
 
     async 'branch:delete'(_ctx, repo, name, force) {
       const root = tab(repo);
       if (typeof force !== 'boolean') throw new TypeError('force must be a boolean');
-      await thenRefresh(root, () => branches.delete(root, parseName(name, 'branch'), force));
+      const branch = parseName(name, 'branch');
+      await thenRefresh(root, () => recorder.deleteBranch(root, branch, () => branches.delete(root, branch, force)));
     },
 
     async 'tag:create'(_ctx, repo, name, sha, message) {
       const root = tab(repo);
       assertSha(sha);
       if (message !== null && (typeof message !== 'string' || message.length > 100_000)) throw new TypeError('message must be text or null');
-      await thenRefresh(root, () => branches.createTag(root, parseName(name, 'tag'), sha, message?.trim() ? message : null));
+      const tagName = parseName(name, 'tag');
+      await thenRefresh(root, () => recorder.tag(root, tagName, true, () => branches.createTag(root, tagName, sha, message?.trim() ? message : null)));
     },
 
     async 'tag:delete'(_ctx, repo, name) {
       const root = tab(repo);
-      await thenRefresh(root, () => branches.deleteTag(root, parseName(name, 'tag')));
+      const tagName = parseName(name, 'tag');
+      await thenRefresh(root, () => recorder.tag(root, tagName, false, () => branches.deleteTag(root, tagName)));
     },
 
     async 'index:stage'(_ctx, repo, paths) {
@@ -437,7 +460,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         if (kind === 'conflicted') throw new Error(`${path} is in conflict; resolve it instead of discarding`);
         (kind === 'untracked' ? untracked : tracked).push(path);
       }
-      await thenRefresh(root, () => staging.discardFiles(root, tracked, untracked));
+      await thenRefresh(root, () => recorder.discard(root, tracked, untracked, () => staging.discardFiles(root, tracked, untracked)));
     },
 
     async 'index:applyLines'(_ctx, repo, request) {
@@ -449,7 +472,8 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       if (typeof message !== 'string' || message.trim() === '') throw new TypeError('Commit message is empty');
       if (typeof amend !== 'boolean') throw new TypeError('amend must be a boolean');
-      return thenRefresh(root, () => staging.commit(root, message, amend));
+      const subject = message.trim().split('\n')[0]!.slice(0, 60);
+      return thenRefresh(root, () => recorder.commit(root, `${amend ? 'amend' : 'commit'} “${subject}”`, () => staging.commit(root, message, amend)));
     },
 
     async 'history:rows'(_ctx, repo, version, start, count) {

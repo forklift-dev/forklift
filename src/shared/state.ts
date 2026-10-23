@@ -117,6 +117,8 @@ export interface RemoteActivity {
 export interface RepoState {
   /** Network operation in progress (it can be cancelled). */
   remote?: RemoteActivity | null;
+  /** Labels of what Undo and Redo would do ("commit “Fix x”"), null when nothing. */
+  undo?: { undo: string | null; redo: string | null };
   path: string | null;
   loading: boolean;
   error: string | null;

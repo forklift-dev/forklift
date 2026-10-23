@@ -71,16 +71,25 @@ export function App() {
   const closeTab = (id: string) => void run(() => invoke('repo:close', id));
 
   // Shortcuts read the latest state through a ref; the listener is registered once.
-  const shortcuts = useRef({ tabs, screen, activate, closeTab });
+  const undoRedo = (redo: boolean) => {
+    if (!tabs.activeId || screen !== 'repo') return;
+    const labels = repo.undo;
+    if (redo ? labels?.redo : labels?.undo) void run(() => invoke(redo ? 'undo:redo' : 'undo:undo', tabs.activeId!));
+  };
+  const shortcuts = useRef({ tabs, screen, activate, closeTab, undoRedo });
   useLayoutEffect(() => {
-    shortcuts.current = { tabs, screen, activate, closeTab };
+    shortcuts.current = { tabs, screen, activate, closeTab, undoRedo };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const { tabs: current, screen: shown, activate: switchTo, closeTab: close } = shortcuts.current;
+      const { tabs: current, screen: shown, activate: switchTo, closeTab: close, undoRedo: history } = shortcuts.current;
+      // Text fields and the editors keep their own undo.
+      const target = event.target as HTMLElement | null;
+      const editing = target?.closest('input, textarea, select, [contenteditable="true"], .monaco-editor');
       let handled = true;
-      if (event.key === ',' && !event.shiftKey) setScreen('preferences');
+      if ((event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y') && !editing) history(event.shiftKey || event.key.toLowerCase() === 'y');
+      else if (event.key === ',' && !event.shiftKey) setScreen('preferences');
       else if (event.key.toLowerCase() === 't' && !event.shiftKey) setScreen('repositories');
       else if (event.key.toLowerCase() === 'w' && !event.shiftKey) {
         if (shown === 'repo' && current.activeId) close(current.activeId);
@@ -154,6 +163,9 @@ export function App() {
         onPullMenu={(event) => remoteActions.pullMenu(event, openMenu)}
         onPush={remoteActions.push}
         onCancelRemote={() => activeId && void invoke('remote:cancel', activeId)}
+        undo={showRepositories ? null : (repo.undo ?? null)}
+        onUndo={() => activeId && run(() => invoke('undo:undo', activeId))}
+        onRedo={() => activeId && run(() => invoke('undo:redo', activeId))}
       />
       {notices.length > 0 && (
         <div className="error-banner notices" role="alert">
