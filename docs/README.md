@@ -103,15 +103,26 @@
 | [T-054](tasks/stage-5-settings/T-054-notifications-log.md) | Уведомления и журнал операций | review |
 | [T-055](tasks/stage-5-settings/T-055-avatars.md) | Аватары авторов | review |
 | [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
+| [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | todo |
+| [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | todo |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)
 
 Решение владельца (2026-10-23): отдельным этапом позже; для проверки нужны его аккаунты/токены.
+Порядок (решение владельца 2026-10-23): **Forgejo → GitVerse → GitHub → GitLab**; Bitbucket, Azure DevOps и
+трекеры задач — дальние планы. T-065 закладывает общий слой интеграций для остальных.
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-060](tasks/stage-6-integrations/T-060-github.md) | GitHub: вход, репозитории, pull requests, issues | draft |
-| [T-061](tasks/stage-6-integrations/T-061-gitlab.md) | GitLab: вход, репозитории, merge requests, issues | draft |
+| [T-065](tasks/stage-6-integrations/T-065-forgejo.md) | 1. Forgejo (и Gitea): вход, репозитории, pull requests, issues | draft |
+| [T-066](tasks/stage-6-integrations/T-066-gitverse.md) | 2. GitVerse: вход, репозитории, pull requests, issues | draft |
+| [T-060](tasks/stage-6-integrations/T-060-github.md) | 3. GitHub: вход, репозитории, pull requests, issues | draft |
+| [T-061](tasks/stage-6-integrations/T-061-gitlab.md) | 4. GitLab: вход, репозитории, merge requests, issues | draft |
+
+Дальние планы:
+
+| ID | Задача | Статус |
+|---|---|---|
 | [T-062](tasks/stage-6-integrations/T-062-bitbucket.md) | Bitbucket: вход, репозитории, pull requests | draft |
 | [T-063](tasks/stage-6-integrations/T-063-azure-devops.md) | Azure DevOps: вход, репозитории, pull requests, work items | draft |
 | [T-064](tasks/stage-6-integrations/T-064-issue-trackers.md) | Трекеры задач: Jira, Trello | draft |

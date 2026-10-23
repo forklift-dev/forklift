@@ -31,6 +31,8 @@ Azure DevOps: вход, репозитории, pull requests, work items. Ре�
 
 ## Нюансы
 
+- 2026-10-23: решение владельца — дальние планы, после Forgejo, GitVerse, GitHub и GitLab.
+
 - draft до согласования; не начинать без владельца.
 
 ## Промт
