@@ -17,9 +17,9 @@ export default async function ({ check, artifactsDir }) {
 
   const { page } = await launchApp();
   check('repo opened', (await page.invoke('repo:open', root))?.ok === true);
-  await page.waitFor(`document.querySelectorAll('.commits tbody tr').length === 2`);
+  await page.waitFor(`document.querySelectorAll('.commit-row[data-hash]').length === 2`);
 
-  await page.evaluate(`document.querySelector('.commits tbody tr').click()`);
+  await page.evaluate(`document.querySelector('.commit-row[data-hash]').click()`);
   const subject = await page.waitFor(`document.querySelector('.commit-details .commit-subject')?.textContent`);
   check('commit details: subject', subject === 'Template strings', subject);
   check('commit details: body', (await page.evaluate(`document.querySelector('.commit-body')?.textContent`)) === 'Use a template literal and an explicit return type.');

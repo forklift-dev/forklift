@@ -24,6 +24,7 @@ main process ─ src/main
   store/          Redux Toolkit: единственный источник правды
   git/service.ts  чтение репозитория через nodegit (+ git/diff.ts: детали коммита, версии файлов)
   git/cli.ts      git CLI поверх ProcessRunner (сеть, хуки, difftool/mergetool)
+  history/        история с раскладкой графа: кэш на вкладку и версию, страницы по запросу окна
   external/       внешний редактор, терминал, diff/merge tools (выбор по настройкам, ОС/рабочему столу, git config)
   settings/       settings.json (атомарная запись, миграции), проверка изменений, кнопки Test/git config
   replication.ts  копия состояния (проекция: вкладки + активный репозиторий) в окна через MessagePort

@@ -12,3 +12,4 @@ declare module 'find-git-repositories' {
   ): Promise<string[]>;
   export = findGitRepos;
 }
+

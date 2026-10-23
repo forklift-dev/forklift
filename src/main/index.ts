@@ -4,6 +4,7 @@ import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { createGitService } from './git/service';
+import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
 import { createCommandHandlers } from './ipc/handlers';
 import { registerCommands } from './ipc/registry';
@@ -64,7 +65,8 @@ async function start() {
   const staging = new StagingService(gitCli, git);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner }), replication);
+  const history = new HistoryService();
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -105,7 +107,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

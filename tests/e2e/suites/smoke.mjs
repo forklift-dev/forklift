@@ -29,7 +29,7 @@ export default async function ({ check }) {
   const body = await page.waitFor(`document.getElementById('root').innerText.includes('Second change') && document.getElementById('root').innerText`);
   check('commits rendered', body.includes('Second change') && body.includes('Initial import'));
   check('branch rendered', body.includes('main'));
-  check('tag decoration rendered', body.includes('tag: v0.1'));
+  check('tag decoration rendered', (await page.evaluate(`document.querySelector('.ref.tag')?.textContent`)) === 'v0.1');
   check('untracked file rendered', body.includes('b.txt'));
 
   const unknown = await page.evaluate(`window.forklift.invoke('fs:rm', '/').then(r => JSON.stringify(r), e => 'rejected: ' + e.message)`);

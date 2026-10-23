@@ -71,7 +71,7 @@ export default async function ({ check, artifactsDir }) {
   await page.evaluate(`document.querySelector('.commit-description').focus()`);
   await page.insertText('Explain why.');
   await page.evaluate(`document.querySelector('.commit-panel button[type=submit]').click()`);
-  await page.waitFor(`document.querySelector('.commits tbody tr .subject')?.textContent.includes('Update g')`);
+  await page.waitFor(`document.querySelector('.commit-row[data-hash] .subject')?.textContent.includes('Update g')`);
   check('commit created with subject and body', git('log', '-1', '--format=%B').trim() === 'Update g\n\nExplain why.', git('log', '-1', '--format=%B'));
   check('commit form cleared', (await page.evaluate(`document.querySelector('.commit-summary').value`)) === '');
 

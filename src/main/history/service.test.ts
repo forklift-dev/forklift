@@ -1,0 +1,82 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { EdgeKind } from '../../shared/graph';
+import { createGitService } from '../git/service';
+import { HistoryService, summary } from './service';
+
+let root: string;
+const git = createGitService();
+const env = { ...process.env, GIT_AUTHOR_NAME: 'A', GIT_AUTHOR_EMAIL: 'a@x', GIT_COMMITTER_NAME: 'A', GIT_COMMITTER_EMAIL: 'a@x', GIT_CONFIG_NOSYSTEM: '1' };
+const sh = (...args: string[]) => execFileSync('git', args, { cwd: root, env }).toString().trim();
+
+beforeAll(() => {
+  root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-history-')));
+  // A long branchy history, generated quickly.
+  execFileSync(process.execPath, [join(__dirname, '../../../scripts/make-history-repo.mjs'), root, '5000', '7'], {
+    env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+  });
+});
+afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+describe('summary', () => {
+  it('is the first paragraph on one line', () => {
+    expect(summary('Fix the thing\n\nBecause.')).toBe('Fix the thing');
+    expect(summary('Fix the thing\nacross lines\r\n\r\nBody')).toBe('Fix the thing across lines');
+    expect(summary('')).toBe('');
+  });
+});
+
+describe('HistoryService', () => {
+  it('serves pages in `git log --all --date-order` order, walking only as far as asked', async () => {
+    const history = new HistoryService();
+    const { historyVersion } = await git.read(root);
+    const first = await history.page(root, historyVersion, 0, 100);
+    expect(first.rows).toHaveLength(100);
+    expect(first.complete).toBe(false);
+    expect(first.loaded).toBeLessThan(5000);
+
+    const expected = sh('log', '--all', '--date-order', '--format=%H').split('\n');
+    const all = [...first.rows];
+    for (let start = 100; ; start += 1000) {
+      const page = await history.page(root, historyVersion, start, 1000);
+      all.push(...page.rows);
+      if (page.complete && start + 1000 >= page.loaded) break;
+    }
+    expect(all.map((row) => row.hash)).toEqual(expected);
+    expect(all).toHaveLength(5000);
+  });
+
+  it('lays out a consistent graph: every lane at the top of a row was open at the bottom of the row above', async () => {
+    const history = new HistoryService();
+    const { historyVersion } = await git.read(root);
+    const { rows } = await history.page(root, historyVersion, 0, 5000);
+    for (let i = 1; i < rows.length; i++) {
+      const bottom = new Set(rows[i - 1]!.graph.edges.filter((e) => e.kind !== EdgeKind.In).map((e) => e.to));
+      const top = new Set(rows[i]!.graph.edges.filter((e) => e.kind !== EdgeKind.Out).map((e) => e.from));
+      expect(top).toEqual(bottom);
+    }
+    // Merges have two parents and draw two lines out of their node.
+    const merge = rows.find((row) => row.parents.length === 2)!;
+    expect(merge.graph.edges.filter((e) => e.kind === EdgeKind.Out)).toHaveLength(2);
+    expect(Math.max(...rows.map((row) => row.graph.width))).toBeLessThan(30);
+  });
+
+  it('rebuilds when the version changes and reports the version it was built for', async () => {
+    const history = new HistoryService();
+    const before = await git.read(root);
+    const old = await history.page(root, before.historyVersion, 0, 5);
+    sh('commit', '--allow-empty', '-qm', 'Newest');
+    const after = await git.read(root);
+    expect(after.historyVersion).not.toBe(before.historyVersion);
+    const fresh = await history.page(root, after.historyVersion, 0, 5);
+    expect(fresh.version).toBe(after.historyVersion);
+    expect(fresh.rows[0]?.subject).toBe('Newest');
+    expect(fresh.rows[1]?.hash).toBe(old.rows.find((row) => row.subject !== 'Newest')?.hash ?? fresh.rows[1]?.hash);
+    // A window still on the old version gets the current history and its version.
+    const stale = await history.page(root, before.historyVersion, 0, 5);
+    expect(stale.version).toBe(after.historyVersion);
+  });
+});

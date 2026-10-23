@@ -59,7 +59,7 @@
 |---|---|---|
 | [T-020](tasks/stage-2-git-core/T-020-built-in-diff.md) | Детали коммита и встроенный diff | review |
 | [T-021](tasks/stage-2-git-core/T-021-stage-commit.md) | Индексация (файлы, фрагменты, строки) и коммит | review |
-| [T-022](tasks/stage-2-git-core/T-022-commit-graph.md) | Граф коммитов и виртуализация списка | todo |
+| [T-022](tasks/stage-2-git-core/T-022-commit-graph.md) | Граф коммитов и виртуализация списка | review |
 | [T-023](tasks/stage-2-git-core/T-023-branches.md) | Ветки и теги, переключение с автоматическим stash | todo |
 | [T-024](tasks/stage-2-git-core/T-024-remote-sync.md) | Fetch, pull (merge и rebase), push; учётные данные в UI | todo |
 | [T-025](tasks/stage-2-git-core/T-025-conflict-editor.md) | Встроенное разрешение конфликтов | todo |

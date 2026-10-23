@@ -1,18 +1,6 @@
 // Application state owned by the main process and replicated to every renderer.
 import type { SettingsState } from './settings';
 
-export interface Commit {
-  hash: string;
-  parents: string[];
-  authorName: string;
-  authorEmail: string;
-  /** Unix time in seconds. */
-  authorTime: number;
-  /** Decorations such as `HEAD -> main`, `origin/main`, `tag: v1.0`. */
-  refs: string[];
-  subject: string;
-}
-
 export type ChangeKind =
   | 'modified'
   | 'added'
@@ -46,7 +34,13 @@ export interface RepoData {
   root: string;
   name: string;
   branch: BranchInfo;
-  commits: Commit[];
+  /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
+  refs: Record<string, string[]>;
+  /**
+   * Changes whenever the history list may change (a commit, a ref moved). The history itself is not
+   * replicated; windows fetch it page by page with `history:rows` and reload on a new version.
+   */
+  historyVersion: string;
   changes: FileChange[];
   loadedAt: number;
 }

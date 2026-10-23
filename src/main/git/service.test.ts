@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { HistoryService } from '../history/service';
 import { createGitService } from './service';
 
 // Fixtures are built with the git CLI so the test checks nodegit against git's own view of the repo.
@@ -24,6 +25,7 @@ function sh(cwd: string, ...args: string[]) {
 describe('GitService', () => {
   let root: string;
   const service = createGitService();
+  const history = new HistoryService();
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-test-')));
@@ -37,7 +39,8 @@ describe('GitService', () => {
   it('reads an empty repository', async () => {
     const data = await service.read(root);
     expect(data.branch).toEqual({ head: 'main', oid: null, upstream: null, ahead: 0, behind: 0 });
-    expect(data.commits).toEqual([]);
+    expect(data.refs).toEqual({});
+    expect(await history.page(root, data.historyVersion, 0, 50)).toMatchObject({ rows: [], loaded: 0, complete: true });
   });
 
   it('resolves the root from a nested directory', async () => {
@@ -73,17 +76,20 @@ describe('GitService', () => {
 
     expect(data.name).toBe(root.split(/[\\/]/).pop());
     expect(data.branch.head).toBe('main');
-    expect(data.branch.oid).toBe(data.commits[0]?.hash);
+    const { rows, complete, version } = await history.page(root, data.historyVersion, 0, 50);
+    expect(complete).toBe(true);
+    expect(version).toBe(data.historyVersion);
+    expect(data.branch.oid).toBe(rows[0]?.hash);
 
-    expect(data.commits.map((c) => c.subject)).toEqual(['Second commit', 'First commit']);
-    expect(data.commits[0]).toMatchObject({
+    expect(rows.map((c) => c.subject)).toEqual(['Second commit', 'First commit']);
+    expect(rows[0]).toMatchObject({
       authorName: 'Ada',
       authorEmail: 'ada@example.com',
       authorTime: Date.parse('2026-01-02T03:04:05Z') / 1000,
-      refs: ['HEAD -> main'],
     });
-    expect(data.commits[0]?.parents).toEqual([data.commits[1]?.hash]);
-    expect(data.commits[1]?.refs.sort()).toEqual(['feature', 'tag: v1']);
+    expect(rows[0]?.parents).toEqual([rows[1]?.hash]);
+    expect(data.refs[rows[0]!.hash]).toEqual(['HEAD -> main']);
+    expect(data.refs[rows[1]!.hash]?.sort()).toEqual(['feature', 'tag: v1']);
 
     const byPath = Object.fromEntries(data.changes.map((c) => [c.path, c]));
     expect(byPath['a.txt']).toMatchObject({ kind: 'modified', staged: false, unstaged: true });

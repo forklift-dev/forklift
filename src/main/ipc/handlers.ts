@@ -7,6 +7,7 @@ import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
 import type { StagingService } from '../git/staging';
+import { MAX_PAGE, type HistoryService } from '../history/service';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
@@ -27,6 +28,7 @@ export interface HandlerDeps {
   settings: SettingsService;
   toolActions: ToolActions;
   scanner: RepoScanner;
+  history: HistoryService;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -122,7 +124,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -182,6 +184,14 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       return thenRefresh(root, () => staging.commit(root, message, amend));
     },
 
+    async 'history:rows'(_ctx, repo, version, start, count) {
+      const root = tab(repo);
+      if (typeof version !== 'string' || version.length > 64) throw new TypeError('version must be a history version');
+      if (!Number.isInteger(start) || start < 0) throw new TypeError('start must be a non-negative integer');
+      if (!Number.isInteger(count) || count < 1 || count > MAX_PAGE) throw new TypeError(`count must be 1 to ${MAX_PAGE}`);
+      return history.page(root, version, start, count);
+    },
+
     async 'commit:details'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
@@ -215,7 +225,9 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     },
 
     async 'repo:close'(_ctx, repo) {
-      store.dispatch(tabClosed(tab(repo)));
+      const root = tab(repo);
+      store.dispatch(tabClosed(root));
+      history.forget(root);
       const active = store.getState().repos.view.activeId;
       const next = active ? store.getState().repos.byId[active] : null;
       if (active && next && !next.data && !next.loading && !next.error) await store.dispatch(loadRepo(active));

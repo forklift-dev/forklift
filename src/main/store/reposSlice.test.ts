@@ -8,7 +8,8 @@ const data = (root: string): RepoData => ({
   root,
   name: root.slice(1),
   branch: { head: 'main', oid: null, upstream: null, ahead: 0, behind: 0 },
-  commits: [],
+  refs: {},
+  historyVersion: 'v',
   changes: [],
   loadedAt: 1,
 });

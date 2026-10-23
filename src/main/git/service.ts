@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
 import { Branch, Graph, Reference, Repository, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
-import type { BranchInfo, ChangeKind, Commit, FileChange, RepoData } from '../../shared/state';
+import type { BranchInfo, ChangeKind, FileChange, RepoData } from '../../shared/state';
 import { readCommitDetails, readFileDiff } from './diff';
-import { INDEX_MASK, OBJECT_TYPE_COMMIT, SORT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
+import { INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
 export interface GitService {
   /** Resolves any path inside a working tree to the repository root; throws when it is not a repository. */
@@ -13,10 +14,21 @@ export interface GitService {
   fileDiff(root: string, target: DiffTarget): Promise<FileDiff>;
 }
 
-const MAX_COMMITS = 1000;
-
 // Equivalent of `git log --all` without stashes.
-const WALK_GLOBS = ['refs/heads/*', 'refs/remotes/*', 'refs/tags/*'];
+export const WALK_GLOBS = ['refs/heads/*', 'refs/remotes/*', 'refs/tags/*'];
+
+/**
+ * Identifies what the history walk starts from (HEAD and the walked refs); it changes exactly when the
+ * history list may change, so windows know to reload it.
+ */
+export async function historyVersion(repo: Repository): Promise<string> {
+  const lines = [repo.headUnborn() ? 'HEAD unborn' : `HEAD ${(await repo.head()).target().tostrS()}`];
+  for (const ref of await repo.getReferences()) {
+    if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag())) continue;
+    lines.push(`${ref.name()} ${ref.target().tostrS()}`);
+  }
+  return createHash('sha1').update(lines.sort().join('\n')).digest('hex');
+}
 
 export function createGitService(): GitService {
   return {
@@ -31,16 +43,18 @@ export function createGitService(): GitService {
     async read(root) {
       const repo = await Repository.open(root);
       const head = repo.headUnborn() ? null : await repo.head();
-      const [branch, refLabels, changes] = await Promise.all([
+      const [branch, refs, changes, version] = await Promise.all([
         readBranch(repo, head),
         readRefLabels(repo, head),
         readChanges(repo),
+        historyVersion(repo),
       ]);
       return {
         root,
         name: basename(root),
         branch,
-        commits: await readCommits(repo, head !== null, refLabels),
+        refs: Object.fromEntries(refs),
+        historyVersion: version,
         changes,
         loadedAt: Date.now(),
       };
@@ -109,28 +123,6 @@ async function readRefLabels(repo: Repository, head: Reference | null): Promise<
   // Keep HEAD first, matching git's own ordering.
   for (const list of labels.values()) list.sort((a, b) => Number(b.startsWith('HEAD')) - Number(a.startsWith('HEAD')));
   return labels;
-}
-
-async function readCommits(repo: Repository, hasHead: boolean, refLabels: Map<string, string[]>): Promise<Commit[]> {
-  const walk = repo.createRevWalk();
-  walk.sorting(SORT.TOPOLOGICAL, SORT.TIME);
-  if (hasHead) walk.pushHead();
-  for (const glob of WALK_GLOBS) walk.pushGlob(glob);
-
-  const commits = await walk.getCommits(MAX_COMMITS).catch(() => []);
-  return commits.map((commit) => {
-    const author = commit.author();
-    const hash = commit.sha();
-    return {
-      hash,
-      parents: commit.parents().map((oid) => oid.tostrS()),
-      authorName: author.name(),
-      authorEmail: author.email(),
-      authorTime: author.when().time(),
-      refs: refLabels.get(hash) ?? [],
-      subject: commit.summary() ?? '',
-    };
-  });
 }
 
 async function readChanges(repo: Repository): Promise<FileChange[]> {

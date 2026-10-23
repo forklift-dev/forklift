@@ -1,5 +1,6 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
+import type { HistoryPage } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
 
@@ -13,6 +14,8 @@ export interface Commands {
   'index:applyLines': { args: [repo: string, request: LineActionRequest]; result: void };
   /** Commits the index (hooks run); returns the new commit hash. */
   'commit:create': { args: [repo: string, message: string, amend: boolean]; result: string };
+  /** Rows `start…start+count` of the commit history with graph layout; `version` is RepoData.historyVersion. */
+  'history:rows': { args: [repo: string, version: string, start: number, count: number]; result: HistoryPage };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
   /** Both versions of one file for the built-in diff view. */
@@ -75,6 +78,7 @@ const commandChannelSet = {
   'index:applyLines': true,
   'commit:create': true,
   'commit:details': true,
+  'history:rows': true,
   'diff:file': true,
   'repo:pick': true,
   'repo:open': true,

@@ -5,7 +5,7 @@ import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
-import { CommitList } from './CommitList';
+import { CommitGraph } from './CommitGraph';
 import { CommitPanel } from './CommitPanel';
 import { useConfirm } from './ConfirmDialog';
 import { DiffView, type DiffEditing } from './DiffView';
@@ -84,11 +84,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           }
         />
       ) : (
-        <CommitList
-          commits={data.commits}
-          selectedHash={selectedCommit}
-          onSelect={(hash) => setSelectedCommit((current) => (current === hash ? null : hash))}
-        />
+        <CommitGraph repo={repo} data={data} selectedHash={selectedCommit} onSelect={setSelectedCommit} />
       )}
       <aside className="side">
         {selectedCommit ? (

@@ -11,6 +11,16 @@
   --ref-bg: #e4edfc;
   --tag-bg: #fdf1d6;
   --selection: #dbe6fb;
+  --graph-0: #2f6fde;
+  --graph-1: #d9480f;
+  --graph-2: #2b8a3e;
+  --graph-3: #ae3ec9;
+  --graph-4: #e67700;
+  --graph-5: #0c8599;
+  --graph-6: #c2255c;
+  --graph-7: #5f3dc4;
+  --graph-8: #74b816;
+  --graph-9: #1971c2;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 13px;
 }
@@ -28,6 +38,16 @@
     --ref-bg: #26385c;
     --tag-bg: #4d3d17;
     --selection: #2c3a55;
+    --graph-0: #5b9bf5;
+    --graph-1: #ff8a4c;
+    --graph-2: #51cf66;
+    --graph-3: #da77f2;
+    --graph-4: #ffc078;
+    --graph-5: #3bc9db;
+    --graph-6: #f783ac;
+    --graph-7: #9775fa;
+    --graph-8: #a9e34b;
+    --graph-9: #74c0fc;
   }
 }
 
@@ -148,38 +168,202 @@ button:disabled {
 }
 
 .commits {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
-.commits table {
-  width: 100%;
-  border-collapse: collapse;
+.commit-header,
+.commit-row {
+  display: flex;
+  align-items: center;
+  height: 28px;
 }
 
-.commits th {
+.commit-header {
   position: sticky;
   top: 0;
-  text-align: left;
-  font-weight: 600;
+  z-index: 1;
   background: var(--bg);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fg-muted);
   border-bottom: 1px solid var(--border);
 }
 
-.commits th,
-.commits td {
-  padding: 4px 8px;
-  white-space: nowrap;
+.commit-scroll {
+  flex: 1;
+  overflow: auto;
+  outline: none;
 }
 
-.commits tr:hover td {
+.commit-rows {
+  position: relative;
+}
+
+.commit-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  cursor: default;
+}
+
+.commit-row:hover {
   background: var(--bg-panel);
 }
 
-.subject {
+.commit-row.selected {
+  background: var(--selection);
+}
+
+.commit-scroll:focus-visible .commit-row.selected {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.commit-row .cell,
+.commit-header .cell {
+  flex: none;
+  padding: 0 8px;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
-  max-width: 0;
-  width: 100%;
+}
+
+.cell.refs {
+  width: 170px;
+  display: flex;
+  gap: 4px;
+}
+
+.cell.graph {
+  padding: 0;
+  height: 28px;
+}
+
+.commit-row .cell.graph {
+  overflow: hidden;
+}
+
+.commit-header .cell.graph {
+  padding: 0 4px;
+}
+
+.cell.message {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+.cell.author {
+  width: 140px;
+}
+
+.cell.date {
+  width: 150px;
+  color: var(--fg-muted);
+}
+
+.cell.sha {
+  width: 80px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--fg-muted);
+}
+
+.commit-row.wip .wip-label {
+  font-style: italic;
+  color: var(--fg-muted);
+  margin-right: 8px;
+}
+
+.wip-counts {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.commit-row.placeholder::after {
+  content: '';
+  position: absolute;
+  left: 190px;
+  width: 40%;
+  top: 11px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.graph-cell {
+  display: block;
+  overflow: visible;
+}
+
+.graph-cell .edge {
+  fill: none;
+  stroke: var(--lane);
+  stroke-width: 2;
+}
+
+.graph-cell .node {
+  fill: var(--lane);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+
+.graph-cell .node.merge {
+  stroke-width: 1;
+}
+
+.graph-cell .wip-edge {
+  stroke: var(--fg-muted);
+  stroke-dasharray: 3 3;
+}
+
+.graph-cell .wip-node {
+  fill: var(--bg);
+  stroke: var(--fg-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+
+.lane-0 {
+  --lane: var(--graph-0);
+}
+
+.lane-1 {
+  --lane: var(--graph-1);
+}
+
+.lane-2 {
+  --lane: var(--graph-2);
+}
+
+.lane-3 {
+  --lane: var(--graph-3);
+}
+
+.lane-4 {
+  --lane: var(--graph-4);
+}
+
+.lane-5 {
+  --lane: var(--graph-5);
+}
+
+.lane-6 {
+  --lane: var(--graph-6);
+}
+
+.lane-7 {
+  --lane: var(--graph-7);
+}
+
+.lane-8 {
+  --lane: var(--graph-8);
+}
+
+.lane-9 {
+  --lane: var(--graph-9);
 }
 
 .ref {
