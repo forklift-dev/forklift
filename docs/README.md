@@ -120,6 +120,12 @@
 | [T-060](tasks/stage-6-integrations/T-060-github.md) | 3. GitHub: вход, репозитории, pull requests, issues | draft |
 | [T-061](tasks/stage-6-integrations/T-061-gitlab.md) | 4. GitLab: вход, репозитории, merge requests, issues | draft |
 
+Техдолг:
+
+| ID | Задача | Статус |
+|---|---|---|
+| [T-067](tasks/stage-6-integrations/T-067-hosting-markdown.md) | Markdown в описаниях и комментариях PR и issues | todo |
+
 Дальние планы:
 
 | ID | Задача | Статус |
