@@ -40,6 +40,15 @@ export interface HistorySearch {
   text: string;
 }
 
+/** A commit the finder offers, with the subject characters that matched. */
+export interface FoundCommit {
+  sha: string;
+  subject: string;
+  authorName: string;
+  authorTime: number;
+  positions: number[];
+}
+
 export interface SearchResult {
   /** Row indices of matching commits in the history list (same version and filter), ascending. */
   indices: number[];

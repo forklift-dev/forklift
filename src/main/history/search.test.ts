@@ -67,3 +67,24 @@ describe('history search', () => {
     expect(await history.locate(root, historyVersion, NONE, 'f'.repeat(40))).toBe(-1);
   });
 });
+
+describe('find (the finder)', () => {
+  it('matches subjects fuzzily, best first, with the matched characters', async () => {
+    const { historyVersion } = await git.read(root);
+    const found = await history.find(root, historyVersion, NONE, 'lgn frm');
+    expect(found[0]).toMatchObject({ sha: shas['login'], subject: 'Add login form', authorName: 'Grace' });
+    expect(found[0]!.positions.map((i) => 'Add login form'[i]).join('')).toBe('lgnfrm');
+  });
+
+  it('finds a commit by the start of its sha, and nothing for an empty text', async () => {
+    const { historyVersion } = await git.read(root);
+    expect((await history.find(root, historyVersion, NONE, shas['feature']!.slice(0, 8)))[0]!.sha).toBe(shas['feature']);
+    expect(await history.find(root, historyVersion, NONE, '  ')).toEqual([]);
+  });
+
+  it('stays within the graph filter', async () => {
+    const { historyVersion } = await git.read(root);
+    const found = await history.find(root, historyVersion, { solo: [], hidden: ['refs/heads/feature'] }, 'feature work');
+    expect(found.map((row) => row.sha)).not.toContain(shas['feature']);
+  });
+});

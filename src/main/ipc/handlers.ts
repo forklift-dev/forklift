@@ -60,6 +60,8 @@ export interface HandlerDeps {
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
   onFetched?(root: string): void;
+  /** Working-tree files of a repository (tracked and untracked, not ignored). */
+  listFiles(root: string): Promise<{ paths: string[]; truncated: boolean }>;
   /** Hands a credential answer to the waiting git process. */
   answerPrompt(id: number, answer: string | null): void;
 }
@@ -190,7 +192,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -523,6 +525,17 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (!['message', 'author', 'sha', 'file', 'content'].includes(raw['field'] as string)) throw new TypeError('unknown search field');
       if (typeof raw['text'] !== 'string' || raw['text'].length > 1000 || /[\0\n]/.test(raw['text'])) throw new TypeError('search text must be one line');
       return history.search(root, version, parseFilter(filter), { field: raw['field'] as HistorySearch['field'], text: raw['text'] });
+    },
+
+    async 'history:find'(_ctx, repo, version, filter, text) {
+      const root = tab(repo);
+      assertVersion(version);
+      if (typeof text !== 'string' || text.length > 200 || /[\0\n]/.test(text)) throw new TypeError('text must be one line');
+      return history.find(root, version, parseFilter(filter), text);
+    },
+
+    async 'repo:files'(_ctx, repo) {
+      return listFiles(tab(repo));
     },
 
     async 'commit:details'(_ctx, repo, sha) {

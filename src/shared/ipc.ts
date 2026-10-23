@@ -5,7 +5,7 @@ import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
-import type { HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
+import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
 
@@ -25,6 +25,10 @@ export interface Commands {
   'history:locate': { args: [repo: string, version: string, filter: HistoryFilter, sha: string]; result: number };
   /** Matching commits as row indices: message, author, sha prefix, file name or content (pickaxe). */
   'history:search': { args: [repo: string, version: string, filter: HistoryFilter, query: HistorySearch]; result: SearchResult };
+  /** Commits for the finder (Ctrl+P): sha prefix or fuzzy subject. */
+  'history:find': { args: [repo: string, version: string, filter: HistoryFilter, text: string]; result: FoundCommit[] };
+  /** Files of the working tree (tracked and untracked, not ignored), for the finder. */
+  'repo:files': { args: [repo: string]; result: { paths: string[]; truncated: boolean } };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
   /** Both versions of one file for the built-in diff view. */
@@ -172,6 +176,8 @@ const commandChannelSet = {
   'history:rows': true,
   'history:locate': true,
   'history:search': true,
+  'history:find': true,
+  'repo:files': true,
   'diff:file': true,
   'ref:validateName': true,
   'branch:create': true,

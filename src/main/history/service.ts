@@ -1,6 +1,7 @@
 import { Reference, Repository, type Revwalk } from '@axosoft/nodegit';
 import { GraphLayout } from '../../shared/graph';
-import type { HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
+import { fuzzyFilter } from '../../shared/fuzzy';
+import type { FoundCommit, HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
 import type { GitCli } from '../git/cli';
 import { SORT } from '../git/libgit2';
 import { historyVersion, readStashes, WALK_GLOBS } from '../git/service';
@@ -88,6 +89,24 @@ export class HistoryService {
     const cache = await this.cache(root, version, filter);
     while (!cache.index.has(sha) && !cache.complete) await cache.ensure(cache.rows.length + 5000);
     return cache.index.get(sha) ?? -1;
+  }
+
+  /** Commits for the finder: sha prefix, or the subject matched fuzzily; best first. */
+  async find(root: string, version: string, filter: HistoryFilter, text: string, limit = 30): Promise<FoundCommit[]> {
+    const cache = await this.cache(root, version, filter);
+    await cache.ensure(Infinity);
+    const query = text.trim();
+    if (!query) return [];
+    const commits = cache.rows.filter((row) => !row.stash);
+    const found: FoundCommit[] = [];
+    if (/^[0-9a-f]{4,40}$/i.test(query)) {
+      const prefix = query.toLowerCase();
+      for (const row of commits) if (row.hash.startsWith(prefix) && found.length < limit) found.push(foundCommit(row, []));
+    }
+    for (const { item, positions } of fuzzyFilter(query, commits, (row) => row.subject, limit - found.length)) {
+      if (!found.some((commit) => commit.sha === item.hash)) found.push(foundCommit(item, positions));
+    }
+    return found;
   }
 
   /** Commits matching a search, as row indices of the same history (message, author, file and content via git log). */
@@ -191,3 +210,5 @@ export class HistoryService {
     return new HistoryCache(version, filterKey, revisions, walk, stashesByBase);
   }
 }
+
+const foundCommit = (row: HistoryRow, positions: number[]): FoundCommit => ({ sha: row.hash, subject: row.subject, authorName: row.authorName, authorTime: row.authorTime, positions });

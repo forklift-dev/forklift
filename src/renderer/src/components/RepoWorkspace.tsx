@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { NO_FILTER, type HistoryFilter } from '../../../shared/history';
 import { useCommand } from '../useCommand';
 import { HistoryBar, type SearchState } from './HistoryBar';
 import type { DiffTarget } from '../../../shared/diff';
-import type { RepoData } from '../../../shared/state';
+import type { FileChange, RepoData } from '../../../shared/state';
+import { useCommandHandlers } from '../commands';
+import { FinderPalette } from './FinderPalette';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
@@ -72,17 +74,6 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     void invoke('history:locate', repo, data.historyVersion, filter, sha).then((index) => index >= 0 && revealIndex(index));
   };
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== 'f' || !(event.ctrlKey || event.metaKey) || event.defaultPrevented) return;
-      // The diff and conflict editors have their own find.
-      if ((event.target as HTMLElement | null)?.closest('.monaco-editor')) return;
-      event.preventDefault();
-      setSearchState((current) => ({ ...current, open: true }));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
   const { open: openMenu, menu } = useContextMenu();
@@ -113,6 +104,45 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         confirmDiscard,
       }
     : undefined;
+
+  const openChange = (change: FileChange, staged: boolean) => {
+    setFileHistory(null);
+    if (change.kind === 'conflicted') {
+      setDiffTarget(null);
+      return setConflictPath(change.path);
+    }
+    setConflictPath(null);
+    // A rename already in the index is under its new name there, so the unstaged side needs no old path.
+    const oldPath = staged || !change.staged ? change.origPath : undefined;
+    setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
+  };
+
+  const [finding, setFinding] = useState(false);
+  const head = data.branch.oid;
+  const centerFree = !fileHistory && !rebaseBase && !conflictPath && !diffTarget;
+  const unstagedPaths = data.changes.filter((c) => c.unstaged).map((c) => c.path);
+  const stagedPaths = data.changes.filter((c) => c.staged).map((c) => c.path);
+  useCommandHandlers({
+    'palette.find': { run: () => setFinding(true) },
+    'repo.stageAll': { run: () => void run(() => invoke('index:stage', repo, unstagedPaths)), enabled: () => unstagedPaths.length > 0 },
+    'repo.unstageAll': { run: () => void run(() => invoke('index:unstage', repo, stagedPaths)), enabled: () => stagedPaths.length > 0 },
+    'repo.discardAll': { run: () => void discardFiles(data.changes.map((c) => c.path)), enabled: () => data.changes.length > 0 && data.operation === null },
+    'repo.focusCommit': {
+      run: () => {
+        setSelectedCommit(null);
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.commit-summary')?.focus());
+      },
+    },
+    'repo.createBranch': { run: () => head && refActions.createBranch(head, data.branch.head ?? head.slice(0, 7)), enabled: () => Boolean(head) },
+    'repo.createTag': { run: () => head && refActions.createTag(head, data.branch.head ?? head.slice(0, 7)), enabled: () => Boolean(head) },
+    'history.search': {
+      run: () => setSearchState((current) => ({ ...current, open: true })),
+      // The diff and conflict editors have their own find.
+      enabled: () => centerFree && !document.activeElement?.closest('.monaco-editor'),
+    },
+    'history.goToHead': { run: () => head && showCommit(head), enabled: () => Boolean(head) },
+    'history.showAll': { run: () => setFilter(NO_FILTER), enabled: () => filter.solo.length > 0 || filter.hidden.length > 0 },
+  });
 
   const stagedCount = data.changes.filter((c) => c.staged).length;
   const selectedStash = data.stashes.find((stash) => stash.sha === selectedCommit) ?? null;
@@ -260,16 +290,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             <ChangesPanel
               changes={data.changes}
               selected={worktreeDiff && { path: worktreeDiff.path, staged: worktreeDiff.staged }}
-              onShowDiff={(change, staged) => {
-                if (change.kind === 'conflicted') {
-                  setDiffTarget(null);
-                  return setConflictPath(change.path);
-                }
-                setConflictPath(null);
-                // A rename already in the index is under its new name there, so the unstaged side needs no old path.
-                const oldPath = staged || !change.staged ? change.origPath : undefined;
-                setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
-              }}
+              onShowDiff={openChange}
               onStage={(paths) => void run(() => invoke('index:stage', repo, paths))}
               onUnstage={(paths) => void run(() => invoke('index:unstage', repo, paths))}
               onDiscard={(paths) => void discardFiles(paths)}
@@ -293,6 +314,25 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       {dialog}
       {refActions.dialogs}
       {menu}
+      {finding && (
+        <FinderPalette
+          data={data}
+          filter={filter}
+          onClose={() => setFinding(false)}
+          onShowCommit={(sha) => {
+            setFileHistory(null);
+            setDiffTarget(null);
+            setConflictPath(null);
+            showCommit(sha);
+          }}
+          onCheckout={refActions.checkout}
+          onOpenChange={(change) => {
+            setSelectedCommit(null);
+            openChange(change, !change.unstaged);
+          }}
+          onFileHistory={(path) => setFileHistory({ path, mode: 'history' })}
+        />
+      )}
     </main>
   );
 }

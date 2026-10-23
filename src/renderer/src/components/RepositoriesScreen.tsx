@@ -30,15 +30,17 @@ interface RepositoriesScreenProps {
   onOpened(): void;
   /** Absent when there is nothing to go back to (no tabs). */
   onClose?(): void;
+  /** The Clone or Init dialog, when open (the command palette can open them too). */
+  creating: NewRepoKind | null;
+  onCreating(kind: NewRepoKind | null): void;
 }
 
 /** Opening repositories: by folder, from favorites and recent ones, or found by searching a folder. */
-export function RepositoriesScreen({ run, onOpened, onClose }: RepositoriesScreenProps) {
+export function RepositoriesScreen({ run, onOpened, onClose, creating, onCreating: setCreating }: RepositoriesScreenProps) {
   const { recent, favorites } = useAppState((s) => s.library);
   const openTabs = useAppState((s) => s.tabs.tabs);
   const [scan, setScan] = useState<{ folder: string; running: boolean; found: string[]; error?: string } | null>(null);
   const [now] = useState(() => Date.now());
-  const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const rootRef = useRef<HTMLElement>(null);
   // Keyboard focus starts inside, so Escape reaches this screen first.
   useEffect(() => rootRef.current?.focus(), []);

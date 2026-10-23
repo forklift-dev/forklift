@@ -1,6 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState, useTransition, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import type { SettingsSection } from '../../shared/settings';
 import type { TabsState } from '../../shared/state';
+import { BUILTIN_THEMES } from '../../shared/themes';
 import { invoke } from './api';
+import { OPEN_COMMANDS_EVENT, startShortcuts, useCommandHandlers } from './commands';
+import { CommandPalette } from './components/CommandPalette';
+import type { NewRepoKind } from './components/NewRepoDialog';
 import { Preferences } from './components/preferences/Preferences';
 import { RepositoriesScreen } from './components/RepositoriesScreen';
 import { RepoWorkspace } from './components/RepoWorkspace';
@@ -70,6 +75,10 @@ export function App() {
     window.addEventListener('pointerup', up);
   };
   const [dropping, setDropping] = useState(false);
+  const [palette, setPalette] = useState<string | null>(null);
+  const [preferencesSection, setPreferencesSection] = useState<SettingsSection | undefined>(undefined);
+  const [creating, setCreating] = useState<NewRepoKind | null>(null);
+  const userThemes = useAppState((s) => s.app.userThemes.themes);
 
   const reportError = (error: unknown) => setActionError(error instanceof Error ? error.message : String(error));
 
@@ -100,52 +109,83 @@ export function App() {
     }
   };
 
+  const remoteActions = useRemoteActions(tabs.activeId, repo.data, run);
+
   const activate = (id: string) => {
     setScreen('repo');
     if (id !== tabs.activeId) void run(() => invoke('repo:activate', id));
   };
   const closeTab = (id: string) => void run(() => invoke('repo:close', id));
 
-  // Shortcuts read the latest state through a ref; the listener is registered once.
   const undoRedo = (redo: boolean) => {
-    if (!tabs.activeId || screen !== 'repo') return;
     const labels = repo.undo;
-    if (redo ? labels?.redo : labels?.undo) void run(() => invoke(redo ? 'undo:redo' : 'undo:undo', tabs.activeId!));
+    if (tabs.activeId && (redo ? labels?.redo : labels?.undo)) void run(() => invoke(redo ? 'undo:redo' : 'undo:undo', tabs.activeId!));
   };
-  const shortcuts = useRef({ tabs, screen, activate, closeTab, undoRedo, toggleTerminal });
-  useLayoutEffect(() => {
-    shortcuts.current = { tabs, screen, activate, closeTab, undoRedo, toggleTerminal };
+  const canUndo = (redo: boolean) => screen === 'repo' && Boolean(tabs.activeId) && Boolean(redo ? repo.undo?.redo : repo.undo?.undo);
+  const goToTab = (key: { step?: number; number?: number }) => {
+    const id = tabFor(tabs, key);
+    if (id) activate(id);
+  };
+  const openPreferences = (section?: SettingsSection) => {
+    setPreferencesSection(section);
+    setScreen('preferences');
+  };
+  const openCreate = (kind: NewRepoKind) => {
+    setCreating(kind);
+    setScreen('repositories');
+  };
+
+  const onRepo = () => screen === 'repo' && Boolean(repo.data);
+  const tabCommands = Object.fromEntries(
+    Array.from({ length: 8 }, (_, i) => [`tabs.select${i + 1}`, { run: () => goToTab({ number: i + 1 }), enabled: () => tabs.tabs.length > i }]),
+  );
+  const themeCommands = Object.fromEntries(
+    [...BUILTIN_THEMES, ...userThemes].map((theme) => [
+      `theme.use.${theme.id}`,
+      { title: `Use the ${theme.name} theme`, category: 'View', run: () => void run(() => invoke('settings:update', { values: { 'ui.theme': theme.id } })) },
+    ]),
+  );
+  useCommandHandlers({
+    'palette.commands': { run: () => setPalette('') },
+    'app.preferences': { run: () => openPreferences() },
+    'app.keybindings': { run: () => openPreferences('keys') },
+    'theme.choose': { run: () => openPreferences('ui') },
+    'app.repositories': { run: () => setScreen('repositories') },
+    'repo.clone': { run: () => openCreate('clone') },
+    'repo.init': { run: () => openCreate('init') },
+    'tabs.close': {
+      run: () => {
+        if (screen === 'repo' && tabs.activeId) closeTab(tabs.activeId);
+        else if (tabs.tabs.length) setScreen('repo');
+      },
+    },
+    'tabs.next': { run: () => goToTab({ step: 1 }), enabled: () => tabs.tabs.length > 0 },
+    'tabs.previous': { run: () => goToTab({ step: -1 }), enabled: () => tabs.tabs.length > 0 },
+    ...tabCommands,
+    'tabs.selectLast': { run: () => goToTab({ number: 9 }), enabled: () => tabs.tabs.length > 0 },
+    'terminal.toggle': { run: toggleTerminal, enabled: () => Boolean(tabs.activeId) },
+    'terminal.external': { run: () => tabs.activeId && void run(() => invoke('repo:openTerminal', tabs.activeId!)), enabled: () => Boolean(tabs.activeId) },
+    'edit.undo': { run: () => undoRedo(false), enabled: () => canUndo(false) },
+    'edit.redo': { run: () => undoRedo(true), enabled: () => canUndo(true) },
+    'repo.refresh': { run: () => tabs.activeId && void run(() => invoke('repo:refresh', tabs.activeId!)), enabled: () => Boolean(tabs.activeId) },
+    'repo.fetch': { run: () => remoteActions.fetch(), enabled: onRepo },
+    'repo.pull': { run: () => remoteActions.pull(), enabled: () => onRepo() && Boolean(repo.data?.branch.head) },
+    'repo.pullMerge': { run: () => remoteActions.pull(false), enabled: () => onRepo() && Boolean(repo.data?.branch.head) },
+    'repo.pullRebase': { run: () => remoteActions.pull(true), enabled: () => onRepo() && Boolean(repo.data?.branch.head) },
+    'repo.push': { run: () => remoteActions.push(), enabled: () => onRepo() && Boolean(repo.data?.branch.head) },
+    'repo.stash': {
+      run: () => tabs.activeId && void run(() => invoke('stash:push', tabs.activeId!, { message: '', includeUntracked: true, stagedOnly: false })),
+      enabled: () => onRepo() && Boolean(repo.data?.changes.length),
+    },
+    'repo.pop': { run: () => tabs.activeId && repo.data?.stashes[0] && void run(() => invoke('stash:pop', tabs.activeId!, repo.data!.stashes[0]!.sha)), enabled: () => onRepo() && Boolean(repo.data?.stashes.length) },
+    ...themeCommands,
   });
+  useEffect(() => startShortcuts(), []);
+  // The finder hands "> text" over to the command palette.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const { tabs: current, screen: shown, activate: switchTo, closeTab: close, undoRedo: history } = shortcuts.current;
-      // Text fields and the editors keep their own undo.
-      const target = event.target as HTMLElement | null;
-      const editing = target?.closest('input, textarea, select, [contenteditable="true"], .monaco-editor');
-      let handled = true;
-      if (event.key === '`' && !event.shiftKey) shortcuts.current.toggleTerminal();
-      else if ((event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y') && !editing) history(event.shiftKey || event.key.toLowerCase() === 'y');
-      else if (event.key === ',' && !event.shiftKey) setScreen('preferences');
-      else if (event.key.toLowerCase() === 't' && !event.shiftKey) setScreen('repositories');
-      else if (event.key.toLowerCase() === 'w' && !event.shiftKey) {
-        if (shown === 'repo' && current.activeId) close(current.activeId);
-        else if (current.tabs.length) setScreen('repo');
-      } else if (event.key === 'Tab') {
-        const id = tabFor(current, { step: event.shiftKey ? -1 : 1 });
-        if (id) switchTo(id);
-      } else if (/^[1-9]$/.test(event.key) && !event.shiftKey) {
-        const id = tabFor(current, { number: Number(event.key) });
-        if (id) switchTo(id);
-      } else handled = false;
-      if (handled) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    // Capture phase: the diff editor would otherwise keep Ctrl+Tab and friends to itself.
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    const open = (event: Event) => setPalette((event as CustomEvent<string>).detail);
+    window.addEventListener(OPEN_COMMANDS_EVENT, open);
+    return () => window.removeEventListener(OPEN_COMMANDS_EVENT, open);
   }, []);
 
   // A folder dropped anywhere on the window opens as a repository.
@@ -158,7 +198,6 @@ export function App() {
     if (path) void run(() => invoke('repo:open', path)).then((ok) => ok && setScreen('repo'));
   };
 
-  const remoteActions = useRemoteActions(tabs.activeId, repo.data, run);
   const { open: openMenu, menu } = useContextMenu();
   const busy = isPending || repo.loading;
   const error = actionError;
@@ -192,7 +231,7 @@ export function App() {
         onRefresh={() => activeId && run(() => invoke('repo:refresh', activeId))}
         onClose={() => activeId && closeTab(activeId)}
         onOpenTerminal={toggleTerminal}
-        onPreferences={() => setScreen('preferences')}
+        onPreferences={() => openPreferences()}
         onStash={() => activeId && run(() => invoke('stash:push', activeId, { message: '', includeUntracked: true, stagedOnly: false }))}
         onPop={() => activeId && data?.stashes[0] && run(() => invoke('stash:pop', activeId, data.stashes[0]!.sha))}
         remote={showRepositories ? null : (repo.remote ?? null)}
@@ -218,12 +257,15 @@ export function App() {
       {prompts[0] && (
         <PromptDialog key={prompts[0].id} prompt={prompts[0]} repoName={tabs.tabs.find((tab) => tab.id === prompts[0]!.repo)?.name ?? null} />
       )}
-      {screen === 'preferences' && <Preferences repo={data} onClose={() => setScreen('repo')} />}
+      {screen === 'preferences' && <Preferences key={preferencesSection ?? ''} repo={data} section={preferencesSection} onClose={() => setScreen('repo')} />}
+      {palette !== null && <CommandPalette query={palette} onQuery={setPalette} onClose={() => setPalette(null)} />}
       {screen !== 'preferences' && showRepositories && (
         <RepositoriesScreen
           run={run}
           onOpened={() => setScreen('repo')}
           onClose={tabs.tabs.length ? () => setScreen('repo') : undefined}
+          creating={creating}
+          onCreating={setCreating}
         />
       )}
       {/* Kept mounted under the other screens, so the selection and an open diff survive a visit there. */}

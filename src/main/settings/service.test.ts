@@ -69,6 +69,7 @@ describe('SettingsService', () => {
     [{ values: { 'ui.theme': 'app' } }, 'There is no theme'],
     [{ values: { 'ui.editorTheme': 'system' } }, 'There is no theme'],
     [{ values: { 'ui.theme': '../x' } }, 'There is no theme'],
+    [{ values: { 'keys.bindings': { 'no.such': [] } } }, 'Unknown command'],
   ])('rejects %j', async (patch, message) => {
     const { service, store } = await setup();
     const before = store.getState().settings;

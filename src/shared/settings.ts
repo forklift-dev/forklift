@@ -1,5 +1,6 @@
 // Application settings: one declarative schema drives the types, defaults, validation, the
 // Preferences screen (sections, labels, search) and which settings a repository may override.
+import { parseKeybindingOverrides, type KeybindingOverrides } from './keybindings';
 
 /** A program with arguments; placeholders are substituted per argument, never through a shell. */
 export interface CommandLine {
@@ -31,6 +32,7 @@ export const SETTINGS_SECTIONS = {
   editor: 'Editor',
   terminal: 'Terminal',
   tools: 'External tools',
+  keys: 'Keyboard shortcuts',
 } as const;
 export type SettingsSection = keyof typeof SETTINGS_SECTIONS;
 
@@ -48,7 +50,8 @@ export type SettingField =
   | (FieldBase & { type: 'enum'; default: string; options: readonly { value: string; label: string }[] })
   | (FieldBase & { type: 'string'; default: string; maxLength: number; placeholder?: string; kind?: 'executable' | 'folder' | 'theme' | 'editorTheme' })
   | (FieldBase & { type: 'appTool'; default: AppToolSetting; tool: AppToolKind })
-  | (FieldBase & { type: 'gitTool'; default: GitToolSetting; tool: GitToolKind });
+  | (FieldBase & { type: 'gitTool'; default: GitToolSetting; tool: GitToolKind })
+  | (FieldBase & { type: 'keybindings'; default: KeybindingOverrides });
 
 export const SETTING_FIELDS = {
   'general.restoreTabs': {
@@ -194,6 +197,13 @@ export const SETTING_FIELDS = {
     label: 'Merge tool',
     description: 'Conflict resolution, run through git mergetool. A custom command may use $LOCAL, $REMOTE, $BASE and $MERGED.',
   },
+  'keys.bindings': {
+    section: 'keys',
+    type: 'keybindings',
+    default: {},
+    label: 'Shortcuts',
+    description: 'Every command is also in the command palette. Changed shortcuts are marked; Reset brings back the default.',
+  },
 } as const satisfies Record<string, SettingField>;
 
 type Fields = typeof SETTING_FIELDS;
@@ -211,7 +221,9 @@ type ValueOf<F> = F extends { type: 'boolean' }
           ? AppToolSetting
           : F extends { type: 'gitTool' }
             ? GitToolSetting
-            : never;
+            : F extends { type: 'keybindings' }
+              ? KeybindingOverrides
+              : never;
 
 export type SettingsValues = { -readonly [K in SettingKey]: ValueOf<Fields[K]> };
 /** Values a repository overrides; absent keys inherit the global value. */
@@ -322,6 +334,12 @@ export function parseSettingValue<K extends SettingKey>(key: K, value: unknown):
       return parseAppTool(key, value) as SettingsValues[K];
     case 'gitTool':
       return parseGitTool(key, value) as SettingsValues[K];
+    case 'keybindings':
+      try {
+        return parseKeybindingOverrides(value) as SettingsValues[K];
+      } catch (error) {
+        throw new SettingValueError(key, error instanceof Error ? error.message : String(error));
+      }
   }
 }
 

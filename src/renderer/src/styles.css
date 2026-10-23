@@ -1349,6 +1349,172 @@ select {
   resize: vertical;
 }
 
+/* Command palette and finder */
+.palette-backdrop {
+  align-items: flex-start;
+  padding-top: 72px;
+  background: transparent;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 120px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 12px 40px var(--shadow);
+  overflow: hidden;
+}
+
+.palette-input {
+  margin: 8px;
+  font-size: 14px;
+}
+
+.palette-list {
+  flex: 1;
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.palette-group {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.palette-item.active {
+  background: var(--selection);
+}
+
+.palette-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-label mark {
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.palette-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.palette-hint,
+.palette-footer kbd,
+.keybinding-chip kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--fg-muted);
+  font: 11px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.palette-hint {
+  margin-left: auto;
+}
+
+.palette-empty {
+  padding: 8px 12px;
+  color: var(--fg-muted);
+}
+
+.palette-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+/* Keyboard shortcuts */
+.setting-row[data-setting='keys.bindings'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.keybindings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.keybindings-filter {
+  width: min(420px, 100%);
+}
+
+.keybindings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.keybindings-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.keybinding-category {
+  color: var(--fg-muted);
+}
+
+.keybinding-changed {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.keybinding-keys {
+  white-space: nowrap;
+}
+
+.keybinding-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 6px;
+}
+
+.keybinding-keys .icon-button {
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.keybinding-keys .codicon {
+  font-size: 13px;
+}
+
+.keybinding-recorder {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.keybinding-reset {
+  width: 1%;
+  white-space: nowrap;
+}
+
 /* Theme picker */
 .theme-picker {
   display: grid;

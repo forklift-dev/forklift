@@ -14,6 +14,7 @@ import { useCommand } from '../../useCommand';
 import { useConfirm } from '../ConfirmDialog';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
+import { KeybindingsEditor } from './KeybindingsEditor';
 import { ThemePicker, UserThemesNote } from './ThemePicker';
 import { AppToolPicker, GitToolPicker } from './ToolPickers';
 
@@ -39,14 +40,16 @@ function GitStatus() {
 
 interface PreferencesProps {
   repo: RepoData | null;
+  /** Section shown first. */
+  section?: SettingsSection;
   onClose(): void;
 }
 
 /** Preferences screen: sections on the left, search, and a scope switch for repository overrides. */
-export function Preferences({ repo, onClose }: PreferencesProps) {
+export function Preferences({ repo, section: initialSection = 'tools', onClose }: PreferencesProps) {
   const problems = useAppState((s) => s.settings.problems);
   const [scope, setScope] = useState<'global' | 'repository'>('global');
-  const [section, setSection] = useState<SettingsSection>('tools');
+  const [section, setSection] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState('');
   const { confirm, dialog } = useConfirm();
   const repoRoot = scope === 'repository' && repo ? repo.root : null;
@@ -83,6 +86,8 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
         return <AppToolPicker {...props} kind={field.tool} detected={detected.data} confirm={confirm} />;
       case 'gitTool':
         return <GitToolPicker {...props} kind={field.tool} detected={detected.data} confirm={confirm} />;
+      case 'keybindings':
+        return <KeybindingsEditor {...props} />;
     }
   };
 
