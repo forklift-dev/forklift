@@ -114,6 +114,19 @@ export const SETTING_FIELDS = {
     label: 'Editor theme',
     description: 'Colors of diffs, blame and the conflict editor.',
   },
+  'ui.graphStyle': {
+    section: 'ui',
+    type: 'enum',
+    default: 'kraken',
+    options: [
+      { value: 'kraken', label: 'Kraken' },
+      { value: 'classic', label: 'Classic' },
+      { value: 'compact', label: 'Compact' },
+      { value: 'metro', label: 'Metro' },
+    ],
+    label: 'Commit graph',
+    description: 'How the branches and commits are drawn.',
+  },
   'ui.gravatar': {
     section: 'ui',
     type: 'boolean',

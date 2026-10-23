@@ -32,13 +32,19 @@ const subscribe = (listener: () => void) => {
   return () => void listeners.delete(listener);
 };
 
-/** A round picture of the author: the Gravatar one when that is turned on and exists, else initials in the email's color. */
-export function Avatar({ name, email, size = 18 }: { name: string; email: string; size?: number }) {
+/** The author's Gravatar picture (a data: URL) when that is on and it exists, else null (use initials). */
+export function useAvatarPicture(email: string): string | null {
   const gravatar = useAppState((s) => s.settings.values['ui.gravatar']);
   const picture = useSyncExternalStore(subscribe, () => (gravatar && email ? pictures.get(email) : null));
   useEffect(() => {
     if (picture === undefined) request(email);
   }, [picture, email]);
+  return picture ?? null;
+}
+
+/** A round picture of the author: the Gravatar one when that is turned on and exists, else initials in the email's color. */
+export function Avatar({ name, email, size = 18 }: { name: string; email: string; size?: number }) {
+  const picture = useAvatarPicture(email);
   const style = { width: size, height: size, fontSize: Math.round(size * 0.45) };
   if (picture) return <img className="avatar" src={picture} alt="" style={style} />;
   return (

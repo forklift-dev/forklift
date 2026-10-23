@@ -15,6 +15,7 @@ import { useConfirm } from '../ConfirmDialog';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
 import { KeybindingsEditor } from './KeybindingsEditor';
+import { GraphStylePicker } from './GraphStylePicker';
 import { ProfilesEditor } from './Profiles';
 import { ThemePicker, UserThemesNote } from './ThemePicker';
 import { AppToolPicker, GitToolPicker } from './ToolPickers';
@@ -77,7 +78,7 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
       case 'boolean':
         return <BooleanControl {...props} />;
       case 'enum':
-        return <EnumControl {...props} />;
+        return key === 'ui.graphStyle' ? <GraphStylePicker {...props} /> : <EnumControl {...props} />;
       case 'integer':
         return <TextControl {...props} />;
       case 'string':

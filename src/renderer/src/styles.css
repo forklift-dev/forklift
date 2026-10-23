@@ -329,7 +329,7 @@ button:disabled {
 .commit-row {
   display: flex;
   align-items: center;
-  height: 28px;
+  height: var(--row-height, 28px);
 }
 
 .commit-header {
@@ -391,7 +391,7 @@ button:disabled {
 
 .cell.graph {
   padding: 0;
-  height: 28px;
+  height: var(--row-height, 28px);
 }
 
 .commit-row .cell.graph {
@@ -452,7 +452,89 @@ button:disabled {
 .graph-cell .edge {
   fill: none;
   stroke: var(--lane);
+  /* The width comes from the graph style (set on the svg). */
+  stroke-linecap: round;
+}
+
+/* Graph styles (src/renderer/src/graphStyles.ts) */
+.graph-cell .streak {
+  fill: var(--lane);
+  stroke: none;
+  opacity: 0.1;
+}
+
+.commit-row:hover .graph-cell .streak,
+.commit-row.selected .graph-cell .streak {
+  opacity: 0.22;
+}
+
+.graph-cell .ref-connector {
+  stroke: var(--lane);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.graph-cell .node.station {
+  fill: var(--bg);
+  stroke: var(--lane);
+  stroke-width: 3;
+}
+
+.graph-cell .avatar-fill {
+  fill: var(--lane);
+  stroke: none;
+}
+
+.graph-cell .avatar-initials {
+  fill: var(--bg);
+  stroke: none;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.graph-cell .node-ring {
+  fill: none;
+  stroke: var(--lane);
   stroke-width: 2;
+}
+
+.lane-refs .commit-row .ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--lane) 32%, var(--bg));
+  color: var(--fg-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lane-refs .commit-row .ref.head {
+  outline: 1px solid var(--lane);
+}
+
+.lane-refs .commit-row .cell.refs.has-refs::after {
+  content: '';
+  flex: 1;
+  min-width: 6px;
+  height: 1px;
+  align-self: center;
+  background: var(--lane);
+  opacity: 0.7;
+}
+
+.ref-icon {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.streak-rows .commit-row:not(.wip) .cell.message {
+  box-shadow: inset 3px 0 0 var(--lane);
+  padding-left: 10px;
 }
 
 .graph-cell .node {
@@ -2252,6 +2334,23 @@ select {
   padding-left: 18px;
   color: var(--danger-fg);
   font-size: 12px;
+}
+
+/* Graph style picker */
+.graph-style-preview {
+  display: flex;
+  flex-direction: column;
+  height: 108px;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.graph-style-preview .preview-text {
+  fill: var(--fg-dimmed);
+  stroke: none;
 }
 
 /* Clone and Init */

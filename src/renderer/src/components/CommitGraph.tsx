@@ -1,39 +1,79 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import { colorIndex, initials } from '../../../shared/avatars';
 import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
 import type { HistoryFilter, HistoryRow } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
 import { historyPages } from '../history';
-import { Avatar } from './Avatar';
+import { Avatar, useAvatarPicture } from './Avatar';
+import { edgePath, graphStyle, laneX, type GraphStyle } from '../graphStyles';
+import { useAppState } from '../state';
 
-export const ROW_HEIGHT = 28;
-const LANE_WIDTH = 14;
 const MAX_GRAPH_LANES = 16;
 const OVERSCAN = 20;
-const NODE_RADIUS = 5;
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const laneX = (lane: number) => LANE_WIDTH / 2 + lane * LANE_WIDTH;
 
-/** One row of the graph: lines through the row and the commit's node. */
-function GraphCell({ layout, width, merge, stash, wipAbove }: { layout: GraphRowLayout; width: number; merge: boolean; stash: boolean; wipAbove: boolean }) {
-  const mid = ROW_HEIGHT / 2;
-  const x = laneX(layout.column);
+/** The author in a node: Gravatar picture when there is one, else initials on the author's color. */
+function AvatarNode({ x, y, r, name, email, ring }: { x: number; y: number; r: number; name: string; email: string; ring: string }) {
+  const picture = useAvatarPicture(email);
+  const id = useId();
   return (
-    <svg className="graph-cell" width={width} height={ROW_HEIGHT} aria-hidden="true">
-      {layout.edges.map((edge, index) => {
-        const from = laneX(edge.from);
-        const to = laneX(edge.to);
-        let d: string;
-        if (edge.kind === EdgeKind.Pass) d = `M${from} 0V${ROW_HEIGHT}`;
-        else if (edge.kind === EdgeKind.In) d = from === to ? `M${from} 0V${mid}` : `M${from} 0C${from} ${mid * 0.6} ${to} ${mid * 0.4} ${to} ${mid}`;
-        else d = from === to ? `M${from} ${mid}V${ROW_HEIGHT}` : `M${from} ${mid}C${from} ${mid * 1.6} ${to} ${mid * 1.4} ${to} ${ROW_HEIGHT}`;
-        return <path key={index} d={d} className={`edge lane-${edge.color % 10}${stash && edge.kind === EdgeKind.Out ? ' stash-edge' : ''}`} />;
-      })}
-      {wipAbove && <path d={`M${x} 0V${mid}`} className={`edge wip-edge lane-${layout.color % 10}`} />}
-      {stash ? (
-        <rect x={x - NODE_RADIUS} y={mid - NODE_RADIUS} width={NODE_RADIUS * 2} height={NODE_RADIUS * 2} rx={2} className={`node stash-node lane-${layout.color % 10}`} />
+    <g className="avatar-node">
+      {picture ? (
+        <>
+          <clipPath id={id}>
+            <circle cx={x} cy={y} r={r - 1} />
+          </clipPath>
+          <image href={picture} x={x - r + 1} y={y - r + 1} width={(r - 1) * 2} height={(r - 1) * 2} clipPath={`url(#${id})`} />
+        </>
       ) : (
-        <circle cx={x} cy={mid} r={merge ? NODE_RADIUS - 1.5 : NODE_RADIUS} className={`node lane-${layout.color % 10}${merge ? ' merge' : ''}`} />
+        <>
+          <circle cx={x} cy={y} r={r - 1} className={`avatar-fill lane-${colorIndex(email || name)}`} />
+          <text x={x} y={y} className="avatar-initials" fontSize={Math.round(r * 0.8)}>
+            {initials(name, email)}
+          </text>
+        </>
+      )}
+      <circle cx={x} cy={y} r={r - 1} className={`node-ring ${ring}`} />
+    </g>
+  );
+}
+
+interface GraphCellProps {
+  style: GraphStyle;
+  layout: GraphRowLayout;
+  width: number;
+  merge: boolean;
+  stash: boolean;
+  wipAbove: boolean;
+  author: { name: string; email: string };
+  /** The row has branch or tag labels: draw the line from them to the node. */
+  refs: boolean;
+}
+
+/** One row of the graph: lines through the row and the commit's node, drawn in `style`. */
+function GraphCell({ style, layout, width, merge, stash, wipAbove, author, refs }: GraphCellProps) {
+  const h = style.rowHeight;
+  const mid = h / 2;
+  const x = laneX(style, layout.column);
+  const lane = `lane-${layout.color % 10}`;
+  const r = merge ? style.mergeRadius : style.nodeRadius;
+  return (
+    <svg className="graph-cell" width={width} height={h} aria-hidden="true" style={{ strokeWidth: style.lineWidth }}>
+      {style.streak && <rect x={x} y={2} width={Math.max(0, width - x)} height={h - 4} className={`streak ${lane}`} />}
+      {style.laneRefs && refs && <line x1={0} y1={mid} x2={x - r} y2={mid} className={`ref-connector ${lane}`} />}
+      {layout.edges.map((edge, index) => (
+        <path key={index} d={edgePath(style, edge)} className={`edge lane-${edge.color % 10}${stash && edge.kind === EdgeKind.Out ? ' stash-edge' : ''}`} />
+      ))}
+      {wipAbove && <path d={`M${x} 0V${mid}`} className={`edge wip-edge ${lane}`} />}
+      {stash ? (
+        <rect x={x - style.mergeRadius - 1} y={mid - style.mergeRadius - 1} width={style.mergeRadius * 2 + 2} height={style.mergeRadius * 2 + 2} rx={2} className={`node stash-node ${lane}`} />
+      ) : merge || style.nodes === 'dot' ? (
+        <circle cx={x} cy={mid} r={r} className={`node ${lane}${merge ? ' merge' : ''}`} />
+      ) : style.nodes === 'station' ? (
+        <circle cx={x} cy={mid} r={r} className={`node station ${lane}`} />
+      ) : (
+        <AvatarNode x={x} y={mid} r={r} name={author.name} email={author.email} ring={lane} />
       )}
     </svg>
   );
@@ -49,6 +89,7 @@ function RefBadges({ labels }: { labels: string[] | undefined }) {
         return (
           <span key={label} className={`ref${tag ? ' tag' : ''}${head ? ' head' : ''}`} title={label}>
             {tag ? label.slice(5) : label.replace(/^HEAD -> /, '')}
+            {tag && <span className="codicon codicon-tag ref-icon" aria-hidden="true" />}
           </span>
         );
       })}
@@ -75,6 +116,8 @@ interface CommitGraphProps {
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
 export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
+  const style = graphStyle(useAppState((s) => s.settings.values['ui.graphStyle']));
+  const ROW_HEIGHT = style.rowHeight;
   const pages = historyPages(repo, data.historyVersion, filter);
   useSyncExternalStore(pages.subscribe, pages.getSnapshot);
 
@@ -103,7 +146,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
   }, [pages, first, last, offset]);
 
   const lanes = Math.min(MAX_GRAPH_LANES, Math.max(pages.maxWidth, 1));
-  const graphWidth = lanes * LANE_WIDTH + 4;
+  const graphWidth = lanes * style.laneWidth + 4;
   const headIsFirst = pages.row(0)?.hash === data.branch.oid;
   const staged = data.changes.filter((change) => change.staged).length;
   const unstaged = data.changes.filter((change) => change.unstaged).length;
@@ -123,7 +166,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     pendingReveal.current = reveal;
     const element = scrollRef.current;
     if (element) element.scrollTop = Math.max(0, (reveal.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
-  }, [reveal, offset]);
+  }, [reveal, offset, ROW_HEIGHT]);
   useEffect(() => {
     const target = pendingReveal.current;
     if (!target) return;
@@ -153,7 +196,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     if (top < element.scrollTop || top + 2 * ROW_HEIGHT > element.scrollTop + element.clientHeight) {
       element.scrollTop = Math.max(0, top - element.clientHeight / 3);
     }
-  }, [selectedHash, selectedIndex, offset]);
+  }, [selectedHash, selectedIndex, offset, ROW_HEIGHT]);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -169,16 +212,16 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
 
   const rows = [];
   for (let index = first; index <= last; index++) {
-    const style = { transform: `translateY(${index * ROW_HEIGHT}px)` };
+    const position = { transform: `translateY(${index * ROW_HEIGHT}px)` };
     if (index < offset) {
       const column = headIsFirst ? (pages.row(0)?.graph.column ?? 0) : 0;
       rows.push(
-        <div key="wip" role="row" aria-selected={selectedHash === null} className={`commit-row wip${selectedHash === null ? ' selected' : ''}`} style={style} onClick={() => onSelect(null)}>
+        <div key="wip" role="row" aria-selected={selectedHash === null} className={`commit-row wip${selectedHash === null ? ' selected' : ''}`} style={position} onClick={() => onSelect(null)}>
           <div className="cell refs" />
           <div className="cell graph" style={{ width: graphWidth }}>
-            <svg className="graph-cell" width={graphWidth} height={ROW_HEIGHT} aria-hidden="true">
-              {headIsFirst && <path d={`M${laneX(column)} ${ROW_HEIGHT / 2}V${ROW_HEIGHT}`} className="edge wip-edge" />}
-              <circle cx={laneX(column)} cy={ROW_HEIGHT / 2} r={NODE_RADIUS} className="node wip-node" />
+            <svg className="graph-cell" width={graphWidth} height={ROW_HEIGHT} aria-hidden="true" style={{ strokeWidth: style.lineWidth }}>
+              {headIsFirst && <path d={`M${laneX(style, column)} ${ROW_HEIGHT / 2}V${ROW_HEIGHT}`} className="edge wip-edge" />}
+              <circle cx={laneX(style, column)} cy={ROW_HEIGHT / 2} r={Math.max(style.nodeRadius - 1, 4)} className="node wip-node" />
             </svg>
           </div>
           <div className="cell message">
@@ -198,7 +241,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     }
     const row: HistoryRow | undefined = pages.row(index - offset);
     if (!row) {
-      rows.push(<div key={`placeholder-${index}`} className="commit-row placeholder" style={style} aria-hidden="true" />);
+      rows.push(<div key={`placeholder-${index}`} className="commit-row placeholder" style={position} aria-hidden="true" />);
       continue;
     }
     const selected = row.hash === selectedHash;
@@ -207,17 +250,26 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
         key={row.hash}
         role="row"
         aria-selected={selected}
-        className={`commit-row${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}`}
-        style={style}
+        className={`commit-row lane-${row.graph.color % 10}${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}`}
+        style={position}
         data-hash={row.hash}
         onClick={() => onSelect(row.hash)}
         onContextMenu={onContextMenu && ((event) => onContextMenu(event, row))}
       >
-        <div className="cell refs">
+        <div className={`cell refs${row.stash || data.refs[row.hash]?.length ? ' has-refs' : ''}`}>
           {row.stash ? <span className="ref stash-ref">stash@{`{${row.stash.index}}`}</span> : <RefBadges labels={data.refs[row.hash]} />}
         </div>
         <div className="cell graph" style={{ width: graphWidth }}>
-          <GraphCell layout={row.graph} width={graphWidth} merge={row.parents.length > 1} stash={Boolean(row.stash)} wipAbove={wip && index === offset && row.hash === data.branch.oid} />
+          <GraphCell
+            style={style}
+            layout={row.graph}
+            width={graphWidth}
+            merge={row.parents.length > 1}
+            stash={Boolean(row.stash)}
+            wipAbove={wip && index === offset && row.hash === data.branch.oid}
+            author={{ name: row.authorName, email: row.authorEmail }}
+            refs={Boolean(row.stash || data.refs[row.hash]?.length)}
+          />
         </div>
         <div className="cell message subject" title={row.subject}>
           {row.subject}
@@ -234,7 +286,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
 
   const empty = pages.complete && pages.loaded === 0 && !wip;
   return (
-    <section className="commits" aria-label="Commit history">
+    <section className={`commits graph-style-${style.id}${style.laneRefs ? ' lane-refs' : ''}${style.streak ? ' streak-rows' : ''}`} aria-label="Commit history" style={{ '--row-height': `${ROW_HEIGHT}px` } as CSSProperties}>
       {pages.error && <div className="diff-message error">{pages.error}</div>}
       {empty && <div className="empty-note">No commits yet</div>}
       <div className="commit-scroll" ref={scrollRef} role="grid" aria-rowcount={total} tabIndex={0} onKeyDown={onKeyDown} hidden={empty}>

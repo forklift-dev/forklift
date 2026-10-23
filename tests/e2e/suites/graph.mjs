@@ -27,7 +27,7 @@ export default async function ({ check }) {
   await page.waitFor(`${dataRows}.length === 4`);
   const subjects = await page.evaluate(`${dataRows}.map(r => r.querySelector('.subject').textContent).join(' | ')`);
   check('history in topological order', subjects === 'Merge feature | Main work | Feature work | Base', subjects);
-  const columns = await page.evaluate(`${dataRows}.map(r => r.querySelector('.node').getAttribute('cx')).join(',')`);
+  const columns = await page.evaluate(`${dataRows}.map(r => r.querySelector('.node, .node-ring').getAttribute('cx')).join(',')`);
   const [merge, main, feature, base] = columns.split(',').map(Number);
   check('merged branch drawn in its own lane, joining at merge and fork point', merge === main && feature > main && base === main, columns);
   check('merge commit draws two lines out of its node', (await page.evaluate(`${dataRows}[0].querySelectorAll('path.edge').length`)) >= 2);
@@ -61,5 +61,6 @@ export default async function ({ check }) {
   }
   check('scrolling to the end reaches the first commit of 3000', last === execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], { cwd: big }).toString().trim(), last);
   const height = await page.evaluate(`document.querySelector('.commit-rows').style.height`);
-  check('list height matches the whole history once walked', height === `${3000 * 28}px`, height);
+  const rowHeight = await page.evaluate(`Math.round(document.querySelector('.commit-row[data-hash]').getBoundingClientRect().height)`);
+  check('list height matches the whole history once walked', height === `${3000 * rowHeight}px`, `${height} (rows of ${rowHeight} px)`);
 }
