@@ -115,8 +115,17 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
                 { label: 'Delete stash…', danger: true, onSelect: () => refActions.dropStash(row.hash, label) },
               ]);
             }
+            const isHead = row.hash === data.branch.oid;
+            const busy = data.operation !== null;
             openMenu(event, [
-              { label: 'Check out this commit (detached)', disabled: row.hash === data.branch.oid, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
+              { label: 'Check out this commit (detached)', disabled: isHead, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
+              'separator',
+              { label: 'Cherry-pick commit', disabled: isHead || busy, onSelect: () => refActions.cherryPick(row.hash, row.subject) },
+              { label: 'Revert commit…', disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },
+              'separator',
+              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: soft…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'soft') },
+              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: mixed…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'mixed') },
+              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: hard…`, danger: true, disabled: busy, onSelect: () => refActions.reset(row.hash, 'hard') },
               'separator',
               { label: 'Create branch here…', onSelect: () => refActions.createBranch(row.hash, short) },
               { label: 'Create tag here…', onSelect: () => refActions.createTag(row.hash, short) },

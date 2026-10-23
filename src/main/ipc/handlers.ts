@@ -7,6 +7,7 @@ import type { LineAction, LineActionRequest, LineChange } from '../../shared/sta
 import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
+import type { CommitOps } from '../git/commitOps';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
@@ -36,6 +37,7 @@ export interface HandlerDeps {
   branches: BranchService;
   stashes: StashService;
   conflicts: ConflictService;
+  commitOps: CommitOps;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -150,7 +152,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -188,6 +190,25 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
 
   return {
+    async 'commit:cherryPick'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      return thenRefresh(root, () => commitOps.cherryPick(root, sha));
+    },
+
+    async 'commit:revert'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      return thenRefresh(root, () => commitOps.revert(root, sha));
+    },
+
+    async 'commit:reset'(_ctx, repo, sha, mode) {
+      const root = tab(repo);
+      assertSha(sha);
+      if (mode !== 'soft' && mode !== 'mixed' && mode !== 'hard') throw new TypeError('mode must be soft, mixed or hard');
+      await thenRefresh(root, () => commitOps.reset(root, sha, mode));
+    },
+
     async 'conflict:file'(_ctx, repo, path) {
       const root = tab(repo);
       assertString(path, 'path');

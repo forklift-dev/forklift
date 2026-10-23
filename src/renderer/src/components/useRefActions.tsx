@@ -19,7 +19,11 @@ async function attempt(action: () => Promise<unknown>): Promise<string | null> {
 }
 
 export interface RefActions {
+  /** A commit or tag (detached HEAD) asks first. */
   checkout(target: CheckoutTarget): void;
+  cherryPick(sha: string, subject: string): void;
+  revert(sha: string, subject: string): void;
+  reset(sha: string, mode: 'soft' | 'mixed' | 'hard'): void;
   createBranch(sha: string, from: string): void;
   createTag(sha: string, from: string): void;
   renameBranch(name: string): void;
@@ -41,7 +45,38 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
     invoke('ref:validateName', repo, kind, String(values['name'] ?? '')).catch(errorText);
 
   return {
-    checkout: (target) => void run(() => invoke('branch:checkout', repo, target)),
+    checkout: (target) =>
+      void (async () => {
+        if (target.kind === 'commit') {
+          const ok = await confirm({
+            title: `Check out ${target.sha.slice(0, 7)}?`,
+            detail: 'You will be on a detached HEAD: new commits belong to no branch until you create one here. Uncommitted changes are carried along.',
+            confirmLabel: 'Check out',
+          });
+          if (!ok) return;
+        }
+        await run(() => invoke('branch:checkout', repo, target));
+      })(),
+
+    cherryPick: (sha) => void run(() => invoke('commit:cherryPick', repo, sha)),
+
+    revert: (sha, subject) =>
+      void (async () => {
+        const ok = await confirm({ title: `Revert “${subject}”?`, detail: 'A new commit that undoes its changes is added to the current branch.', confirmLabel: 'Revert' });
+        if (ok) await run(() => invoke('commit:revert', repo, sha));
+      })(),
+
+    reset: (sha, mode) =>
+      void (async () => {
+        const branch = headLabel(data);
+        const detail = {
+          soft: 'The commits after it are undone; their changes stay staged.',
+          mixed: 'The commits after it are undone; their changes stay in the working tree, unstaged.',
+          hard: 'The commits after it and ALL uncommitted changes are discarded. This cannot be undone from Forklift.',
+        }[mode];
+        const ok = await confirm({ title: `Reset ${branch} to ${sha.slice(0, 7)} (${mode})?`, detail, confirmLabel: `Reset ${mode}`, danger: mode === 'hard' });
+        if (ok) await run(() => invoke('commit:reset', repo, sha, mode));
+      })(),
 
     createBranch: (sha, from) =>
       void form({

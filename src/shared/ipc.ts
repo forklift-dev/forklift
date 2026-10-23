@@ -41,6 +41,12 @@ export interface Commands {
   /** Applies a stash and drops it if it applied cleanly (otherwise it is kept, with a notice). */
   'stash:pop': { args: [repo: string, sha: string]; result: void };
   'stash:drop': { args: [repo: string, sha: string]; result: void };
+  /** Applies a commit onto the current branch; 'conflicts' when git stopped for them (see RepoData.operation). */
+  'commit:cherryPick': { args: [repo: string, sha: string]; result: 'done' | 'conflicts' };
+  /** Commits the inverse of a commit (merges: relative to the first parent). */
+  'commit:revert': { args: [repo: string, sha: string]; result: 'done' | 'conflicts' };
+  /** Moves the current branch to a commit: soft keeps changes staged, mixed unstaged, hard discards them. */
+  'commit:reset': { args: [repo: string, sha: string, mode: 'soft' | 'mixed' | 'hard']; result: void };
   /** Versions of a conflicted file for the conflict editor. */
   'conflict:file': { args: [repo: string, path: string]; result: ConflictFile };
   /** Writes the edited result (refused if the file changed since `expectedHash`); optionally marks it resolved. */
@@ -120,6 +126,9 @@ const commandChannelSet = {
   'stash:apply': true,
   'stash:pop': true,
   'stash:drop': true,
+  'commit:cherryPick': true,
+  'commit:revert': true,
+  'commit:reset': true,
   'conflict:file': true,
   'conflict:save': true,
   'conflict:take': true,
