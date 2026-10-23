@@ -1,8 +1,10 @@
 import { isAbsolute } from 'node:path';
 import { BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from 'electron';
+import type { CheckoutTarget } from '../../shared/branches';
 import type { DiffTarget } from '../../shared/diff';
 import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
+import type { BranchService, SwitchResult } from '../git/branches';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
@@ -11,7 +13,7 @@ import { MAX_PAGE, type HistoryService } from '../history/service';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
-import { noticesDismissed, type AppStore } from '../store';
+import { noticeAdded, noticesDismissed, type AppStore } from '../store';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
@@ -29,6 +31,7 @@ export interface HandlerDeps {
   toolActions: ToolActions;
   scanner: RepoScanner;
   history: HistoryService;
+  branches: BranchService;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -113,6 +116,25 @@ function parseGitToolKind(value: unknown): GitToolKind {
   return value;
 }
 
+const MAX_NAME = 255;
+
+function parseName(value: unknown, what: string): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_NAME) throw new TypeError(`${what} must be 1 to ${MAX_NAME} characters`);
+  return value;
+}
+
+function parseCheckoutTarget(value: unknown): CheckoutTarget {
+  if (typeof value !== 'object' || value === null) throw new TypeError('target must be an object');
+  const raw = value as Record<string, unknown>;
+  if (raw['kind'] === 'branch') return { kind: 'branch', name: parseName(raw['name'], 'branch') };
+  if (raw['kind'] === 'remote') return { kind: 'remote', name: parseName(raw['name'], 'branch'), remote: parseName(raw['remote'], 'remote') };
+  if (raw['kind'] === 'commit') {
+    assertSha(raw['sha']);
+    return { kind: 'commit', sha: raw['sha'] };
+  }
+  throw new TypeError('target.kind must be branch, remote or commit');
+}
+
 function assertAbsolutePath(value: unknown, name: string): asserts value is string {
   assertString(value, name);
   if (value.length > 4096 || !isAbsolute(value)) throw new TypeError(`${name} must be an absolute path`);
@@ -124,7 +146,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -146,7 +168,52 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     }
   };
 
+  /** Switch results that need the user's attention (a conflict, a kept stash) become a notice. */
+  const report = (result: SwitchResult) => {
+    if (result.message) store.dispatch(noticeAdded(result.message));
+  };
+
   return {
+    async 'ref:validateName'(_ctx, repo, kind, name) {
+      if (kind !== 'branch' && kind !== 'tag') throw new TypeError('kind must be branch or tag');
+      return branches.invalidName(tab(repo), kind, parseName(name, kind));
+    },
+
+    async 'branch:create'(_ctx, repo, name, sha, checkout) {
+      const root = tab(repo);
+      if (typeof checkout !== 'boolean') throw new TypeError('checkout must be a boolean');
+      assertSha(sha);
+      report(await thenRefresh(root, () => branches.create(root, parseName(name, 'branch'), sha, checkout)));
+    },
+
+    async 'branch:checkout'(_ctx, repo, target) {
+      const root = tab(repo);
+      report(await thenRefresh(root, () => branches.checkout(root, parseCheckoutTarget(target))));
+    },
+
+    async 'branch:rename'(_ctx, repo, from, to) {
+      const root = tab(repo);
+      await thenRefresh(root, () => branches.rename(root, parseName(from, 'branch'), parseName(to, 'branch')));
+    },
+
+    async 'branch:delete'(_ctx, repo, name, force) {
+      const root = tab(repo);
+      if (typeof force !== 'boolean') throw new TypeError('force must be a boolean');
+      await thenRefresh(root, () => branches.delete(root, parseName(name, 'branch'), force));
+    },
+
+    async 'tag:create'(_ctx, repo, name, sha, message) {
+      const root = tab(repo);
+      assertSha(sha);
+      if (message !== null && (typeof message !== 'string' || message.length > 100_000)) throw new TypeError('message must be text or null');
+      await thenRefresh(root, () => branches.createTag(root, parseName(name, 'tag'), sha, message?.trim() ? message : null));
+    },
+
+    async 'tag:delete'(_ctx, repo, name) {
+      const root = tab(repo);
+      await thenRefresh(root, () => branches.deleteTag(root, parseName(name, 'tag')));
+    },
+
     async 'index:stage'(_ctx, repo, paths) {
       const root = tab(repo);
       await thenRefresh(root, () => staging.stageFiles(root, parsePaths(paths)));

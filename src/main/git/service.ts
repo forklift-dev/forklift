@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
-import { Branch, Graph, Reference, Repository, type StatusFile } from '@axosoft/nodegit';
+import { Branch, Graph, Reference, Remote, Repository, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
-import type { BranchInfo, ChangeKind, FileChange, RepoData } from '../../shared/state';
+import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, TagInfo } from '../../shared/state';
 import { readCommitDetails, readFileDiff } from './diff';
 import { INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
@@ -43,17 +43,22 @@ export function createGitService(): GitService {
     async read(root) {
       const repo = await Repository.open(root);
       const head = repo.headUnborn() ? null : await repo.head();
-      const [branch, refs, changes, version] = await Promise.all([
+      const [branch, refs, changes, version, remotes] = await Promise.all([
         readBranch(repo, head),
-        readRefLabels(repo, head),
+        readRefs(repo, head),
         readChanges(repo),
         historyVersion(repo),
+        Remote.list(repo) as Promise<string[]>,
       ]);
       return {
         root,
         name: basename(root),
         branch,
-        refs: Object.fromEntries(refs),
+        branches: refs.branches,
+        remoteBranches: refs.remoteBranches,
+        tags: refs.tags,
+        remotes: [...remotes].sort(),
+        refs: Object.fromEntries(refs.labels),
         historyVersion: version,
         changes,
         loadedAt: Date.now(),
@@ -98,13 +103,21 @@ async function readBranch(repo: Repository, head: Reference | null): Promise<Bra
   return info;
 }
 
-/** Builds `git log --decorate` style labels keyed by commit sha. */
-async function readRefLabels(repo: Repository, head: Reference | null): Promise<Map<string, string[]>> {
-  const labels = new Map<string, string[]>();
+interface Refs {
+  /** `git log --decorate` style labels keyed by commit sha. */
+  labels: Map<string, string[]>;
+  branches: LocalBranch[];
+  remoteBranches: RemoteBranch[];
+  tags: TagInfo[];
+}
+
+/** Branches, remote branches and tags, plus the commit labels the history list shows. */
+async function readRefs(repo: Repository, head: Reference | null): Promise<Refs> {
+  const refs: Refs = { labels: new Map(), branches: [], remoteBranches: [], tags: [] };
   const add = (sha: string, label: string) => {
-    const list = labels.get(sha);
+    const list = refs.labels.get(sha);
     if (list) list.push(label);
-    else labels.set(sha, [label]);
+    else refs.labels.set(sha, [label]);
   };
 
   const headName = head && !repo.headDetached() ? head.name() : null;
@@ -112,17 +125,42 @@ async function readRefLabels(repo: Repository, head: Reference | null): Promise<
 
   for (const ref of await repo.getReferences()) {
     if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag())) continue;
-    // Annotated tags point at a tag object; peel to the commit it labels.
-    const target = ref.isTag() ? (await ref.peel(OBJECT_TYPE_COMMIT)).id() : ref.target();
     const name = ref.shorthand();
-    if (ref.isTag()) add(target.tostrS(), `tag: ${name}`);
-    else if (ref.name() === headName) add(target.tostrS(), `HEAD -> ${name}`);
-    else add(target.tostrS(), name);
+    if (ref.isTag()) {
+      // Annotated tags point at a tag object; peel to the commit it labels. Tags of trees or blobs are skipped.
+      const commit = await ref.peel(OBJECT_TYPE_COMMIT).catch(() => null);
+      if (!commit) continue;
+      const sha = commit.id().tostrS();
+      add(sha, `tag: ${name}`);
+      refs.tags.push({ name, sha, annotated: !ref.target().equal(commit.id()) });
+      continue;
+    }
+    const sha = ref.target().tostrS();
+    if (ref.isRemote()) {
+      add(sha, name);
+      refs.remoteBranches.push({ name, remote: name.slice(0, name.indexOf('/')), sha });
+      continue;
+    }
+    const current = ref.name() === headName;
+    add(sha, current ? `HEAD -> ${name}` : name);
+    refs.branches.push({ name, sha, current, ...(await readTracking(repo, ref)) });
   }
 
   // Keep HEAD first, matching git's own ordering.
-  for (const list of labels.values()) list.sort((a, b) => Number(b.startsWith('HEAD')) - Number(a.startsWith('HEAD')));
-  return labels;
+  for (const list of refs.labels.values()) list.sort((a, b) => Number(b.startsWith('HEAD')) - Number(a.startsWith('HEAD')));
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+  refs.branches.sort(byName);
+  refs.remoteBranches.sort(byName);
+  refs.tags.sort(byName);
+  return refs;
+}
+
+async function readTracking(repo: Repository, branch: Reference): Promise<Pick<LocalBranch, 'upstream' | 'ahead' | 'behind'>> {
+  const upstream = await Branch.upstream(branch).catch(() => null);
+  if (!upstream) return { upstream: null, ahead: 0, behind: 0 };
+  // Typed as number in @types/nodegit, but the binding resolves to { ahead, behind }.
+  const counts = (await Graph.aheadBehind(repo, branch.target(), upstream.target())) as unknown as { ahead: number; behind: number };
+  return { upstream: upstream.shorthand(), ahead: counts.ahead, behind: counts.behind };
 }
 
 async function readChanges(repo: Repository): Promise<FileChange[]> {

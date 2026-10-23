@@ -6,6 +6,9 @@ import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
 import { CommitGraph } from './CommitGraph';
+import { copyText, useContextMenu } from './ContextMenu';
+import { LeftPanel } from './LeftPanel';
+import { useRefActions } from './useRefActions';
 import { CommitPanel } from './CommitPanel';
 import { useConfirm } from './ConfirmDialog';
 import { DiffView, type DiffEditing } from './DiffView';
@@ -24,6 +27,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const { confirm, dialog } = useConfirm();
+  const refActions = useRefActions(repo, data, run);
+  const { open: openMenu, menu } = useContextMenu();
   const closeDiff = useCallback(() => setDiffTarget(null), []);
   const worktreeDiff = diffTarget?.kind === 'worktree' ? diffTarget : null;
 
@@ -56,6 +61,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   return (
     <main className="workspace">
+      <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={setSelectedCommit} />
       {diffTarget ? (
         <DiffView
           key={JSON.stringify(diffTarget)}
@@ -84,7 +90,25 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           }
         />
       ) : (
-        <CommitGraph repo={repo} data={data} selectedHash={selectedCommit} onSelect={setSelectedCommit} />
+        <CommitGraph
+          repo={repo}
+          data={data}
+          selectedHash={selectedCommit}
+          onSelect={setSelectedCommit}
+          onContextMenu={(event, row) => {
+            setSelectedCommit(row.hash);
+            const short = row.hash.slice(0, 7);
+            openMenu(event, [
+              { label: 'Check out this commit (detached)', disabled: row.hash === data.branch.oid, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
+              'separator',
+              { label: 'Create branch here…', onSelect: () => refActions.createBranch(row.hash, short) },
+              { label: 'Create tag here…', onSelect: () => refActions.createTag(row.hash, short) },
+              'separator',
+              { label: 'Copy commit SHA', onSelect: () => copyText(row.hash) },
+              { label: 'Copy commit message', onSelect: () => copyText(row.subject) },
+            ]);
+          }}
+        />
       )}
       <aside className="side">
         {selectedCommit ? (
@@ -128,6 +152,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         )}
       </aside>
       {dialog}
+      {refActions.dialogs}
+      {menu}
     </main>
   );
 }

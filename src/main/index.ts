@@ -2,7 +2,9 @@ import { join } from 'node:path';
 import { app, BrowserWindow, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
+import { BranchService } from './git/branches';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
+import { RepoQueue } from './git/repoQueue';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
@@ -63,11 +65,14 @@ async function start() {
   const gitCli = new GitCli(runner, () => settings.values['git.executable'] || 'git');
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);
-  const staging = new StagingService(gitCli, git);
+  // Index, HEAD and working tree are written one operation at a time per repository.
+  const repoQueue = new RepoQueue();
+  const staging = new StagingService(gitCli, git, repoQueue);
+  const branches = new BranchService(gitCli, repoQueue);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -113,7 +118,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

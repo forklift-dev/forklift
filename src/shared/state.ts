@@ -30,10 +30,40 @@ export interface BranchInfo {
   behind: number;
 }
 
+export interface LocalBranch {
+  name: string;
+  /** Commit the branch points at. */
+  sha: string;
+  /** Tracked remote branch, e.g. `origin/main`. */
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  /** Checked out (HEAD points at it). */
+  current: boolean;
+}
+
+export interface RemoteBranch {
+  /** As git shows it: `origin/main`. */
+  name: string;
+  remote: string;
+  sha: string;
+}
+
+export interface TagInfo {
+  name: string;
+  /** The commit it labels (annotated tags peeled). */
+  sha: string;
+  annotated: boolean;
+}
+
 export interface RepoData {
   root: string;
   name: string;
   branch: BranchInfo;
+  branches: LocalBranch[];
+  remoteBranches: RemoteBranch[];
+  tags: TagInfo[];
+  remotes: string[];
   /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
   refs: Record<string, string[]>;
   /**

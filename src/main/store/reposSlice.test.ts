@@ -10,6 +10,10 @@ const data = (root: string): RepoData => ({
   branch: { head: 'main', oid: null, upstream: null, ahead: 0, behind: 0 },
   refs: {},
   historyVersion: 'v',
+      branches: [],
+      remoteBranches: [],
+      tags: [],
+      remotes: [],
   changes: [],
   loadedAt: 1,
 });

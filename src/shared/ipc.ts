@@ -1,4 +1,5 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
+import type { CheckoutTarget } from './branches';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { HistoryPage } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -20,6 +21,18 @@ export interface Commands {
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
   /** Both versions of one file for the built-in diff view. */
   'diff:file': { args: [repo: string, target: DiffTarget]; result: FileDiff };
+  /** Why `name` cannot be a new branch/tag, or null when it can. */
+  'ref:validateName': { args: [repo: string, kind: 'branch' | 'tag', name: string]; result: string | null };
+  /** Creates a branch at a commit, optionally switching to it (uncommitted changes are carried along). */
+  'branch:create': { args: [repo: string, name: string, sha: string, checkout: boolean]; result: void };
+  /** Switches branch or commit; uncommitted changes are stashed and brought back (problems become a notice). */
+  'branch:checkout': { args: [repo: string, target: CheckoutTarget]; result: void };
+  'branch:rename': { args: [repo: string, from: string, to: string]; result: void };
+  /** Without `force`, an unmerged branch is refused ("not fully merged"). */
+  'branch:delete': { args: [repo: string, name: string, force: boolean]; result: void };
+  /** `message` null: a lightweight tag; otherwise an annotated one. */
+  'tag:create': { args: [repo: string, name: string, sha: string, message: string | null]; result: void };
+  'tag:delete': { args: [repo: string, name: string]; result: void };
   /** Shows a folder picker; resolves to the chosen path or null when cancelled. */
   'repo:pick': { args: [purpose: 'open' | 'scan']; result: string | null };
   /** Opens the repository containing `path` in a tab (or switches to its tab); resolves to the tab id. */
@@ -80,6 +93,13 @@ const commandChannelSet = {
   'commit:details': true,
   'history:rows': true,
   'diff:file': true,
+  'ref:validateName': true,
+  'branch:create': true,
+  'branch:checkout': true,
+  'branch:rename': true,
+  'branch:delete': true,
+  'tag:create': true,
+  'tag:delete': true,
   'repo:pick': true,
   'repo:open': true,
   'repo:activate': true,

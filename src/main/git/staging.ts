@@ -5,6 +5,7 @@ import type { LineActionRequest } from '../../shared/staging';
 import { GitCliError, type GitCli } from './cli';
 import { applyLineChanges, dominantEol, splitLines } from './partial';
 import type { GitService } from './service';
+import { RepoQueue } from './repoQueue';
 
 export class StagingError extends Error {
   constructor(message: string) {
@@ -22,12 +23,11 @@ const COMMIT_OUTPUT_LINES = 40;
  * Operations on one repository run one at a time so they never race for index.lock.
  */
 export class StagingService {
-  /** One queue per repository: index operations of different tabs do not wait for each other. */
-  private readonly queues = new Map<string, Promise<unknown>>();
-
   constructor(
     private readonly git: GitCli,
     private readonly reader: Pick<GitService, 'fileDiff'>,
+    /** Shared with other services that write the repository. */
+    private readonly queue = new RepoQueue(),
   ) {}
 
   stageFiles(root: string, paths: readonly string[]): Promise<void> {
@@ -143,13 +143,7 @@ export class StagingService {
   }
 
   private serial<T>(root: string, task: () => Promise<T>): Promise<T> {
-    const run = (this.queues.get(root) ?? Promise.resolve()).then(task, task);
-    const settled = run.catch(() => {});
-    this.queues.set(root, settled);
-    void settled.then(() => {
-      if (this.queues.get(root) === settled) this.queues.delete(root);
-    });
-    return run;
+    return this.queue.run(root, task);
   }
 }
 

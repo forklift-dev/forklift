@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from 'react';
 import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
 import type { HistoryRow } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
@@ -57,13 +57,14 @@ interface CommitGraphProps {
   /** null: the working tree (WIP row) is selected. */
   selectedHash: string | null;
   onSelect(hash: string | null): void;
+  onContextMenu?(event: MouseEvent, row: HistoryRow): void;
 }
 
 /**
  * The history list with its graph, virtualized: only rows in view are rendered and history pages are
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
-export function CommitGraph({ repo, data, selectedHash, onSelect }: CommitGraphProps) {
+export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu }: CommitGraphProps) {
   const pages = historyPages(repo, data.historyVersion);
   useSyncExternalStore(pages.subscribe, pages.getSnapshot);
 
@@ -104,6 +105,19 @@ export function CommitGraph({ repo, data, selectedHash, onSelect }: CommitGraphP
   };
 
   const selectedIndex = selectedHash ? pages.indexOf(selectedHash) + offset : wip ? 0 : -1;
+
+  // A commit selected from elsewhere (a branch in the left panel) is scrolled into view once.
+  const revealed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedHash || revealed.current === selectedHash || selectedIndex < offset) return;
+    revealed.current = selectedHash;
+    const element = scrollRef.current;
+    if (!element) return;
+    const top = selectedIndex * ROW_HEIGHT;
+    if (top < element.scrollTop || top + 2 * ROW_HEIGHT > element.scrollTop + element.clientHeight) {
+      element.scrollTop = Math.max(0, top - element.clientHeight / 3);
+    }
+  }, [selectedHash, selectedIndex, offset]);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -161,6 +175,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect }: CommitGraphP
         style={style}
         data-hash={row.hash}
         onClick={() => onSelect(row.hash)}
+        onContextMenu={onContextMenu && ((event) => onContextMenu(event, row))}
       >
         <div className="cell refs">
           <RefBadges labels={data.refs[row.hash]} />

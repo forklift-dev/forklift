@@ -163,7 +163,7 @@ button:disabled {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
   min-height: 0;
 }
 
@@ -1205,4 +1205,164 @@ select {
   font-size: 16px;
   pointer-events: none;
   z-index: 50;
+}
+
+/* Left panel: branches, remotes, tags */
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.ref-filter {
+  margin: 8px;
+}
+
+.ref-sections {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
+.ref-section-header {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+}
+
+.ref-section-toggle,
+.ref-group-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.ref-section-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.ref-count {
+  margin-left: auto;
+  font-weight: normal;
+}
+
+.ref-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ref-group > .ref-list .ref-item {
+  padding-left: 34px;
+}
+
+.ref-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px 0 20px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.ref-item:hover {
+  background: var(--bg);
+}
+
+.ref-item.current {
+  font-weight: 600;
+}
+
+.ref-item.current .codicon {
+  color: var(--accent);
+}
+
+.ref-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ahead-behind-badge {
+  flex: none;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.ref.head {
+  outline: 1px solid var(--accent);
+}
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 30%);
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 5px 12px;
+  border-radius: 4px;
+}
+
+.context-menu button:hover:not(:disabled),
+.context-menu button:focus-visible {
+  background: var(--selection);
+  outline: none;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* Dialogs with fields */
+.form-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-dialog h2,
+.form-dialog p {
+  margin: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field textarea {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
 }

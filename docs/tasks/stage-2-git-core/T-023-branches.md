@@ -2,9 +2,9 @@
 id: T-023
 title: Ветки и теги, переключение с автоматическим stash
 stage: 2 — Основная работа внутри приложения
-status: todo
+status: review
 depends_on: [T-012]
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # T-023. Ветки и теги, переключение с автоматическим stash
@@ -20,12 +20,37 @@ updated: 2026-10-22
 
 ## Этапы
 
-- [ ] Список веток/тегов в состоянии (upstream, ahead/behind)
-- [ ] `branch:create`, `branch:checkout`, `branch:rename`, `branch:delete`, `tag:create`, `tag:delete`
-- [ ] Checkout через git CLI (хуки `post-checkout`, LFS, sparse-checkout)
-- [ ] Автоматический stash: `git stash push --include-untracked` → checkout → `git stash pop`; при конфликте
-      pop — stash не удалять, показать конфликт (T-025)
-- [ ] UI: левая панель, контекстные действия
+- [x] Список веток/тегов в состоянии (`RepoData.branches/remoteBranches/tags/remotes`, upstream, ahead/behind)
+- [x] `branch:create`, `branch:checkout`, `branch:rename`, `branch:delete`, `tag:create`, `tag:delete`, `ref:validateName`
+- [x] Checkout через git CLI (`git switch`; хуки `post-checkout`, LFS, sparse-checkout работают как в git)
+- [x] Автоматический stash: `git stash push --include-untracked` → `git switch` → `git stash apply --index`
+      (при отказе индекса — без `--index`) → `drop`; при конфликте/неудаче stash не удаляется, сообщение в уведомлении
+- [x] UI: левая панель (Local / Remote по удалённым / Tags, фильтр, сворачивание, двойной клик — checkout,
+      клик — коммит в графе), контекстные меню веток, тегов и коммитов графа, диалоги с проверкой имени
+
+## Нюансы
+
+- 2026-10-23: stash делается только когда рабочая копия «грязная» **и** целевой коммит отличается от HEAD:
+  новая ветка на HEAD (`switch -c`) переносит изменения сама, без stash (так безопаснее и быстрее).
+- 2026-10-23: возврат изменений — `stash apply` (не `pop`), затем `drop` по позиции, найденной по sha stash'а: если
+  пользователь параллельно сделал свой stash, удалится именно наш. Исходы: `restored`; `restored-unstaged`
+  (индекс не лёг — изменения вернулись, но всё unstaged, об этом сообщается); `conflicts` (маркеры в файлах, stash
+  оставлен); `kept` (например, неотслеживаемый файл совпал с файлом ветки — `already exists`; stash оставлен).
+  Если сам `git switch` упал, изменения возвращаются на место и показывается ошибка.
+- 2026-10-23: checkout удалённой ветки создаёт локальную с тем же именем (`switch -c <name> --track`); если такая
+  локальная уже есть — ошибка с подсказкой (не подменяем ветку молча). Удаление веток на удалённом — с T-024 (сеть).
+- 2026-10-23: удаление неслитой ветки — второе подтверждение («not fully merged» от git) и `-D`.
+- 2026-10-23: имена проверяет сам git (`check-ref-format --branch` / `refs/tags/…`), имена с `-` в начале
+  отклоняются отдельно (защита от подстановки опций). Сообщение аннотированного тега идёт через stdin.
+- 2026-10-23: операции с ветками и индексом идут через общую очередь репозитория (`RepoQueue`) — не конкурируют
+  за `index.lock`.
+- 2026-10-23: копирование в буфер (меню «Copy …») — через `execCommand('copy')`: разрешений на буфер обмена окно
+  не получает (`setPermissionRequestHandler` отклоняет всё), и ослаблять это не стали.
+- 2026-10-23: кнопка «Branch» в тулбаре по design.md — вместе с переделкой тулбара в T-024 (Pull/Push/Branch/Stash/Pop);
+  сейчас создание ветки — «+» в секции Local и контекстные меню.
+- 2026-10-23: проверено: юнит-тесты на реальном git (чистая копия, перенос без конфликта со staged и untracked,
+  конфликт при возврате, коллизия untracked, неудачный switch, ветка на HEAD, detached, удалённая ветка, имена,
+  rename/delete, теги) и сквозной набор `branches` (20 проверок).
 
 ## Промт
 
