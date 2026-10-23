@@ -45,6 +45,15 @@ on Linux, downloaded prebuilt (SHA-256 verified) from the nodegit fork's bucket 
 Node.js ≥ 22.12. Build every OS/CPU architecture (x64, arm64) on a matching machine or CI
 runner; cross-compiling nodegit is not supported.
 
+**Windows packages in one command** (installs missing tools with winget, then builds; artifacts in `dist\`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1            # NSIS installer + ZIP
+powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -SkipSetup # tools already installed
+```
+
+Options: `-Arch arm64`, `-Clean` (rebuild native modules and OpenSSL), `-Test` (typecheck, lint, unit tests).
+
 ## Scripts
 
 | Command | Purpose |
