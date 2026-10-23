@@ -34,6 +34,7 @@ import type { ProfileService } from '../profiles/service';
 import type { OperationLog } from '../log/operationLog';
 import type { AvatarService } from '../avatars/service';
 import type { SubmoduleService } from '../git/submodules';
+import type { WorktreeService } from '../git/worktrees';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -65,6 +66,7 @@ export interface HandlerDeps {
   log: OperationLog;
   avatars: AvatarService;
   submodules: SubmoduleService;
+  worktrees: WorktreeService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -201,7 +203,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -842,6 +844,40 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       assertString(path, 'path');
       await thenRefresh(root, () => submodules.remove(root, path));
+    },
+
+    async 'worktree:list'(_ctx, repo) {
+      return worktrees.list(tab(repo));
+    },
+
+    async 'worktree:add'(_ctx, repo, request) {
+      const root = tab(repo);
+      const path = await thenRefresh(root, () => worktrees.add(root, request));
+      return openRepository(store, git, path);
+    },
+
+    async 'worktree:remove'(_ctx, repo, path, force) {
+      const root = tab(repo);
+      if (typeof force !== 'boolean') throw new TypeError('force must be a boolean');
+      await thenRefresh(root, () => worktrees.remove(root, path, force));
+      // A tab of the removed tree has nothing to show any more.
+      if (typeof path === 'string' && store.getState().repos.byId[path]) {
+        store.dispatch(tabClosed(path));
+        history.forget(path);
+        terminals.closeRepo(path);
+      }
+    },
+
+    async 'worktree:lock'(_ctx, repo, path, locked) {
+      const root = tab(repo);
+      if (typeof locked !== 'boolean') throw new TypeError('locked must be a boolean');
+      // Read again so the window's list (keyed by the read) shows it.
+      await thenRefresh(root, () => worktrees.lock(root, path, locked));
+    },
+
+    async 'worktree:prune'(_ctx, repo) {
+      const root = tab(repo);
+      await thenRefresh(root, () => worktrees.prune(root));
     },
 
     async 'avatars:get'(_ctx, emails) {

@@ -50,6 +50,12 @@ export interface RefActions {
   removeSubmodule(path: string): void;
   /** Opens an initialized submodule in its own tab. */
   openSubmodule(path: string): void;
+  /** A new working tree for `branch` (or a new branch); it opens in a tab. */
+  addWorktree(branch?: string): void;
+  removeWorktree(path: string): void;
+  lockWorktree(path: string, locked: boolean): void;
+  pruneWorktrees(): void;
+  openWorktree(path: string): void;
   dialogs: ReactNode;
 }
 
@@ -291,6 +297,59 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
         });
         if (ok) await run(() => invoke('submodule:remove', repo, path));
       })(),
+
+    addWorktree: (branch) => {
+      const sep = repo.includes('\\') ? '\\' : '/';
+      const parent = repo.slice(0, repo.lastIndexOf(sep)) || repo;
+      const folder = (name: string) => `${parent}${sep}${data.name}-${name.replace(/[\\/:*?"<>|\s]+/g, '-')}`;
+      const busy = new Set(data.branches.filter((b) => b.current).map((b) => b.name));
+      void form({
+        title: 'New working tree',
+        detail: 'A second folder with its own checkout of a branch, sharing this repository.',
+        fields: [
+          {
+            name: 'branch',
+            label: 'Branch',
+            type: 'select',
+            initial: branch ?? '',
+            options: [{ value: '', label: 'A new branch from HEAD…' }, ...data.branches.filter((b) => !busy.has(b.name)).map((b) => ({ value: b.name, label: b.name }))],
+          },
+          { name: 'newBranch', label: 'New branch name (for a new branch)', placeholder: 'feature/x' },
+          { name: 'path', label: 'Folder', initial: folder(branch ?? 'worktree') },
+        ],
+        confirmLabel: 'Create',
+        validate: async (values) => {
+          if (!String(values['path']).trim()) return 'Choose the folder';
+          if (!values['branch'] && !String(values['newBranch']).trim()) return 'Enter the new branch name';
+          return values['branch'] ? null : invoke('ref:validateName', repo, 'branch', String(values['newBranch']).trim()).catch(errorText);
+        },
+        submit: (values) =>
+          attempt(() =>
+            invoke('worktree:add', repo, {
+              path: String(values['path']).trim(),
+              branch: values['branch'] ? String(values['branch']) : null,
+              newBranch: values['branch'] ? null : String(values['newBranch']).trim(),
+            }),
+          ),
+      });
+    },
+
+    removeWorktree: (path) =>
+      void (async () => {
+        const ok = await confirm({
+          title: `Remove the working tree ${path}?`,
+          detail: 'Its folder is deleted, including uncommitted changes in it. Its branch and commits stay in the repository.',
+          confirmLabel: 'Remove',
+          danger: true,
+        });
+        if (ok) await run(() => invoke('worktree:remove', repo, path, true));
+      })(),
+
+    lockWorktree: (path, locked) => void run(() => invoke('worktree:lock', repo, path, locked)),
+
+    pruneWorktrees: () => void run(() => invoke('worktree:prune', repo)),
+
+    openWorktree: (path) => void run(() => invoke('repo:open', path)),
 
     openSubmodule: (path) => {
       // The root uses the system's separator (backslashes on Windows); submodule paths always use "/".

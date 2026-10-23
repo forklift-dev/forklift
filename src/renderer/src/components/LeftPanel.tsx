@@ -15,7 +15,7 @@ interface LeftPanelProps {
   onFilter(filter: HistoryFilter): void;
 }
 
-type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules';
+type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules' | 'worktrees';
 
 const REF_MIME = 'application/x-forklift-ref';
 
@@ -73,6 +73,9 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
   const stashes = data.stashes.filter((stash) => match(stash.message));
   const submoduleList = useCommand('submodule:list', [data.root], { reloadKey: data.loadedAt, keepPrevious: true });
   const submodules = (submoduleList.data ?? []).filter((submodule) => match(submodule.path));
+  const worktreeList = useCommand('worktree:list', [data.root], { reloadKey: data.loadedAt, keepPrevious: true });
+  // A single working tree is the repository itself: the section shows once there are linked ones.
+  const worktrees = (worktreeList.data ?? []).filter((tree) => match(tree.path) || match(tree.branch ?? ''));
   const remotes = data.remotes.length ? data.remotes : [...new Set(data.remoteBranches.map((branch) => branch.remote))];
 
   /** What dropping branch `dragged` on local branch `target` can do: git merges and rebases the checked-out branch. */
@@ -133,6 +136,7 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
               onContextMenu={(event) =>
                 openMenu(event, [
                   { label: `Check out ${branch.name}`, disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
+                  { label: 'Check out in a new working tree…', disabled: branch.current || (worktreeList.data ?? []).some((tree) => tree.branch === branch.name), onSelect: () => actions.addWorktree(branch.name) },
                   'separator',
                   { label: `Merge ${branch.name} into ${current}…`, disabled: branch.current || busy, onSelect: () => actions.merge(branch.name, branch.name) },
                   { label: `Rebase ${current} onto ${branch.name}…`, disabled: branch.current || busy, onSelect: () => actions.rebase(branch.name, branch.name) },
@@ -351,6 +355,51 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
                 <span className={`codicon ${ready ? 'codicon-file-submodule' : 'codicon-cloud-download'}`} aria-hidden="true" />
                 <span className="ref-name">{submodule.path}</span>
                 {(note || submodule.dirty) && <span className="submodule-state">{[note, submodule.dirty && 'changed'].filter(Boolean).join(', ')}</span>}
+              </li>
+            );
+          })}
+        </Section>
+
+        <Section
+          id="worktrees"
+          title="Worktrees"
+          count={worktreeList.data?.length ?? 0}
+          collapsed={Boolean(collapsed['worktrees'])}
+          onToggle={toggle}
+          action={
+            <button type="button" className="icon-button" aria-label="Add a working tree" title="Add a working tree" onClick={() => actions.addWorktree()}>
+              <span className="codicon codicon-add" aria-hidden="true" />
+            </button>
+          }
+        >
+          {worktrees.map((tree) => {
+            const name = tree.path.split(/[\\/]/).filter(Boolean).pop() ?? tree.path;
+            const note = [tree.current && 'this tab', tree.main && 'main', tree.locked !== null && 'locked', tree.prunable && 'missing'].filter(Boolean).join(', ');
+            return (
+              <li
+                key={tree.path}
+                className={`ref-item worktree${tree.current ? ' current' : ''}${tree.prunable ? ' prunable' : ''}`}
+                data-worktree={tree.path}
+                title={`${tree.path}${tree.branch ? ` — ${tree.branch}` : tree.head ? ` — detached at ${tree.head.slice(0, 7)}` : ''}${tree.locked ? ` (locked: ${tree.locked})` : ''}`}
+                onDoubleClick={() => !tree.current && !tree.prunable && !tree.bare && actions.openWorktree(tree.path)}
+                onContextMenu={(event) =>
+                  openMenu(event, [
+                    { label: 'Open in a new tab', disabled: tree.current || tree.prunable || tree.bare, onSelect: () => actions.openWorktree(tree.path) },
+                    'separator',
+                    tree.locked === null
+                      ? { label: 'Lock', disabled: tree.main, onSelect: () => actions.lockWorktree(tree.path, true) }
+                      : { label: 'Unlock', onSelect: () => actions.lockWorktree(tree.path, false) },
+                    { label: 'Prune missing working trees', onSelect: actions.pruneWorktrees },
+                    'separator',
+                    { label: 'Copy path', onSelect: () => copyText(tree.path) },
+                    'separator',
+                    { label: 'Remove working tree…', danger: true, disabled: tree.main || tree.current || tree.locked !== null, onSelect: () => actions.removeWorktree(tree.path) },
+                  ])
+                }
+              >
+                <span className={`codicon ${tree.prunable ? 'codicon-warning' : tree.current ? 'codicon-check' : 'codicon-folder'}`} aria-hidden="true" />
+                <span className="ref-name">{tree.branch ?? name}</span>
+                <span className="submodule-state">{note || name}</span>
               </li>
             );
           })}

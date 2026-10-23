@@ -7,6 +7,7 @@ import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { SubmoduleInfo } from './submodules';
+import type { WorktreeAddRequest, WorktreeInfo } from './worktrees';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -174,6 +175,13 @@ export interface Commands {
   'submodule:sync': { args: [repo: string]; result: void };
   /** Removes a submodule (staged, to be committed) and its clone in .git/modules. */
   'submodule:remove': { args: [repo: string, path: string]; result: void };
+  'worktree:list': { args: [repo: string]; result: WorktreeInfo[] };
+  /** Creates a working tree and opens it in a tab; resolves to its tab id. */
+  'worktree:add': { args: [repo: string, request: WorktreeAddRequest]; result: string };
+  /** `force`: also with uncommitted changes in it (they are lost). */
+  'worktree:remove': { args: [repo: string, path: string, force: boolean]; result: void };
+  'worktree:lock': { args: [repo: string, path: string, locked: boolean]; result: void };
+  'worktree:prune': { args: [repo: string]; result: void };
   /** Gravatar pictures (data: URLs) by email; empty unless the setting is on. */
   'avatars:get': { args: [emails: string[]]; result: Record<string, string> };
   /** Opens userData/themes in the file manager. */
@@ -276,6 +284,11 @@ const commandChannelSet = {
   'settings:browseExecutable': true,
   'themes:openFolder': true,
   'avatars:get': true,
+  'worktree:list': true,
+  'worktree:add': true,
+  'worktree:remove': true,
+  'worktree:lock': true,
+  'worktree:prune': true,
   'submodule:list': true,
   'submodule:add': true,
   'submodule:update': true,
