@@ -24,6 +24,10 @@ export interface RefActions {
   cherryPick(sha: string, subject: string): void;
   revert(sha: string, subject: string): void;
   reset(sha: string, mode: 'soft' | 'mixed' | 'hard'): void;
+  /** Merge a branch/commit into the current branch (dialog with the merge mode). */
+  merge(ref: string, label: string): void;
+  /** Rebase the current branch onto a branch/commit (confirmation). */
+  rebase(onto: string, label: string): void;
   createBranch(sha: string, from: string): void;
   createTag(sha: string, from: string): void;
   renameBranch(name: string): void;
@@ -167,6 +171,40 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       void (async () => {
         const ok = await confirm({ title: `Delete ${label}?`, detail: 'The stashed changes are lost.', confirmLabel: 'Delete', danger: true });
         if (ok) await run(() => invoke('stash:drop', repo, sha));
+      })(),
+
+    merge: (ref, label) =>
+      void form({
+        title: `Merge ${label} into ${headLabel(data)}`,
+        detail: 'Uncommitted changes are stashed and put back afterwards.',
+        fields: [
+          {
+            name: 'mode',
+            label: 'How',
+            type: 'select',
+            initial: 'default',
+            options: [
+              { value: 'default', label: 'Fast-forward if possible, otherwise a merge commit' },
+              { value: 'no-ff', label: 'Always create a merge commit' },
+              { value: 'ff-only', label: 'Fast-forward only' },
+              { value: 'squash', label: 'Squash into staged changes (commit them yourself)' },
+            ],
+          },
+          { name: 'message', label: 'Merge commit message (optional)', placeholder: `Merge ${label}` },
+        ],
+        confirmLabel: 'Merge',
+        submit: (values) =>
+          attempt(() => invoke('branch:merge', repo, ref, values['mode'] as 'default' | 'no-ff' | 'ff-only' | 'squash', String(values['message'] ?? '').trim() || null)),
+      }),
+
+    rebase: (onto, label) =>
+      void (async () => {
+        const ok = await confirm({
+          title: `Rebase ${headLabel(data)} onto ${label}?`,
+          detail: `The commits of ${headLabel(data)} that ${label} does not have are re-applied on top of it (their hashes change). Uncommitted changes are stashed and put back afterwards.`,
+          confirmLabel: 'Rebase',
+        });
+        if (ok) await run(() => invoke('branch:rebase', repo, onto));
       })(),
 
     dialogs: (

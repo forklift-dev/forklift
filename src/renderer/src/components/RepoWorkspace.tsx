@@ -122,6 +122,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               'separator',
               { label: 'Cherry-pick commit', disabled: isHead || busy, onSelect: () => refActions.cherryPick(row.hash, row.subject) },
               { label: 'Revert commit…', disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },
+              { label: `Merge this commit into ${data.branch.head ?? 'HEAD'}…`, disabled: isHead || busy, onSelect: () => refActions.merge(row.hash, short) },
+              { label: `Rebase ${data.branch.head ?? 'HEAD'} onto this commit…`, disabled: isHead || busy, onSelect: () => refActions.rebase(row.hash, short) },
               'separator',
               { label: `Reset ${data.branch.head ?? 'HEAD'} to here: soft…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'soft') },
               { label: `Reset ${data.branch.head ?? 'HEAD'} to here: mixed…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'mixed') },
@@ -189,6 +191,9 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               onExternalMerge={(path) => void runInBackground(() => invoke('file:externalMerge', repo, path))}
             />
             <CommitPanel
+              // A new prepared message (a merge or squash started) restarts the form with it.
+              key={data.preparedMessage ?? ''}
+              preparedMessage={data.preparedMessage}
               repo={repo}
               stagedCount={stagedCount}
               headSha={data.branch.oid}

@@ -3,7 +3,9 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 export interface FormField {
   name: string;
   label: string;
-  type?: 'text' | 'textarea' | 'checkbox';
+  type?: 'text' | 'textarea' | 'checkbox' | 'select';
+  /** For `select`. */
+  options?: Array<{ value: string; label: string }>;
   initial?: string | boolean;
   placeholder?: string;
 }
@@ -114,6 +116,20 @@ function FormDialog({ options, onClose }: { options: FormOptions; onClose(done: 
                   onChange={(event) => setValues((v) => ({ ...v, [field.name]: event.target.checked }))}
                 />
                 {field.label}
+              </label>
+            );
+          }
+          if (field.type === 'select') {
+            return (
+              <label key={field.name} className="form-field">
+                {field.label}
+                <select name={field.name} value={values[field.name] as string} onChange={(event) => setValues((v) => ({ ...v, [field.name]: event.target.value }))}>
+                  {field.options?.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             );
           }

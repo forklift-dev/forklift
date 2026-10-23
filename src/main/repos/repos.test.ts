@@ -41,6 +41,7 @@ function setup(repos: string[]) {
       remotes: [],
       stashes: [],
       operation: null,
+      preparedMessage: null,
       changes: [],
       loadedAt: Date.now(),
     }),

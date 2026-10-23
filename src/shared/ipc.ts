@@ -47,6 +47,10 @@ export interface Commands {
   'commit:revert': { args: [repo: string, sha: string]; result: 'done' | 'conflicts' };
   /** Moves the current branch to a commit: soft keeps changes staged, mixed unstaged, hard discards them. */
   'commit:reset': { args: [repo: string, sha: string, mode: 'soft' | 'mixed' | 'hard']; result: void };
+  /** Merges a branch or commit into the current branch ('conflicts': git stopped, see RepoData.operation). */
+  'branch:merge': { args: [repo: string, ref: string, mode: 'default' | 'no-ff' | 'ff-only' | 'squash', message: string | null]; result: 'done' | 'conflicts' };
+  /** Rebases the current branch onto a branch or commit. */
+  'branch:rebase': { args: [repo: string, onto: string]; result: 'done' | 'conflicts' };
   /** Versions of a conflicted file for the conflict editor. */
   'conflict:file': { args: [repo: string, path: string]; result: ConflictFile };
   /** Writes the edited result (refused if the file changed since `expectedHash`); optionally marks it resolved. */
@@ -129,6 +133,8 @@ const commandChannelSet = {
   'commit:cherryPick': true,
   'commit:revert': true,
   'commit:reset': true,
+  'branch:merge': true,
+  'branch:rebase': true,
   'conflict:file': true,
   'conflict:save': true,
   'conflict:take': true,

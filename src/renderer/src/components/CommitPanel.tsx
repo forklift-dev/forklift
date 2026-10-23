@@ -7,11 +7,14 @@ interface CommitPanelProps {
   /** HEAD commit, or null in a repository without commits (nothing to amend). */
   headSha: string | null;
   onCommit(message: string, amend: boolean): Promise<boolean>;
+  /** A message git prepared (merge, squash): the form starts with it. */
+  preparedMessage?: string | null;
 }
 
-export function CommitPanel({ repo, stagedCount, headSha, onCommit }: CommitPanelProps) {
-  const [summary, setSummary] = useState('');
-  const [description, setDescription] = useState('');
+export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMessage }: CommitPanelProps) {
+  const [prepared = '', ...preparedBody] = (preparedMessage ?? '').split('\n');
+  const [summary, setSummary] = useState(prepared);
+  const [description, setDescription] = useState(preparedBody.join('\n').trim());
   const [amend, setAmend] = useState(false);
   const [committing, setCommitting] = useState(false);
 

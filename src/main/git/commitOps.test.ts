@@ -77,3 +77,58 @@ describe('CommitOps', () => {
     await expect(ops.reset(root, 'nope', 'hard')).rejects.toThrow('full commit hash');
   });
 });
+
+describe('merge and rebase', () => {
+  const branchSetup = () => {
+    // main gets its own commit, so merging feature is not a fast-forward.
+    write('m.txt', 'main\n');
+    sh('add', '.');
+    sh('commit', '-qm', 'main work');
+  };
+
+  it('fast-forwards by default when possible; ff-only refuses otherwise', async () => {
+    expect(await ops.merge(root, 'feature', 'default', null)).toBe('done');
+    expect(sh('rev-parse', 'HEAD')).toBe(sh('rev-parse', 'feature'));
+    sh('reset', '-q', '--hard', 'HEAD~2');
+    branchSetup();
+    await expect(ops.merge(root, 'feature', 'ff-only', null)).rejects.toThrow(/fast-forward|Not possible/i);
+  });
+
+  it('creates a merge commit with no-ff and a custom message', async () => {
+    expect(await ops.merge(root, 'feature', 'no-ff', 'Bring in feature; $(echo safe)')).toBe('done');
+    expect(sh('log', '-1', '--format=%P').split(' ')).toHaveLength(2);
+    expect(sh('log', '-1', '--format=%s')).toBe('Bring in feature; $(echo safe)');
+  });
+
+  it('squashes: changes staged with a prepared message, nothing committed', async () => {
+    branchSetup();
+    const head = sh('rev-parse', 'HEAD');
+    expect(await ops.merge(root, 'feature', 'squash', null)).toBe('done');
+    expect(sh('rev-parse', 'HEAD')).toBe(head);
+    expect(sh('diff', '--cached', '--name-only')).toBe('f.txt\ng.txt');
+    expect((await git.read(root)).preparedMessage).toMatch(/^Squashed commit of the following/);
+  });
+
+  it('stops a conflicting merge for the banner, carrying uncommitted changes with autostash', async () => {
+    write('f.txt', 'main edit\n');
+    sh('commit', '-qam', 'main edit');
+    write('m.txt', 'uncommitted, unrelated\n');
+    expect(await ops.merge(root, 'feature', 'default', null)).toBe('conflicts');
+    expect((await git.read(root)).operation).toMatchObject({ kind: 'merge', subject: 'feature' });
+    expect((await git.read(root)).preparedMessage).toMatch(/^Merge branch 'feature'/);
+  });
+
+  it('rebases onto another branch, and stops on conflicts', async () => {
+    branchSetup();
+    sh('switch', '-q', 'feature');
+    expect(await ops.rebase(root, 'main')).toBe('done');
+    expect(sh('log', '--format=%s', '-4')).toBe('edit f\nadd g\nmain work\nbase');
+    sh('switch', '-q', 'main');
+    write('f.txt', 'main edit\n');
+    sh('commit', '-qam', 'main edit');
+    sh('switch', '-q', 'feature');
+    expect(await ops.rebase(root, 'main')).toBe('conflicts');
+    expect((await git.read(root)).operation).toMatchObject({ kind: 'rebase', subject: 'feature' });
+    await expect(ops.rebase(root, '--exec=rm')).rejects.toThrow('is not a branch');
+  });
+});

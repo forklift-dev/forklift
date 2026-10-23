@@ -13,6 +13,8 @@ interface LeftPanelProps {
 
 type SectionId = 'local' | 'remote' | 'tags' | 'stashes';
 
+const REF_MIME = 'application/x-forklift-ref';
+
 function Section({ id, title, count, collapsed, onToggle, action, children }: {
   id: SectionId;
   title: string;
@@ -44,12 +46,35 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
   const toggle = (id: string) => setCollapsed((current) => ({ ...current, [id]: !current[id] }));
   const match = (name: string) => name.toLowerCase().includes(filter.trim().toLowerCase());
   const head = data.branch.oid;
+  const current = headLabel(data);
+  // Merging or rebasing again while an operation waits would only fail.
+  const busy = data.operation !== null || !head;
 
   const local = data.branches.filter((branch) => match(branch.name));
   const remote = data.remoteBranches.filter((branch) => match(branch.name));
   const tags = data.tags.filter((tag) => match(tag.name));
   const stashes = data.stashes.filter((stash) => match(stash.message));
   const remotes = data.remotes.length ? data.remotes : [...new Set(data.remoteBranches.map((branch) => branch.remote))];
+
+  /** What dropping branch `dragged` on local branch `target` can do: git merges and rebases the checked-out branch. */
+  const dropMenu = (dragged: string, target: string, targetCurrent: boolean): MenuItem[] => {
+    const draggedCurrent = data.branches.some((b) => b.current && b.name === dragged);
+    if (targetCurrent) {
+      return [
+        { label: `Merge ${dragged} into ${target}…`, disabled: busy, onSelect: () => actions.merge(dragged, dragged) },
+        { label: `Rebase ${target} onto ${dragged}…`, disabled: busy, onSelect: () => actions.rebase(dragged, dragged) },
+      ];
+    }
+    if (draggedCurrent) {
+      return [
+        { label: `Rebase ${dragged} onto ${target}…`, disabled: busy, onSelect: () => actions.rebase(target, target) },
+        { label: `Merge ${target} into ${dragged}…`, disabled: busy, onSelect: () => actions.merge(target, target) },
+      ];
+    }
+    return [
+      { label: `Check out ${target} to merge ${dragged} into it`, onSelect: () => actions.checkout({ kind: 'branch', name: target }) },
+    ];
+  };
 
   const addButton = (label: string, onClick: () => void) => (
     <button type="button" className="icon-button" aria-label={label} title={label} onClick={onClick} disabled={!head}>
@@ -77,9 +102,21 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
               title={branch.upstream ? `${branch.name} → ${branch.upstream}` : branch.name}
               onClick={() => onSelectCommit(branch.sha)}
               onDoubleClick={() => !branch.current && actions.checkout({ kind: 'branch', name: branch.name })}
+              draggable
+              onDragStart={(event) => event.dataTransfer.setData(REF_MIME, branch.name)}
+              onDragOver={(event) => event.dataTransfer.types.includes(REF_MIME) && event.preventDefault()}
+              onDrop={(event) => {
+                const dragged = event.dataTransfer.getData(REF_MIME);
+                if (!dragged || dragged === branch.name) return;
+                event.preventDefault();
+                openMenu(event, dropMenu(dragged, branch.name, branch.current));
+              }}
               onContextMenu={(event) =>
                 openMenu(event, [
                   { label: `Check out ${branch.name}`, disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
+                  'separator',
+                  { label: `Merge ${branch.name} into ${current}…`, disabled: branch.current || busy, onSelect: () => actions.merge(branch.name, branch.name) },
+                  { label: `Rebase ${current} onto ${branch.name}…`, disabled: branch.current || busy, onSelect: () => actions.rebase(branch.name, branch.name) },
                   'separator',
                   { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
                   { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },
@@ -124,9 +161,14 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
                         title={branch.name}
                         onClick={() => onSelectCommit(branch.sha)}
                         onDoubleClick={() => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote })}
+                        draggable
+                        onDragStart={(event) => event.dataTransfer.setData(REF_MIME, branch.name)}
                         onContextMenu={(event) =>
                           openMenu(event, [
                             { label: `Check out ${branch.name}`, onSelect: () => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote }) },
+                            'separator',
+                            { label: `Merge ${branch.name} into ${current}…`, disabled: busy, onSelect: () => actions.merge(branch.name, branch.name) },
+                            { label: `Rebase ${current} onto ${branch.name}…`, disabled: busy, onSelect: () => actions.rebase(branch.name, branch.name) },
                             'separator',
                             { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
                             { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },

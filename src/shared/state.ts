@@ -89,6 +89,8 @@ export interface RepoData {
   /** Newest first. */
   stashes: StashInfo[];
   operation: RepoOperation | null;
+  /** A commit message git prepared (MERGE_MSG of a merge or cherry-pick, SQUASH_MSG of a squash), to prefill the form. */
+  preparedMessage: string | null;
   /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
   refs: Record<string, string[]>;
   /**

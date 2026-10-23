@@ -209,6 +209,18 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       await thenRefresh(root, () => commitOps.reset(root, sha, mode));
     },
 
+    async 'branch:merge'(_ctx, repo, ref, mode, message) {
+      const root = tab(repo);
+      if (!['default', 'no-ff', 'ff-only', 'squash'].includes(mode as string)) throw new TypeError('unknown merge mode');
+      if (message !== null && (typeof message !== 'string' || message.length > 100_000)) throw new TypeError('message must be text or null');
+      return thenRefresh(root, () => commitOps.merge(root, parseName(ref, 'ref'), mode, message));
+    },
+
+    async 'branch:rebase'(_ctx, repo, onto) {
+      const root = tab(repo);
+      return thenRefresh(root, () => commitOps.rebase(root, parseName(onto, 'ref')));
+    },
+
     async 'conflict:file'(_ctx, repo, path) {
       const root = tab(repo);
       assertString(path, 'path');

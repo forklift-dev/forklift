@@ -49,13 +49,14 @@ export function createGitService(): GitService {
       const repo = await Repository.open(root);
       const head = repo.headUnborn() ? null : await repo.head();
       const stashes = await readStashes(repo);
-      const [branch, refs, changes, version, remotes, operation] = await Promise.all([
+      const [branch, refs, changes, version, remotes, operation, preparedMessage] = await Promise.all([
         readBranch(repo, head),
         readRefs(repo, head),
         readChanges(repo),
         historyVersion(repo, stashes),
         Remote.list(repo) as Promise<string[]>,
         readOperation(repo),
+        readPreparedMessage(repo),
       ]);
       return {
         root,
@@ -67,6 +68,7 @@ export function createGitService(): GitService {
         remotes: [...remotes].sort(),
         stashes,
         operation,
+        preparedMessage,
         refs: Object.fromEntries(refs.labels),
         historyVersion: version,
         changes,
@@ -120,6 +122,16 @@ async function readBranch(repo: Repository, head: Reference | null): Promise<Bra
 const STATE = { MERGE: 1, REVERT: 2, REVERT_SEQUENCE: 3, CHERRYPICK: 4, CHERRYPICK_SEQUENCE: 5, REBASE: 7, REBASE_INTERACTIVE: 8, REBASE_MERGE: 9 };
 
 const readText = (path: string) => readFile(path, 'utf8').then((text) => text.trim(), () => '');
+
+/** MERGE_MSG or SQUASH_MSG without git's comment lines. */
+async function readPreparedMessage(repo: Repository): Promise<string | null> {
+  for (const file of ['MERGE_MSG', 'SQUASH_MSG']) {
+    const text = await readFile(join(repo.path(), file), 'utf8').catch(() => '');
+    const message = text.split('\n').filter((line) => !line.startsWith('#')).join('\n').trim();
+    if (message) return message;
+  }
+  return null;
+}
 
 /** Which operation is in progress, from git's state files. */
 async function readOperation(repo: Repository): Promise<RepoOperation | null> {
