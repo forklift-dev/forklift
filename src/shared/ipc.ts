@@ -118,6 +118,10 @@ export interface Commands {
   'file:externalDiff': { args: [repo: string, path: string, staged: boolean]; result: void };
   /** Resolves a conflicted file in the external merge tool; resolves when its window closes. */
   'file:externalMerge': { args: [repo: string, path: string]; result: void };
+  /** Starts a shell in the repository's folder in the embedded terminal; resolves to the terminal id. */
+  'terminal:create': { args: [repo: string, cols: number, rows: number]; result: number };
+  'terminal:resize': { args: [id: number, cols: number, rows: number]; result: void };
+  'terminal:kill': { args: [id: number]; result: void };
   /** Changes settings (validated in main); `repo` targets that open repository's overrides. */
   /** Clears the notices shown above the window content. */
   'app:dismissNotices': { args: []; result: void };
@@ -207,6 +211,9 @@ const commandChannelSet = {
   'file:blame': true,
   'file:externalMerge': true,
   'app:dismissNotices': true,
+  'terminal:create': true,
+  'terminal:resize': true,
+  'terminal:kill': true,
   'settings:update': true,
   'settings:dismissProblems': true,
   'settings:browseExecutable': true,

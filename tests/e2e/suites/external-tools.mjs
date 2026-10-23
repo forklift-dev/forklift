@@ -29,6 +29,8 @@ export default async function ({ check }) {
   await page.waitFor(`!!document.querySelector('.change-row')`);
 
   await page.evaluate(`[...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Terminal').click()`);
+  // The toolbar shows the embedded terminal; the external one opens from its header.
+  await page.click(`document.querySelector('.terminal-dock:not([hidden]) [aria-label="Open external terminal"]')`);
   const term = await recorded(join(work, 'term.out'));
   check('Terminal button → $TERMINAL in repo root', term?.[0] === root && term.length === 1, JSON.stringify(term));
 

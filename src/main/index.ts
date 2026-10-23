@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
 import { BranchService } from './git/branches';
@@ -11,6 +11,9 @@ import { CommitOps } from './git/commitOps';
 import { InteractiveRebase } from './git/interactiveRebase';
 import { UndoService } from './git/undo';
 import { FileHistory } from './git/fileHistory';
+import { TerminalService } from './terminal/service';
+import { TERMINAL_INPUT_CHANNEL } from '../shared/terminal';
+import { isTrustedSender } from './origin';
 import { RemoteService } from './git/remote';
 import { runAskpassClient } from './askpass/client';
 import { ASKPASS_FLAG } from './askpass/protocol';
@@ -107,6 +110,13 @@ async function start() {
   const remotes = new RemoteService(gitCli, askpass, repoQueue);
   const answerPrompt = (id: number, answer: string | null) => waiting.get(id)?.(answer);
   const networkOps = new NetworkOps(store);
+  const terminals = new TerminalService();
+  app.on('will-quit', () => terminals.dispose());
+  // Keystrokes: frequent and fire-and-forget, so a plain channel; only the app's own page may type.
+  ipcMain.on(TERMINAL_INPUT_CHANNEL, (event, id: unknown, data: unknown) => {
+    if (!isTrustedSender(event.senderFrame) || !Number.isInteger(id) || typeof data !== 'string' || data.length > 1_000_000) return;
+    terminals.write(event.sender, id as number, data);
+  });
   const undo = new UndoService({
     git: gitCli,
     branches,
@@ -122,7 +132,7 @@ async function start() {
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -168,7 +178,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch, undo } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch, undo, terminals } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

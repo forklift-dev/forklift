@@ -86,7 +86,7 @@ export function Toolbar(props: ToolbarProps) {
         <button type="button" onClick={onPop} disabled={busy || !repo || repo.stashes.length === 0} title={repo?.stashes[0] ? `Pop ${repo.stashes[0].message}` : 'No stashes'}>
           Pop
         </button>
-        <button type="button" onClick={onOpenTerminal} disabled={!repo}>
+        <button type="button" onClick={onOpenTerminal} disabled={!repo} title="Show or hide the terminal (Ctrl+`)">
           Terminal
         </button>
         <button type="button" onClick={onClose} disabled={busy || !repo}>

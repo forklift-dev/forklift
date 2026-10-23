@@ -20,7 +20,7 @@ export default async function ({ check }) {
   check('git version via process host shown', /^git \d+\.\d+\.\d+$/.test(gitLine ?? ''), gitLine);
   check('no Node globals in page', (await page.evaluate('typeof require + "/" + typeof process')) === 'undefined/undefined');
   const bridge = await page.evaluate('Object.keys(window.forklift).sort().join(",")');
-  check('bridge exposes only the API', bridge === 'ackReplicaUpdate,invoke,onReplicaMessage,pathForFile,platform', bridge);
+  check('bridge exposes only the API', bridge === 'ackReplicaUpdate,invoke,onReplicaMessage,pathForFile,platform,terminal', bridge);
 
   const opened = await page.invoke('repo:open', root);
   check('repo:open via IPC returns the tab id', opened?.ok === true && opened.value === root, JSON.stringify(opened));

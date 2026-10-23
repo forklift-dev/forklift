@@ -12,6 +12,8 @@ import type { CommitOps } from '../git/commitOps';
 import type { InteractiveRebase } from '../git/interactiveRebase';
 import type { UndoService } from '../git/undo';
 import type { FileHistory } from '../git/fileHistory';
+import type { TerminalService } from '../terminal/service';
+import { sanitizeEnv } from '../process/env';
 import { UndoRecorder } from '../git/undoRecorder';
 import type { RebaseStep } from '../../shared/rebase';
 import type { RemoteRun, RemoteService } from '../git/remote';
@@ -51,6 +53,9 @@ export interface HandlerDeps {
   interactiveRebase: InteractiveRebase;
   undo: UndoService;
   fileHistory: FileHistory;
+  terminals: TerminalService;
+  /** The environment shells start with (the user's login-shell environment once resolved). */
+  shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
   onFetched?(root: string): void;
   /** Hands a credential answer to the waiting git process. */
@@ -183,7 +188,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -555,6 +560,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       store.dispatch(tabClosed(root));
       history.forget(root);
+      terminals.closeRepo(root);
       const active = store.getState().repos.view.activeId;
       const next = active ? store.getState().repos.byId[active] : null;
       if (active && next && !next.data && !next.loading && !next.error) await store.dispatch(loadRepo(active));
@@ -629,6 +635,28 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'app:dismissNotices'() {
       store.dispatch(noticesDismissed());
+    },
+
+    async 'terminal:create'({ sender }, repo, cols, rows) {
+      const root = tab(repo);
+      const size = (value: unknown) => (Number.isInteger(value) && (value as number) > 0 && (value as number) < 2000 ? (value as number) : 80);
+      return terminals.create(sender, root, {
+        cwd: root,
+        shell: settings.values['terminal.shell'],
+        env: sanitizeEnv(await shellEnv()),
+        cols: size(cols),
+        rows: size(rows),
+      });
+    },
+
+    async 'terminal:resize'({ sender }, id, cols, rows) {
+      if (!Number.isInteger(id) || !Number.isInteger(cols) || !Number.isInteger(rows)) throw new TypeError('id and size must be integers');
+      terminals.resize(sender, id, cols, rows);
+    },
+
+    async 'terminal:kill'({ sender }, id) {
+      if (!Number.isInteger(id)) throw new TypeError('id must be an integer');
+      terminals.kill(sender, id);
     },
 
     async 'settings:update'(_ctx, patch) {

@@ -33,6 +33,9 @@ main process ─ src/main
   ipc/            типизированная таблица команд → ipcMain.handle
   process/       ProcessRunner — клиент utilityProcess, очистка env
 
+utility process ─ src/pty-host
+  встроенный терминал: node-pty, shell'ы вкладок; вывод пачками в main
+
 utility process ─ src/process-host
   запуск git CLI и внешних программ; отмена, таймауты, убийство дерева процессов
 

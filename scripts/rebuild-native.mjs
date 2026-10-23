@@ -60,7 +60,7 @@ process.env.NODEGIT_OPENSSL_STATIC_LINK = '1';
 await rebuild({
   buildPath: projectDir,
   electronVersion,
-  onlyModules: ['@axosoft/nodegit', 'nsfw', 'find-git-repositories'],
+  onlyModules: ['@axosoft/nodegit', 'nsfw', 'find-git-repositories', 'node-pty'],
   buildFromSource: true,
   force,
   jobs: availableParallelism(),

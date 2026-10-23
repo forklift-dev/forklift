@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import type { TabsState } from '../../shared/state';
 import { invoke } from './api';
 import { Preferences } from './components/preferences/Preferences';
@@ -7,6 +7,7 @@ import { RepoWorkspace } from './components/RepoWorkspace';
 import { useContextMenu } from './components/ContextMenu';
 import { PromptDialog } from './components/PromptDialog';
 import { TabBar } from './components/TabBar';
+import { TerminalPanel } from './components/TerminalPanel';
 import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
@@ -33,6 +34,41 @@ export function App() {
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>('repo');
+  // Repositories whose terminal panel was opened (their shells live while the tab is open) and whether it shows.
+  const [terminalRepos, setTerminalRepos] = useState<string[]>([]);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(() => {
+    try {
+      return Number(localStorage.getItem('forklift.terminalHeight')) || 260;
+    } catch {
+      return 260;
+    }
+  });
+  const toggleTerminal = () => {
+    const id = tabs.activeId;
+    if (!id) return;
+    if (!terminalRepos.includes(id)) setTerminalRepos((current) => [...current, id]);
+    setTerminalOpen((open) => !(open && terminalRepos.includes(id)));
+  };
+  const resizeTerminal = (event: ReactPointerEvent) => {
+    const startY = event.clientY;
+    const startHeight = terminalHeight;
+    const move = (e: PointerEvent) => setTerminalHeight(Math.max(100, Math.min(window.innerHeight - 200, startHeight + startY - e.clientY)));
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setTerminalHeight((height) => {
+        try {
+          localStorage.setItem('forklift.terminalHeight', String(height));
+        } catch {
+          // not kept: fine
+        }
+        return height;
+      });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
   const [dropping, setDropping] = useState(false);
 
   const reportError = (error: unknown) => setActionError(error instanceof Error ? error.message : String(error));
@@ -76,9 +112,9 @@ export function App() {
     const labels = repo.undo;
     if (redo ? labels?.redo : labels?.undo) void run(() => invoke(redo ? 'undo:redo' : 'undo:undo', tabs.activeId!));
   };
-  const shortcuts = useRef({ tabs, screen, activate, closeTab, undoRedo });
+  const shortcuts = useRef({ tabs, screen, activate, closeTab, undoRedo, toggleTerminal });
   useLayoutEffect(() => {
-    shortcuts.current = { tabs, screen, activate, closeTab, undoRedo };
+    shortcuts.current = { tabs, screen, activate, closeTab, undoRedo, toggleTerminal };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -88,7 +124,8 @@ export function App() {
       const target = event.target as HTMLElement | null;
       const editing = target?.closest('input, textarea, select, [contenteditable="true"], .monaco-editor');
       let handled = true;
-      if ((event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y') && !editing) history(event.shiftKey || event.key.toLowerCase() === 'y');
+      if (event.key === '`' && !event.shiftKey) shortcuts.current.toggleTerminal();
+      else if ((event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y') && !editing) history(event.shiftKey || event.key.toLowerCase() === 'y');
       else if (event.key === ',' && !event.shiftKey) setScreen('preferences');
       else if (event.key.toLowerCase() === 't' && !event.shiftKey) setScreen('repositories');
       else if (event.key.toLowerCase() === 'w' && !event.shiftKey) {
@@ -154,7 +191,7 @@ export function App() {
         onOpen={() => setScreen('repositories')}
         onRefresh={() => activeId && run(() => invoke('repo:refresh', activeId))}
         onClose={() => activeId && closeTab(activeId)}
-        onOpenTerminal={() => activeId && run(() => invoke('repo:openTerminal', activeId))}
+        onOpenTerminal={toggleTerminal}
         onPreferences={() => setScreen('preferences')}
         onStash={() => activeId && run(() => invoke('stash:push', activeId, { message: '', includeUntracked: true, stagedOnly: false }))}
         onPop={() => activeId && data?.stashes[0] && run(() => invoke('stash:pop', activeId, data.stashes[0]!.sha))}
@@ -214,6 +251,23 @@ export function App() {
             </main>
           )
         )}
+        {terminalRepos
+          .filter((id) => tabs.tabs.some((tab) => tab.id === id))
+          .map((id) => {
+            const visible = terminalOpen && id === activeId && Boolean(data);
+            return (
+              <div key={id} className="terminal-dock" hidden={!visible} style={{ height: terminalHeight }}>
+                <div className="terminal-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize terminal" onPointerDown={resizeTerminal} />
+                <TerminalPanel
+                  repo={id}
+                  visible={visible}
+                  onExternal={() => void run(() => invoke('repo:openTerminal', id))}
+                  onHide={() => setTerminalOpen(false)}
+                  onEmpty={() => setTerminalRepos((current) => current.filter((r) => r !== id))}
+                />
+              </div>
+            );
+          })}
       </div>
     </div>
   );

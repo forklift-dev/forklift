@@ -64,7 +64,7 @@
 | [T-024](tasks/stage-2-git-core/T-024-remote-sync.md) | Fetch, pull (merge и rebase), push; учётные данные в UI | review |
 | [T-025](tasks/stage-2-git-core/T-025-conflict-editor.md) | Встроенное разрешение конфликтов | review |
 | [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | review |
-| [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | todo |
+| [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | review |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
 
 ### Этап 3 — История и операции над коммитами

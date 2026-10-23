@@ -76,7 +76,7 @@ export class SettingsService {
   private async checkProgram(key: SettingKey, value: unknown): Promise<void> {
     const type = settingField(key).type;
     const custom = (type === 'appTool' || type === 'gitTool') && (value as { mode: string }).mode === 'custom';
-    const command = key === 'git.executable' ? (value as string) : custom ? (value as { command: string }).command : '';
+    const command = key === 'git.executable' || key === 'terminal.shell' ? (value as string) : custom ? (value as { command: string }).command : '';
     if (!command) return;
     if (key === 'git.executable' && !isAbsolute(command) && command !== 'git') {
       throw new TypeError('Git executable must be a full path (or empty to use git from PATH)');

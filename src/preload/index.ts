@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ForkliftBridge } from '../shared/bridge';
 import { isCommandName } from '../shared/ipc';
 import { REPLICA_READY_CHANNEL, type ReplicaAck, type ReplicaMessage } from '../shared/state';
+import { TERMINAL_EVENT_CHANNEL, TERMINAL_INPUT_CHANNEL, type TerminalEvent } from '../shared/terminal';
 
 // The replication port stays inside the preload; the page only receives plain messages.
 const { port1, port2 } = new MessageChannel();
@@ -33,6 +34,19 @@ const bridge: ForkliftBridge = {
 
   ackReplicaUpdate(updateIndex) {
     port2.postMessage({ updateIndex } satisfies ReplicaAck);
+  },
+
+  terminal: {
+    onEvent(listener) {
+      const handler = (_event: unknown, payload: TerminalEvent) => listener(payload);
+      ipcRenderer.on(TERMINAL_EVENT_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(TERMINAL_EVENT_CHANNEL, handler);
+      };
+    },
+    write(id, data) {
+      if (typeof id === 'number' && typeof data === 'string') ipcRenderer.send(TERMINAL_INPUT_CHANNEL, id, data);
+    },
   },
 
   // Electron no longer exposes File.path to pages; dropped folders are resolved here instead.

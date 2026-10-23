@@ -28,6 +28,7 @@ export const SETTINGS_SECTIONS = {
   git: 'Git',
   diff: 'Diff',
   editor: 'Editor',
+  terminal: 'Terminal',
   tools: 'External tools',
 } as const;
 export type SettingsSection = keyof typeof SETTINGS_SECTIONS;
@@ -116,6 +117,18 @@ export const SETTING_FIELDS = {
   },
   'editor.fontSize': { section: 'editor', type: 'integer', default: 13, min: 8, max: 32, label: 'Font size' },
   'editor.tabSize': { section: 'editor', type: 'integer', default: 4, min: 1, max: 16, label: 'Tab width' },
+  'terminal.shell': {
+    section: 'terminal',
+    type: 'string',
+    kind: 'executable',
+    default: '',
+    maxLength: 4096,
+    placeholder: 'Your login shell',
+    label: 'Shell',
+    description: 'Program the embedded terminal runs. Empty: $SHELL (PowerShell or cmd on Windows).',
+  },
+  'terminal.fontSize': { section: 'terminal', type: 'integer', default: 13, min: 8, max: 32, label: 'Font size' },
+  'terminal.fontFamily': { section: 'terminal', type: 'string', default: '', maxLength: 200, placeholder: 'Default monospace font', label: 'Font family' },
   'tools.editor': {
     section: 'tools',
     type: 'appTool',

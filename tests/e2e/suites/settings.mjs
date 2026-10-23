@@ -97,6 +97,8 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('[aria-label="Close preferences"]')`);
 
   await page.evaluate(`[...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Terminal').click()`);
+  // The toolbar shows the embedded terminal; the external one opens from its header.
+  await page.click(`document.querySelector('.terminal-dock:not([hidden]) [aria-label="Open external terminal"]')`);
   const term = await recorded(join(work, 'repo-term.out'));
   check('Terminal uses the repository override', JSON.stringify(term) === JSON.stringify([root, '--cd', root]), JSON.stringify(term));
   await page.evaluate(`[...document.querySelectorAll('.change-row')].find(r => r.textContent.includes('a.txt')).querySelector('[aria-label="Open in editor"]').click()`);
@@ -132,6 +134,8 @@ export default async function ({ check }) {
   check('settings saved to userData/settings.json', saved?.settings?.['diff.contextLines'] === 5 && saved?.settings?.['tools.editor']?.command === 'alt-editor' && saved?.repositories?.[root]?.['tools.terminal']?.command === 'repo-term', JSON.stringify(saved));
   execFileSync('rm', ['-f', join(work, 'repo-term.out')]);
   await page.evaluate(`[...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Terminal').click()`);
+  // The toolbar shows the embedded terminal; the external one opens from its header.
+  await page.click(`document.querySelector('.terminal-dock:not([hidden]) [aria-label="Open external terminal"]')`);
   check('repository override still applies after restart', (await recorded(join(work, 'repo-term.out')))?.[1] === '--cd');
 
   // A damaged settings file: defaults, a visible explanation, the old file kept.

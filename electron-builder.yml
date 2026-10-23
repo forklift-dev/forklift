@@ -17,10 +17,16 @@ files:
   - '!node_modules/{nsfw,find-git-repositories}/build/Release/{obj.target,.deps}/**'
   # Copies left by @electron/rebuild's prebuild cache; the addons load from build/Release.
   - '!node_modules/{nsfw,find-git-repositories}/bin/**'
+  # node-pty: its sources and the build intermediates; other platforms' prebuilds stay out too.
+  - '!node_modules/node-pty/{deps,src,scripts,third_party}/**'
+  - '!node_modules/node-pty/build/{Release/obj.target,Release/.deps,deps,*.mk,Makefile}/**'
 
 asar: true
 asarUnpack:
   - '**/*.node'
+  # node-pty runs this helper as a program on macOS: it must be a real file.
+  - 'node_modules/node-pty/build/Release/spawn-helper'
+  - 'node_modules/node-pty/prebuilds/**/spawn-helper'
 
 # Native modules are rebuilt by scripts/rebuild-native.mjs (postinstall), which also
 # applies nodegit's static OpenSSL setting. Build each OS/arch on a matching runner.
