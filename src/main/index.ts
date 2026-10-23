@@ -5,6 +5,7 @@ import { ExternalTools } from './external/tools';
 import { BranchService } from './git/branches';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { RepoQueue } from './git/repoQueue';
+import { StashService } from './git/stash';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
@@ -68,11 +69,12 @@ async function start() {
   // Index, HEAD and working tree are written one operation at a time per repository.
   const repoQueue = new RepoQueue();
   const staging = new StagingService(gitCli, git, repoQueue);
-  const branches = new BranchService(gitCli, repoQueue);
+  const stashes = new StashService(gitCli, repoQueue);
+  const branches = new BranchService(gitCli, repoQueue, stashes);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -118,7 +120,7 @@ async function start() {
   });
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
-  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches } });
+  if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes } });
 
   showMainWindow();
   app.on('activate', showMainWindow);

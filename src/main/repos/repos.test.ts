@@ -39,6 +39,7 @@ function setup(repos: string[]) {
       remoteBranches: [],
       tags: [],
       remotes: [],
+      stashes: [],
       changes: [],
       loadedAt: Date.now(),
     }),

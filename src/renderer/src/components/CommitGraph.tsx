@@ -14,7 +14,7 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
 const laneX = (lane: number) => LANE_WIDTH / 2 + lane * LANE_WIDTH;
 
 /** One row of the graph: lines through the row and the commit's node. */
-function GraphCell({ layout, width, merge, wipAbove }: { layout: GraphRowLayout; width: number; merge: boolean; wipAbove: boolean }) {
+function GraphCell({ layout, width, merge, stash, wipAbove }: { layout: GraphRowLayout; width: number; merge: boolean; stash: boolean; wipAbove: boolean }) {
   const mid = ROW_HEIGHT / 2;
   const x = laneX(layout.column);
   return (
@@ -26,10 +26,14 @@ function GraphCell({ layout, width, merge, wipAbove }: { layout: GraphRowLayout;
         if (edge.kind === EdgeKind.Pass) d = `M${from} 0V${ROW_HEIGHT}`;
         else if (edge.kind === EdgeKind.In) d = from === to ? `M${from} 0V${mid}` : `M${from} 0C${from} ${mid * 0.6} ${to} ${mid * 0.4} ${to} ${mid}`;
         else d = from === to ? `M${from} ${mid}V${ROW_HEIGHT}` : `M${from} ${mid}C${from} ${mid * 1.6} ${to} ${mid * 1.4} ${to} ${ROW_HEIGHT}`;
-        return <path key={index} d={d} className={`edge lane-${edge.color % 10}`} />;
+        return <path key={index} d={d} className={`edge lane-${edge.color % 10}${stash && edge.kind === EdgeKind.Out ? ' stash-edge' : ''}`} />;
       })}
       {wipAbove && <path d={`M${x} 0V${mid}`} className={`edge wip-edge lane-${layout.color % 10}`} />}
-      <circle cx={x} cy={mid} r={merge ? NODE_RADIUS - 1.5 : NODE_RADIUS} className={`node lane-${layout.color % 10}${merge ? ' merge' : ''}`} />
+      {stash ? (
+        <rect x={x - NODE_RADIUS} y={mid - NODE_RADIUS} width={NODE_RADIUS * 2} height={NODE_RADIUS * 2} rx={2} className={`node stash-node lane-${layout.color % 10}`} />
+      ) : (
+        <circle cx={x} cy={mid} r={merge ? NODE_RADIUS - 1.5 : NODE_RADIUS} className={`node lane-${layout.color % 10}${merge ? ' merge' : ''}`} />
+      )}
     </svg>
   );
 }
@@ -171,17 +175,17 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu 
         key={row.hash}
         role="row"
         aria-selected={selected}
-        className={`commit-row${selected ? ' selected' : ''}`}
+        className={`commit-row${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}`}
         style={style}
         data-hash={row.hash}
         onClick={() => onSelect(row.hash)}
         onContextMenu={onContextMenu && ((event) => onContextMenu(event, row))}
       >
         <div className="cell refs">
-          <RefBadges labels={data.refs[row.hash]} />
+          {row.stash ? <span className="ref stash-ref">stash@{`{${row.stash.index}}`}</span> : <RefBadges labels={data.refs[row.hash]} />}
         </div>
         <div className="cell graph" style={{ width: graphWidth }}>
-          <GraphCell layout={row.graph} width={graphWidth} merge={row.parents.length > 1} wipAbove={wip && index === offset && row.hash === data.branch.oid} />
+          <GraphCell layout={row.graph} width={graphWidth} merge={row.parents.length > 1} stash={Boolean(row.stash)} wipAbove={wip && index === offset && row.hash === data.branch.oid} />
         </div>
         <div className="cell message subject" title={row.subject}>
           {row.subject}

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { CommitFile, FileChangeStatus } from '../../../shared/diff';
 import { useCommand } from '../useCommand';
 
@@ -27,9 +28,11 @@ interface CommitDetailsPanelProps {
   selectedPath: string | null;
   onOpenFile(file: CommitFile): void;
   onClose(): void;
+  /** Extra header content: actions for a stash. */
+  actions?: ReactNode;
 }
 
-export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions }: CommitDetailsPanelProps) {
   const { data, error } = useCommand('commit:details', [repo, sha]);
 
   if (error) return <div className="changes commit-details diff-message error">{error}</div>;
@@ -49,6 +52,7 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
           ✕
         </button>
       </div>
+      {actions && <div className="commit-details-actions">{actions}</div>}
       <h2 className="commit-subject">{subject}</h2>
       {body && <pre className="commit-body">{body}</pre>}
       <dl className="commit-meta">
@@ -77,7 +81,7 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
         </h3>
         <ul>
           {data.files.map((file) => (
-            <li key={file.path} className="change-row">
+            <li key={`${file.sourceSha ?? ''}:${file.path}`} className="change-row">
               <button
                 type="button"
                 className={`change-item${file.path === selectedPath ? ' selected' : ''}`}
@@ -86,6 +90,7 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
               >
                 <span className={`kind ${STATUS_CLASS[file.status]}`}>{STATUS_LABEL[file.status]}</span>
                 {file.path}
+                {file.sourceSha && <span className="untracked-note">untracked</span>}
               </button>
               {!data.statsOmitted && !file.binary && (
                 <span className="line-stats">

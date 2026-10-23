@@ -1,6 +1,7 @@
 import type { CheckoutTarget } from '../../shared/branches';
-import { GitCliError, type GitCli, type GitCliResult } from './cli';
+import { GitCliError, type GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
+import { StashService } from './stash';
 
 /** What happened to uncommitted changes around a switch; `message` explains anything but a clean outcome. */
 export interface SwitchResult {
@@ -22,6 +23,7 @@ export class BranchService {
   constructor(
     private readonly git: GitCli,
     private readonly queue = new RepoQueue(),
+    private readonly stashes = new StashService(git, queue),
   ) {}
 
   /** null when `name` is a valid new branch or tag name, else git's reason. */
@@ -115,53 +117,29 @@ export class BranchService {
     }
 
     const label = `Forklift: changes from before switching to ${description}`;
-    await this.exec(root, ['stash', 'push', '--include-untracked', '-m', label]);
-    const stash = (await this.git.exec(['rev-parse', 'stash@{0}'], { cwd: root, readOnly: true })).stdout.trim();
+    const stash = await this.stashes.pushNow(root, { message: label, includeUntracked: true, stagedOnly: false });
+    if (!stash) {
+      await this.exec(root, ['switch', ...args]);
+      return { stash: 'none', message: null };
+    }
     try {
       await this.exec(root, ['switch', ...args]);
     } catch (error) {
       // The switch did not happen: put the changes back where they were.
-      await this.restore(root, stash);
+      await this.stashes.applyNow(root, stash, true);
       throw error;
     }
-    const result = await this.restore(root, stash);
-    if (result.stash === 'conflicts') {
-      result.message = `Switched to ${description}. Your uncommitted changes conflict with it in ${result.message}; resolve the conflicts. The changes are also kept in the stash "${label}".`;
-    } else if (result.stash === 'kept') {
-      result.message = `Switched to ${description}, but your uncommitted changes could not be put back (${result.message}). They are safe in the stash "${label}".`;
-    } else if (result.stash === 'restored-unstaged') {
-      result.message = `Switched to ${description}. Your changes are back, but what was staged is now unstaged (it did not apply to the index here).`;
+    const { outcome, detail } = await this.stashes.applyNow(root, stash, true);
+    switch (outcome) {
+      case 'applied':
+        return { stash: 'restored', message: null };
+      case 'applied-unstaged':
+        return { stash: 'restored-unstaged', message: `Switched to ${description}. Your changes are back, but what was staged is now unstaged (it did not apply to the index here).` };
+      case 'conflicts':
+        return { stash: 'conflicts', message: `Switched to ${description}. Your uncommitted changes conflict with it in ${detail}; resolve the conflicts. The changes are also kept in the stash "${label}".` };
+      case 'failed':
+        return { stash: 'kept', message: `Switched to ${description}, but your uncommitted changes could not be put back (${detail}). They are safe in the stash "${label}".` };
     }
-    return result;
-  }
-
-  /** Applies a stash (with its index if possible) and drops it when it applied cleanly. */
-  private async restore(root: string, stash: string): Promise<SwitchResult> {
-    let result = await this.apply(root, ['--index', stash]);
-    let outcome: SwitchResult['stash'] = 'restored';
-    if (result.exitCode !== 0 && /Try without --index|Conflicts in index/i.test(output(result))) {
-      result = await this.apply(root, [stash]);
-      outcome = 'restored-unstaged';
-    }
-    if (result.exitCode === 0) {
-      await this.drop(root, stash);
-      return { stash: outcome, message: null };
-    }
-    const conflicts = [...output(result).matchAll(/CONFLICT \([^)]*\): .*? in (.+)$/gm)].map((match) => match[1]!.trim());
-    if (conflicts.length) return { stash: 'conflicts', message: conflicts.join(', ') };
-    const reason = output(result).split('\n').map((line) => line.trim()).find((line) => /^(error|fatal):/.test(line)) ?? 'git stash apply failed';
-    return { stash: 'kept', message: reason.replace(/^(error|fatal):\s*/, '') };
-  }
-
-  private apply(root: string, args: string[]): Promise<GitCliResult> {
-    return this.git.exec(['stash', 'apply', ...args], { cwd: root, allowedExitCodes: [1] });
-  }
-
-  /** `git stash drop` takes a stash@{n} reference, so find the stash's position by its commit. */
-  private async drop(root: string, stash: string): Promise<void> {
-    const { stdout } = await this.git.exec(['stash', 'list', '--format=%H'], { cwd: root, readOnly: true });
-    const index = stdout.split('\n').indexOf(stash);
-    if (index >= 0) await this.exec(root, ['stash', 'drop', '-q', `stash@{${index}}`]);
   }
 
   private async resolve(root: string, ref: string): Promise<string> {
@@ -189,8 +167,6 @@ export class BranchService {
     }
   }
 }
-
-const output = (result: GitCliResult) => `${result.stdout}\n${result.stderr}`;
 
 function assertSha(sha: string): void {
   if (!SHA.test(sha)) throw new BranchError('A full commit hash is required');

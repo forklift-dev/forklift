@@ -58,6 +58,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     : undefined;
 
   const stagedCount = data.changes.filter((c) => c.staged).length;
+  const selectedStash = data.stashes.find((stash) => stash.sha === selectedCommit) ?? null;
 
   return (
     <main className="workspace">
@@ -98,6 +99,15 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           onContextMenu={(event, row) => {
             setSelectedCommit(row.hash);
             const short = row.hash.slice(0, 7);
+            if (row.stash) {
+              const label = `stash@{${row.stash.index}}`;
+              return openMenu(event, [
+                { label: 'Apply stash', onSelect: () => refActions.applyStash(row.hash) },
+                { label: 'Pop stash', onSelect: () => refActions.popStash(row.hash) },
+                'separator',
+                { label: 'Delete stash…', danger: true, onSelect: () => refActions.dropStash(row.hash, label) },
+              ]);
+            }
             openMenu(event, [
               { label: 'Check out this commit (detached)', disabled: row.hash === data.branch.oid, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
               'separator',
@@ -118,8 +128,22 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             sha={selectedCommit}
             selectedPath={diffTarget?.kind === 'commit' ? diffTarget.path : null}
             onOpenFile={(file) =>
-              setDiffTarget({ kind: 'commit', sha: selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
+              setDiffTarget({ kind: 'commit', sha: file.sourceSha ?? selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
             }
+            actions={selectedStash && (
+              <>
+                <span className="stash-label">stash@{`{${selectedStash.index}}`}</span>
+                <button type="button" onClick={() => refActions.applyStash(selectedStash.sha)}>
+                  Apply
+                </button>
+                <button type="button" onClick={() => refActions.popStash(selectedStash.sha)}>
+                  Pop
+                </button>
+                <button type="button" className="danger-text" onClick={() => refActions.dropStash(selectedStash.sha, `stash@{${selectedStash.index}}`)}>
+                  Delete
+                </button>
+              </>
+            )}
             onClose={() => {
               setSelectedCommit(null);
               setDiffTarget((target) => (target?.kind === 'commit' ? null : target));

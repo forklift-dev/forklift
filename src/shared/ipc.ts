@@ -33,6 +33,13 @@ export interface Commands {
   /** `message` null: a lightweight tag; otherwise an annotated one. */
   'tag:create': { args: [repo: string, name: string, sha: string, message: string | null]; result: void };
   'tag:delete': { args: [repo: string, name: string]; result: void };
+  /** Stashes uncommitted changes; resolves false when there was nothing to stash. */
+  'stash:push': { args: [repo: string, options: { message: string; includeUntracked: boolean; stagedOnly: boolean }]; result: boolean };
+  /** Applies a stash (by its sha) and keeps it; conflicts or failures become a notice. */
+  'stash:apply': { args: [repo: string, sha: string]; result: void };
+  /** Applies a stash and drops it if it applied cleanly (otherwise it is kept, with a notice). */
+  'stash:pop': { args: [repo: string, sha: string]; result: void };
+  'stash:drop': { args: [repo: string, sha: string]; result: void };
   /** Shows a folder picker; resolves to the chosen path or null when cancelled. */
   'repo:pick': { args: [purpose: 'open' | 'scan']; result: string | null };
   /** Opens the repository containing `path` in a tab (or switches to its tab); resolves to the tab id. */
@@ -100,6 +107,10 @@ const commandChannelSet = {
   'branch:delete': true,
   'tag:create': true,
   'tag:delete': true,
+  'stash:push': true,
+  'stash:apply': true,
+  'stash:pop': true,
+  'stash:drop': true,
   'repo:pick': true,
   'repo:open': true,
   'repo:activate': true,

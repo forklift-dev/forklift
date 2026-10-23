@@ -10,6 +10,8 @@ export interface HistoryRow {
   authorTime: number;
   subject: string;
   graph: GraphRowLayout;
+  /** Set for a stash, drawn above the commit it was made on; `parents` then holds only that commit. */
+  stash?: { index: number };
 }
 
 export interface HistoryPage {

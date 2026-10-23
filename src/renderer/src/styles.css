@@ -1366,3 +1366,43 @@ select {
   color: var(--fg);
   resize: vertical;
 }
+
+/* Stashes */
+.graph-cell .stash-node {
+  fill: var(--bg);
+  stroke: var(--lane);
+  stroke-width: 2;
+}
+
+.graph-cell .stash-edge {
+  stroke-dasharray: 3 2;
+}
+
+.commit-row.stash .subject {
+  font-style: italic;
+  color: var(--fg-muted);
+}
+
+.ref.stash-ref {
+  background: var(--bg-panel);
+  outline: 1px dashed var(--border);
+}
+
+.commit-details-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.stash-label {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--fg-muted);
+  margin-right: auto;
+}
+
+.untracked-note {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}

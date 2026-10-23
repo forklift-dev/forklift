@@ -25,6 +25,11 @@ export interface RefActions {
   renameBranch(name: string): void;
   deleteBranch(name: string): void;
   deleteTag(name: string): void;
+  /** Opens the stash dialog (message, untracked files, only staged). */
+  stash(): void;
+  applyStash(sha: string): void;
+  popStash(sha: string): void;
+  dropStash(sha: string, label: string): void;
   dialogs: ReactNode;
 }
 
@@ -98,6 +103,35 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       void (async () => {
         const ok = await confirm({ title: `Delete tag ${name}?`, detail: 'The tag is deleted in this repository only.', confirmLabel: 'Delete', danger: true });
         if (ok) await run(() => invoke('tag:delete', repo, name));
+      })(),
+
+    stash: () =>
+      void form({
+        title: 'Stash changes',
+        fields: [
+          { name: 'message', label: 'Message (optional)', placeholder: 'What these changes are' },
+          { name: 'untracked', label: 'Include untracked files', type: 'checkbox', initial: true },
+          { name: 'staged', label: 'Only staged changes', type: 'checkbox', initial: false },
+        ],
+        confirmLabel: 'Stash',
+        validate: async (values) => (values['untracked'] && values['staged'] ? 'Untracked files cannot be stashed together with only staged changes' : null),
+        submit: (values) =>
+          attempt(async () => {
+            const stashed = await invoke('stash:push', repo, {
+              message: String(values['message'] ?? ''),
+              includeUntracked: values['untracked'] === true,
+              stagedOnly: values['staged'] === true,
+            });
+            if (!stashed) throw new Error('There are no changes to stash');
+          }),
+      }),
+
+    applyStash: (sha) => void run(() => invoke('stash:apply', repo, sha)),
+    popStash: (sha) => void run(() => invoke('stash:pop', repo, sha)),
+    dropStash: (sha, label) =>
+      void (async () => {
+        const ok = await confirm({ title: `Delete ${label}?`, detail: 'The stashed changes are lost.', confirmLabel: 'Delete', danger: true });
+        if (ok) await run(() => invoke('stash:drop', repo, sha));
       })(),
 
     dialogs: (

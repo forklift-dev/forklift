@@ -11,7 +11,7 @@ interface LeftPanelProps {
   onSelectCommit(sha: string): void;
 }
 
-type SectionId = 'local' | 'remote' | 'tags';
+type SectionId = 'local' | 'remote' | 'tags' | 'stashes';
 
 function Section({ id, title, count, collapsed, onToggle, action, children }: {
   id: SectionId;
@@ -48,6 +48,7 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
   const local = data.branches.filter((branch) => match(branch.name));
   const remote = data.remoteBranches.filter((branch) => match(branch.name));
   const tags = data.tags.filter((tag) => match(tag.name));
+  const stashes = data.stashes.filter((stash) => match(stash.message));
   const remotes = data.remotes.length ? data.remotes : [...new Set(data.remoteBranches.map((branch) => branch.remote))];
 
   const addButton = (label: string, onClick: () => void) => (
@@ -175,6 +176,46 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit }: LeftPanel
               <span className="ref-name">{tag.name}</span>
             </li>
           ))}
+        </Section>
+
+        <Section
+          id="stashes"
+          title="Stashes"
+          count={data.stashes.length}
+          collapsed={Boolean(collapsed['stashes'])}
+          onToggle={toggle}
+          action={
+            <button type="button" className="icon-button" aria-label="Stash changes" title="Stash changes" onClick={actions.stash} disabled={data.changes.length === 0}>
+              <span className="codicon codicon-add" aria-hidden="true" />
+            </button>
+          }
+        >
+          {stashes.map((stash) => {
+            const label = `stash@{${stash.index}}`;
+            return (
+              <li
+                key={stash.sha}
+                className="ref-item"
+                data-stash={stash.index}
+                title={`${label}: ${stash.message}`}
+                onClick={() => onSelectCommit(stash.sha)}
+                onDoubleClick={() => actions.applyStash(stash.sha)}
+                onContextMenu={(event) =>
+                  openMenu(event, [
+                    { label: 'Apply stash', onSelect: () => actions.applyStash(stash.sha) },
+                    { label: 'Pop stash', onSelect: () => actions.popStash(stash.sha) },
+                    'separator',
+                    { label: 'Delete stash…', danger: true, onSelect: () => actions.dropStash(stash.sha, label) },
+                    'separator',
+                    { label: 'Copy stash message', onSelect: () => copyText(stash.message) },
+                  ])
+                }
+              >
+                <span className="codicon codicon-archive" aria-hidden="true" />
+                <span className="ref-name">{stash.message.replace(/^(WIP on|On) [^:]+: /, '')}</span>
+              </li>
+            );
+          })}
         </Section>
       </div>
     </aside>

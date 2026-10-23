@@ -2,7 +2,7 @@ import { Repository, type Revwalk } from '@axosoft/nodegit';
 import { GraphLayout } from '../../shared/graph';
 import type { HistoryPage, HistoryRow } from '../../shared/history';
 import { SORT } from '../git/libgit2';
-import { historyVersion, WALK_GLOBS } from '../git/service';
+import { historyVersion, readStashes, WALK_GLOBS } from '../git/service';
 
 /** Commits read per walk step; the first page of a large repository costs the topological sort anyway. */
 const CHUNK = 2000;
@@ -23,6 +23,8 @@ class HistoryCache {
   constructor(
     readonly version: string,
     private readonly walk: Revwalk,
+    /** Stash rows by the commit they were made on; each is placed right above it. */
+    private readonly stashesByBase: Map<string, HistoryRow[]> = new Map(),
   ) {}
 
   /** Walks until at least `count` rows exist or history ends; concurrent calls run one after another. */
@@ -31,6 +33,9 @@ class HistoryCache {
       while (!this.complete && this.rows.length < count) {
         const commits = await this.walk.commitWalk(CHUNK, { returnPlainObjects: true });
         for (const commit of commits) {
+          for (const stash of this.stashesByBase.get(commit.sha) ?? []) {
+            this.rows.push({ ...stash, graph: this.layout.next(stash.hash, stash.parents) });
+          }
           this.rows.push({
             hash: commit.sha,
             parents: commit.parents,
@@ -80,12 +85,30 @@ export class HistoryService {
 
   private async build(root: string): Promise<HistoryCache> {
     const repo = await Repository.open(root);
-    const version = await historyVersion(repo);
+    const stashes = await readStashes(repo);
+    const version = await historyVersion(repo, stashes);
+    const stashesByBase = new Map<string, HistoryRow[]>();
+    for (const stash of stashes) {
+      const commit = await repo.getCommit(stash.sha);
+      const author = commit.author();
+      const row: HistoryRow = {
+        hash: stash.sha,
+        // Only the base: the index and untracked-files commits of a stash are its internals.
+        parents: [stash.base],
+        authorName: author.name(),
+        authorEmail: author.email(),
+        authorTime: author.when().time(),
+        subject: stash.message,
+        graph: { column: 0, color: 0, edges: [], width: 1 },
+        stash: { index: stash.index },
+      };
+      stashesByBase.set(stash.base, [...(stashesByBase.get(stash.base) ?? []), row]);
+    }
     const walk = repo.createRevWalk();
     walk.sorting(SORT.TOPOLOGICAL, SORT.TIME);
     // A detached HEAD is not under any ref. Globs without matches (a new repository) push nothing.
     if (!repo.headUnborn()) walk.pushHead();
     for (const glob of WALK_GLOBS) walk.pushGlob(glob);
-    return new HistoryCache(version, walk);
+    return new HistoryCache(version, walk, stashesByBase);
   }
 }

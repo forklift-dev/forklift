@@ -10,6 +10,8 @@ export interface CommitFile {
   additions: number;
   deletions: number;
   binary: boolean;
+  /** Commit to diff for this file when it is not the shown commit itself (untracked files of a stash). */
+  sourceSha?: string;
 }
 
 export interface Signature {

@@ -5,6 +5,7 @@ import type { DiffTarget } from '../../shared/diff';
 import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
 import type { BranchService, SwitchResult } from '../git/branches';
+import type { ApplyOutcome, StashService } from '../git/stash';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
@@ -32,6 +33,7 @@ export interface HandlerDeps {
   scanner: RepoScanner;
   history: HistoryService;
   branches: BranchService;
+  stashes: StashService;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -146,7 +148,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -173,7 +175,47 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     if (result.message) store.dispatch(noticeAdded(result.message));
   };
 
+  const stashName = (root: string, sha: string) => {
+    const stash = repoData(root)?.stashes.find((s) => s.sha === sha);
+    return stash ? `stash@{${stash.index}} (${stash.message})` : 'the stash';
+  };
+  const reportApply = (what: string, popped: boolean, { outcome, detail }: ApplyOutcome) => {
+    if (outcome === 'applied-unstaged') store.dispatch(noticeAdded(`Applied ${what}, but what was staged in it is now unstaged.`));
+    else if (outcome === 'conflicts') store.dispatch(noticeAdded(`Applied ${what} with conflicts in ${detail}; resolve them.${popped ? ' The stash is kept.' : ''}`));
+    else if (outcome === 'failed') store.dispatch(noticeAdded(`Could not apply ${what}: ${detail}. The stash is unchanged.`));
+  };
+
   return {
+    async 'stash:push'(_ctx, repo, options) {
+      const root = tab(repo);
+      if (typeof options !== 'object' || options === null) throw new TypeError('options must be an object');
+      const { message, includeUntracked, stagedOnly } = options as Record<string, unknown>;
+      if (typeof message !== 'string' || message.length > 10_000 || /[\0\r\n]/.test(message)) throw new TypeError('message must be one line of text');
+      if (typeof includeUntracked !== 'boolean' || typeof stagedOnly !== 'boolean') throw new TypeError('flags must be booleans');
+      const sha = await thenRefresh(root, () => stashes.push(root, { message, includeUntracked, stagedOnly }));
+      return sha !== null;
+    },
+
+    async 'stash:apply'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      const what = stashName(root, sha);
+      reportApply(what, false, await thenRefresh(root, () => stashes.apply(root, sha, false)));
+    },
+
+    async 'stash:pop'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      const what = stashName(root, sha);
+      reportApply(what, true, await thenRefresh(root, () => stashes.apply(root, sha, true)));
+    },
+
+    async 'stash:drop'(_ctx, repo, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      await thenRefresh(root, () => stashes.drop(root, sha));
+    },
+
     async 'ref:validateName'(_ctx, repo, kind, name) {
       if (kind !== 'branch' && kind !== 'tag') throw new TypeError('kind must be branch or tag');
       return branches.invalidName(tab(repo), kind, parseName(name, kind));
@@ -262,6 +304,8 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'commit:details'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
+      // A stash is shown with the untracked files it saved.
+      if (repoData(root)?.stashes.some((stash) => stash.sha === sha)) return git.stashDetails(root, sha);
       return git.commitDetails(root, sha);
     },
 

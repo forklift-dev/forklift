@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
-import { Branch, Graph, Reference, Remote, Repository, type StatusFile } from '@axosoft/nodegit';
+import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
-import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, TagInfo } from '../../shared/state';
-import { readCommitDetails, readFileDiff } from './diff';
+import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, StashInfo, TagInfo } from '../../shared/state';
+import { readCommitDetails, readFileDiff, readStashDetails } from './diff';
 import { INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
 export interface GitService {
@@ -11,6 +11,8 @@ export interface GitService {
   resolveRoot(path: string): Promise<string>;
   read(root: string): Promise<RepoData>;
   commitDetails(root: string, sha: string): Promise<CommitDetails>;
+  /** A stash's changes against its base, with the untracked files it saved. */
+  stashDetails(root: string, sha: string): Promise<CommitDetails>;
   fileDiff(root: string, target: DiffTarget): Promise<FileDiff>;
 }
 
@@ -21,8 +23,10 @@ export const WALK_GLOBS = ['refs/heads/*', 'refs/remotes/*', 'refs/tags/*'];
  * Identifies what the history walk starts from (HEAD and the walked refs); it changes exactly when the
  * history list may change, so windows know to reload it.
  */
-export async function historyVersion(repo: Repository): Promise<string> {
+export async function historyVersion(repo: Repository, stashes?: StashInfo[]): Promise<string> {
   const lines = [repo.headUnborn() ? 'HEAD unborn' : `HEAD ${(await repo.head()).target().tostrS()}`];
+  // Stashes are drawn in the graph; dropping an older one changes only the list, not refs/stash.
+  for (const stash of stashes ?? (await readStashes(repo))) lines.push(`stash ${stash.sha}`);
   for (const ref of await repo.getReferences()) {
     if (ref.isSymbolic() || !(ref.isBranch() || ref.isRemote() || ref.isTag())) continue;
     lines.push(`${ref.name()} ${ref.target().tostrS()}`);
@@ -43,11 +47,12 @@ export function createGitService(): GitService {
     async read(root) {
       const repo = await Repository.open(root);
       const head = repo.headUnborn() ? null : await repo.head();
+      const stashes = await readStashes(repo);
       const [branch, refs, changes, version, remotes] = await Promise.all([
         readBranch(repo, head),
         readRefs(repo, head),
         readChanges(repo),
-        historyVersion(repo),
+        historyVersion(repo, stashes),
         Remote.list(repo) as Promise<string[]>,
       ]);
       return {
@@ -58,6 +63,7 @@ export function createGitService(): GitService {
         remoteBranches: refs.remoteBranches,
         tags: refs.tags,
         remotes: [...remotes].sort(),
+        stashes,
         refs: Object.fromEntries(refs.labels),
         historyVersion: version,
         changes,
@@ -67,6 +73,10 @@ export function createGitService(): GitService {
 
     async commitDetails(root, sha) {
       return readCommitDetails(await Repository.open(root), sha);
+    },
+
+    async stashDetails(root, sha) {
+      return readStashDetails(await Repository.open(root), sha);
     },
 
     async fileDiff(root, target) {
@@ -101,6 +111,20 @@ async function readBranch(repo: Repository, head: Reference | null): Promise<Bra
     info.behind = counts.behind;
   }
   return info;
+}
+
+/** The stash list, newest first (stash@{0}). */
+export async function readStashes(repo: Repository): Promise<StashInfo[]> {
+  const found: Array<{ index: number; message: string; sha: string }> = [];
+  await Stash.foreach(repo, (index: number, message: string, oid: Oid) => {
+    found.push({ index, message, sha: oid.tostrS() });
+  }).catch(() => 0);
+  const stashes: StashInfo[] = [];
+  for (const entry of found.sort((a, b) => a.index - b.index)) {
+    const commit = await repo.getCommit(entry.sha);
+    stashes.push({ ...entry, base: commit.parentId(0).tostrS(), time: commit.time() });
+  }
+  return stashes;
 }
 
 interface Refs {

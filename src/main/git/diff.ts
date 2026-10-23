@@ -76,6 +76,24 @@ export async function readCommitDetails(repo: Repository, sha: string): Promise<
   };
 }
 
+/**
+ * A stash commit's tree is the stashed working tree (its parents: the base, the index, the untracked files).
+ * Shown like a commit against the base, plus the untracked files of the third parent as added files.
+ */
+export async function readStashDetails(repo: Repository, sha: string): Promise<CommitDetails> {
+  const details = await readCommitDetails(repo, sha);
+  const commit = await repo.getCommit(sha);
+  if (commit.parentcount() < 3) return details;
+  const untracked = await commit.parent(2);
+  const extra = await readCommitDetails(repo, untracked.sha());
+  const known = new Set(details.files.map((file) => file.path));
+  for (const file of extra.files) {
+    if (!known.has(file.path)) details.files.push({ ...file, status: 'added', sourceSha: untracked.sha() });
+  }
+  details.files.sort((a, b) => a.path.localeCompare(b.path));
+  return details;
+}
+
 const missing = (path: string): FileVersion => ({
   path,
   exists: false,

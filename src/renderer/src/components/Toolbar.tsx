@@ -8,9 +8,11 @@ interface ToolbarProps {
   onClose(): void;
   onOpenTerminal(): void;
   onPreferences(): void;
+  onStash(): void;
+  onPop(): void;
 }
 
-export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences }: ToolbarProps) {
+export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences, onStash, onPop }: ToolbarProps) {
   const branch = repo?.branch;
   return (
     <header className="toolbar">
@@ -34,6 +36,12 @@ export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal
         </button>
         <button type="button" onClick={onRefresh} disabled={busy || !repo}>
           Refresh
+        </button>
+        <button type="button" onClick={onStash} disabled={busy || !repo || repo.changes.length === 0} title="Stash all changes, untracked files included">
+          Stash
+        </button>
+        <button type="button" onClick={onPop} disabled={busy || !repo || repo.stashes.length === 0} title={repo?.stashes[0] ? `Pop ${repo.stashes[0].message}` : 'No stashes'}>
+          Pop
         </button>
         <button type="button" onClick={onOpenTerminal} disabled={!repo}>
           Terminal

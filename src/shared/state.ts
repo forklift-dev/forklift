@@ -56,6 +56,18 @@ export interface TagInfo {
   annotated: boolean;
 }
 
+export interface StashInfo {
+  /** Position: stash@{index}. Changes as stashes come and go; operations use `sha`. */
+  index: number;
+  sha: string;
+  /** Commit the changes were stashed on. */
+  base: string;
+  /** "On main: message" or "WIP on main: <commit>". */
+  message: string;
+  /** Unix time in seconds. */
+  time: number;
+}
+
 export interface RepoData {
   root: string;
   name: string;
@@ -64,6 +76,8 @@ export interface RepoData {
   remoteBranches: RemoteBranch[];
   tags: TagInfo[];
   remotes: string[];
+  /** Newest first. */
+  stashes: StashInfo[];
   /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
   refs: Record<string, string[]>;
   /**

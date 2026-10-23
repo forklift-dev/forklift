@@ -76,7 +76,7 @@
 | [T-032](tasks/stage-3-history/T-032-commit-ops.md) | Cherry-pick, revert, reset, checkout коммита | todo |
 | [T-033](tasks/stage-3-history/T-033-merge-rebase.md) | Merge и rebase веток | todo |
 | [T-034](tasks/stage-3-history/T-034-interactive-rebase.md) | Интерактивный rebase | todo |
-| [T-035](tasks/stage-3-history/T-035-stash.md) | Stash | todo |
+| [T-035](tasks/stage-3-history/T-035-stash.md) | Stash | review |
 | [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | todo |
 
 ### Этап 4 — Репозитории

@@ -141,6 +141,8 @@ export function App() {
         onClose={() => activeId && closeTab(activeId)}
         onOpenTerminal={() => activeId && run(() => invoke('repo:openTerminal', activeId))}
         onPreferences={() => setScreen('preferences')}
+        onStash={() => activeId && run(() => invoke('stash:push', activeId, { message: '', includeUntracked: true, stagedOnly: false }))}
+        onPop={() => activeId && data?.stashes[0] && run(() => invoke('stash:pop', activeId, data.stashes[0]!.sha))}
       />
       {notices.length > 0 && (
         <div className="error-banner notices" role="alert">
