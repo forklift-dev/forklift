@@ -17,11 +17,6 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 // The diff computation runs in this worker; it is bundled as a 'self' asset, so the CSP stays strict.
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 
-const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-const applyTheme = () => monaco.editor.setTheme(darkQuery.matches ? 'vs-dark' : 'vs');
-applyTheme();
-darkQuery.addEventListener('change', applyTheme);
-
 /** Code font when the user has not chosen one; Monaco measures it, so CSS variables cannot be used here. */
 export const CODE_FONT = "ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace";
 

@@ -39,7 +39,8 @@ import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected, noticeAdded, promptAdded, promptRemoved } from './store';
+import { createAppStore, gitCliDetected, noticeAdded, promptAdded, promptRemoved, userThemesRead } from './store';
+import { ThemeLibrary } from './themes';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
@@ -73,14 +74,17 @@ async function start() {
   const store = createAppStore({ version: app.getVersion(), platform: process.platform }, { git });
   const replication = startReplication(store);
   const runner = new ProcessRunner();
+  const themes = new ThemeLibrary(join(app.getPath('userData'), 'themes'), (state) => store.dispatch(userThemesRead(state)));
   const settings = new SettingsService({
     store,
     file: new SettingsFile(join(app.getPath('userData'), 'settings.json')),
     runner,
     isOpenRepo: (root) => Boolean(store.getState().repos.byId[root]),
+    themeExists: (id) => themes.exists(id),
   });
-  // Before the window exists, so its first state snapshot already has the user's settings.
-  await settings.load();
+  // Before the window exists, so its first state snapshot already has the user's settings and themes.
+  await Promise.all([settings.load(), themes.start().catch((error: unknown) => console.error('[themes] could not read user themes:', error))]);
+  app.on('will-quit', () => themes.stop());
   const gitCli = new GitCli(runner, () => settings.values['git.executable'] || 'git');
   const tools = new ExternalTools({ runner, openPath: (path) => shell.openPath(path) });
   const diffTools = new DiffTools(gitCli, runner);

@@ -8,6 +8,7 @@ import {
   type SettingKey,
   type SettingsValues,
 } from '../../shared/settings';
+import { APP_THEME, SYSTEM_THEME, THEME_ID } from '../../shared/themes';
 import { findExecutable } from '../external/which';
 import type { Runner } from '../process/types';
 import type { AppStore } from '../store';
@@ -20,6 +21,8 @@ export interface SettingsServiceDeps {
   runner: Pick<Runner, 'environment'>;
   /** Whether overrides may be stored for this repository root (it is open in the app). */
   isOpenRepo(root: string): boolean;
+  /** Whether a theme with this id exists (built-in or a user theme file). */
+  themeExists?(id: string): boolean;
 }
 
 const MAX_PATCH_KEYS = 64;
@@ -67,12 +70,21 @@ export class SettingsService {
       if (repo !== undefined && !REPO_SETTING_KEYS.includes(key)) throw new TypeError(`${key} cannot be set per repository`);
       const parsed = value === null ? null : parseSettingValue(key, value);
       if (parsed !== null) await this.checkProgram(key, parsed);
-      if (settingField(key).type === 'string' && (settingField(key) as { kind?: string }).kind === 'folder' && parsed && !isAbsolute(parsed as string)) {
-        throw new TypeError('Enter a full folder path (or leave it empty)');
-      }
+      if (parsed !== null) this.checkKind(key, parsed);
       (change.values as Record<SettingKey, unknown>)[key] = parsed;
     }
     this.deps.store.dispatch(settingsChanged(change));
+  }
+
+  private checkKind(key: SettingKey, value: unknown): void {
+    const field = settingField(key);
+    if (field.type !== 'string') return;
+    if (field.kind === 'folder' && value && !isAbsolute(value as string)) throw new TypeError('Enter a full folder path (or leave it empty)');
+    if (field.kind === 'theme' || field.kind === 'editorTheme') {
+      const special = field.kind === 'theme' ? SYSTEM_THEME : APP_THEME;
+      const id = value as string;
+      if (id !== special && (!THEME_ID.test(id) || !(this.deps.themeExists?.(id) ?? true))) throw new TypeError(`There is no theme "${id}"`);
+    }
   }
 
   /** Programs named in settings must exist when chosen; later they may disappear and fail with a clear error. */

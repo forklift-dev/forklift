@@ -139,6 +139,8 @@ export interface Commands {
   'settings:dismissProblems': { args: []; result: void };
   /** Shows a file picker for a program; resolves to its path or null when cancelled. */
   'settings:browseExecutable': { args: []; result: string | null };
+  /** Opens userData/themes in the file manager. */
+  'themes:openFolder': { args: []; result: void };
   /** Editors, terminals and git diff/merge tools found on this machine (git config as seen from `repo`). */
   'tools:detect': { args: [repo: string | null]; result: DetectedTools };
   /** Runs the tool chosen for `repo` (or globally) on sample files; resolves with a description. */
@@ -232,6 +234,7 @@ const commandChannelSet = {
   'settings:update': true,
   'settings:dismissProblems': true,
   'settings:browseExecutable': true,
+  'themes:openFolder': true,
   'tools:detect': true,
   'tools:test': true,
   'tools:writeGitConfig': true,

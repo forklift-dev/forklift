@@ -1,5 +1,6 @@
 // Application state owned by the main process and replicated to every renderer.
 import type { CloneActivity } from './repos';
+import type { UserThemesState } from './themes';
 import type { SettingsState } from './settings';
 
 export type ChangeKind =
@@ -157,6 +158,8 @@ export interface AppInfo {
   prompts: AskPrompt[];
   /** The clone running from the Repositories screen. */
   clone: CloneActivity | null;
+  /** Themes from userData/themes. */
+  userThemes: UserThemesState;
 }
 
 /** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */

@@ -22,6 +22,7 @@ async function setup() {
     file,
     runner: { environment: async () => ({ PATH: dir }) },
     isOpenRepo: (root) => root === '/repo',
+    themeExists: (id) => ['polar', 'user:mine'].includes(id),
   });
   await service.load();
   const saved = async () => {
@@ -64,11 +65,23 @@ describe('SettingsService', () => {
     [{ values: { 'git.executable': 'relative/git' } }, 'full path'],
     [{ values: { 'git.executable': '/no/such/git' } }, 'was not found'],
     [{ values: { 'general.repositoriesFolder': 'projects' } }, 'full folder path'],
+    [{ values: { 'ui.theme': 'user:gone' } }, 'There is no theme "user:gone"'],
+    [{ values: { 'ui.theme': 'app' } }, 'There is no theme'],
+    [{ values: { 'ui.editorTheme': 'system' } }, 'There is no theme'],
+    [{ values: { 'ui.theme': '../x' } }, 'There is no theme'],
   ])('rejects %j', async (patch, message) => {
     const { service, store } = await setup();
     const before = store.getState().settings;
     await expect(service.update(patch)).rejects.toThrow(message);
     expect(store.getState().settings).toBe(before);
+  });
+
+  it('accepts existing themes and the special values', async () => {
+    const { service, store } = await setup();
+    await service.update({ values: { 'ui.theme': 'user:mine', 'ui.editorTheme': 'polar' } });
+    expect(store.getState().settings.values).toMatchObject({ 'ui.theme': 'user:mine', 'ui.editorTheme': 'polar' });
+    await service.update({ values: { 'ui.theme': 'system', 'ui.editorTheme': 'app' } });
+    expect(store.getState().settings.values).toMatchObject({ 'ui.theme': 'system', 'ui.editorTheme': 'app' });
   });
 
   it('accepts programs that exist, by name in PATH or by full path', async () => {

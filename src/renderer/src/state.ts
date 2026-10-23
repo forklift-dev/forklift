@@ -27,7 +27,7 @@ window.forklift.onReplicaMessage((message) => {
   for (const listener of listeners) listener();
 });
 
-function subscribe(listener: () => void) {
+export function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

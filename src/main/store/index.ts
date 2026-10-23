@@ -4,11 +4,12 @@ import { librarySlice } from './librarySlice';
 import { reposSlice } from './reposSlice';
 import { settingsSlice } from './settingsSlice';
 import type { CloneActivity } from '../../shared/repos';
+import type { UserThemesState } from '../../shared/themes';
 import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] } } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -29,10 +30,13 @@ const appSlice = createSlice({
     cloneActivity: (state, action: PayloadAction<CloneActivity | null>) => {
       state.clone = action.payload;
     },
+    userThemesRead: (state, action: PayloadAction<UserThemesState>) => {
+      state.userThemes = action.payload;
+    },
   },
 });
 
-export const { cloneActivity, gitCliDetected, noticeAdded, noticesDismissed, promptAdded, promptRemoved } = appSlice.actions;
+export const { cloneActivity, gitCliDetected, noticeAdded, noticesDismissed, promptAdded, promptRemoved, userThemesRead } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,

@@ -25,6 +25,7 @@ export type ToolKind = AppToolKind | GitToolKind;
 
 export const SETTINGS_SECTIONS = {
   general: 'General',
+  ui: 'UI',
   git: 'Git',
   diff: 'Diff',
   editor: 'Editor',
@@ -45,7 +46,7 @@ export type SettingField =
   | (FieldBase & { type: 'boolean'; default: boolean })
   | (FieldBase & { type: 'integer'; default: number; min: number; max: number })
   | (FieldBase & { type: 'enum'; default: string; options: readonly { value: string; label: string }[] })
-  | (FieldBase & { type: 'string'; default: string; maxLength: number; placeholder?: string; kind?: 'executable' | 'folder' })
+  | (FieldBase & { type: 'string'; default: string; maxLength: number; placeholder?: string; kind?: 'executable' | 'folder' | 'theme' | 'editorTheme' })
   | (FieldBase & { type: 'appTool'; default: AppToolSetting; tool: AppToolKind })
   | (FieldBase & { type: 'gitTool'; default: GitToolSetting; tool: GitToolKind });
 
@@ -81,6 +82,24 @@ export const SETTING_FIELDS = {
     placeholder: 'Home folder',
     label: 'Folder for new repositories',
     description: 'Where Clone and Init suggest creating repositories.',
+  },
+  'ui.theme': {
+    section: 'ui',
+    type: 'string',
+    kind: 'theme',
+    default: 'system',
+    maxLength: 110,
+    label: 'Theme',
+    description: 'Colors of the whole app. "System" follows the light or dark mode of your system.',
+  },
+  'ui.editorTheme': {
+    section: 'ui',
+    type: 'string',
+    kind: 'editorTheme',
+    default: 'app',
+    maxLength: 110,
+    label: 'Editor theme',
+    description: 'Colors of diffs, blame and the conflict editor.',
   },
   'git.executable': {
     section: 'git',

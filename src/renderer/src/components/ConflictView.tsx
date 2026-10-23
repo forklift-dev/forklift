@@ -116,7 +116,7 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
       const found = parseConflicts(model.getLinesContent().join('\n'));
       setBlocks(found);
       const lineDecoration = (from: number, to: number, className: string) =>
-        from <= to ? [{ range: new monaco.Range(from, 1, to, 1), options: { isWholeLine: true, className, overviewRuler: { color: '#e5a50a', position: monaco.editor.OverviewRulerLane.Full } } }] : [];
+        from <= to ? [{ range: new monaco.Range(from, 1, to, 1), options: { isWholeLine: true, className, overviewRuler: { color: { id: 'editorOverviewRuler.warningForeground' }, position: monaco.editor.OverviewRulerLane.Full } } }] : [];
       decorations.set(
         found.flatMap((block) => {
           const oursEnd = (block.baseLine || block.separatorLine) - 1;

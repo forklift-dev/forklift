@@ -14,6 +14,7 @@ import { useCommand } from '../../useCommand';
 import { useConfirm } from '../ConfirmDialog';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
+import { ThemePicker, UserThemesNote } from './ThemePicker';
 import { AppToolPicker, GitToolPicker } from './ToolPickers';
 
 const IDENTITY_TERMS = 'commit author identity user name email';
@@ -76,6 +77,7 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
       case 'integer':
         return <TextControl {...props} />;
       case 'string':
+        if (field.kind === 'theme' || field.kind === 'editorTheme') return <ThemePicker {...props} />;
         return <TextControl {...props} browse={field.kind} />;
       case 'appTool':
         return <AppToolPicker {...props} kind={field.tool} detected={detected.data} confirm={confirm} />;
@@ -92,7 +94,7 @@ export function Preferences({ repo, onClose }: PreferencesProps) {
         settingKey={key}
         repo={repoRoot}
         render={render(key)}
-        extra={key === 'git.executable' ? <GitStatus /> : undefined}
+        extra={key === 'git.executable' ? <GitStatus /> : key === 'ui.theme' ? <UserThemesNote /> : undefined}
       />
     ));
 

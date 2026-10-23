@@ -1,5 +1,5 @@
 import { isAbsolute } from 'node:path';
-import { BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from 'electron';
+import { BrowserWindow, dialog, shell, type OpenDialogOptions, type WebContents } from 'electron';
 import type { CheckoutTarget } from '../../shared/branches';
 import type { DiffTarget } from '../../shared/diff';
 import type { HistoryFilter, HistorySearch } from '../../shared/history';
@@ -729,6 +729,13 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'settings:browseExecutable'({ sender }) {
       return showOpenDialog(sender, { title: 'Choose program', properties: ['openFile', 'dontAddToRecent'] });
+    },
+
+    async 'themes:openFolder'() {
+      const folder = store.getState().app.userThemes.folder;
+      if (!folder) throw new Error('The themes folder is not available');
+      const failure = await shell.openPath(folder);
+      if (failure) throw new Error(failure);
     },
 
     async 'tools:detect'(_ctx, repo) {

@@ -8,6 +8,7 @@ import type { TerminalEvent } from '../../../shared/terminal';
 import { invoke } from '../api';
 import { CODE_FONT } from '../monaco/setup';
 import { useAppState } from '../state';
+import { terminalTheme, THEME_EVENT } from '../theme';
 
 // One subscription for all terminals; events are routed by terminal id.
 const listeners = new Map<number, (event: TerminalEvent) => void>();
@@ -29,12 +30,6 @@ function onTerminalEvent(id: number, listener: (event: TerminalEvent) => void): 
   return () => listeners.delete(id);
 }
 
-function themeColors() {
-  const style = getComputedStyle(document.documentElement);
-  const color = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
-  return { background: color('--bg', '#1b1d22'), foreground: color('--fg', '#e6e8ec'), cursor: color('--accent', '#6b9cf5'), selectionBackground: color('--selection', '#2c3a55') };
-}
-
 /** One xterm.js terminal connected to a shell in the pty host. */
 function TerminalView({ repo, visible, onTitle, onExit }: { repo: string; visible: boolean; onTitle(title: string): void; onExit(code: number): void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -54,7 +49,7 @@ function TerminalView({ repo, visible, onTitle, onExit }: { repo: string; visibl
       cursorBlink: true,
       allowProposedApi: false,
       scrollback: 5000,
-      theme: themeColors(),
+      theme: terminalTheme(),
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -93,10 +88,13 @@ function TerminalView({ repo, visible, onTitle, onExit }: { repo: string; visibl
       (error: unknown) => terminal.write(`\x1b[31m${error instanceof Error ? error.message : String(error)}\x1b[0m\r\n`),
     );
     terminal.onTitleChange((title) => callbacks.current.onTitle(title));
+    const repaint = () => (terminal.options.theme = terminalTheme());
+    window.addEventListener(THEME_EVENT, repaint);
     const observer = new ResizeObserver(() => resize());
     observer.observe(ref.current!);
     return () => {
       disposed = true;
+      window.removeEventListener(THEME_EVENT, repaint);
       observer.disconnect();
       unsubscribe();
       if (id !== null) void invoke('terminal:kill', id).catch(() => {});
