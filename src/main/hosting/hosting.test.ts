@@ -1,4 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -67,12 +69,32 @@ describe.each(['forgejo', 'gitverse'] as const)('HostingClient (%s)', (provider)
     expect((await client.issue('ada', 'demo', 3)).discussion).toEqual([comment]);
   });
 
+  it('does not follow redirects with the token, and names the address they lead to', async () => {
+    const seen: string[] = [];
+    const moved = createServer((req, res) => {
+      seen.push(String(req.headers.authorization ?? ''));
+      res.writeHead(301, { Location: `${served.url}${req.url}` }).end();
+    });
+    await new Promise<void>((resolve) => moved.listen(0, '127.0.0.1', resolve));
+    try {
+      const old = `http://127.0.0.1:${(moved.address() as AddressInfo).port}`;
+      await expect(new HostingClient(provider, old, 'tok-ada', fetch).user()).rejects.toThrow(`sends requests on to ${served.url}: add the account with that address`);
+      expect(served.requests.some((request) => request.authorized)).toBe(false);
+      expect(seen[0]).not.toBe('');
+      expect(seen[1]).toBe('');
+    } finally {
+      await new Promise((resolve) => moved.close(resolve));
+    }
+  });
+
   it('explains failures', async () => {
     await expect(connect('wrong').user()).rejects.toThrow(/refused the token/);
     await expect(connect().pull('ada', 'demo', 99)).rejects.toThrow(/Not found on the server: The target/);
     await expect(new HostingClient(provider, 'http://127.0.0.1:1', 'tok-ada', fetch).user()).rejects.toThrow(/Could not reach 127\.0\.0\.1:1/);
     const html: Fetch = async () => ({ status: 200, ok: true, headers: { get: () => null }, text: async () => '<html>' });
     await expect(connect('t', html).user()).rejects.toThrow(/not answer with JSON/);
+    const challenge: Fetch = async () => ({ status: 202, ok: true, headers: { get: () => null }, text: async () => "<html><head><title>Making sure you're not a bot!</title>" });
+    await expect(connect('t', challenge).user()).rejects.toThrow(/bot check page/);
     const silent: Fetch = (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new Error('aborted'))));
     await expect(connect('t', silent, 20).user()).rejects.toThrow(/did not answer in time/);
   });

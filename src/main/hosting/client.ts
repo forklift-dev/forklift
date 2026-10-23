@@ -1,6 +1,9 @@
 import type { HostingComment, HostingProvider, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary } from '../../shared/hosting';
 
-export type Fetch = (url: string, init: { method?: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{
+export type Fetch = (
+  url: string,
+  init: { method?: string; headers: Record<string, string>; body?: string; signal?: AbortSignal; redirect?: 'error' | 'manual' },
+) => Promise<{
   status: number;
   ok: boolean;
   headers: { get(name: string): string | null };
@@ -170,20 +173,45 @@ export class HostingClient {
     return ((await this.request(`/repos/${seg(owner)}/${seg(name)}/issues/${number}/comments`)) as Json[]).map(toComment);
   }
 
+  /**
+   * Where `url` redirects to, asked again without the token (a failed request may have been a redirect, e.g.
+   * an old address of the server): the server address to use instead, or null.
+   */
+  private async redirectTarget(url: string): Promise<string | null> {
+    try {
+      const probe = await this.fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(this.timeoutMs), redirect: 'manual' });
+      const location = probe.status >= 300 && probe.status < 400 ? probe.headers.get('Location') : null;
+      if (!location) return null;
+      const target = new URL(location, url);
+      // The same API path on the new server: its address is what comes before it; otherwise just its origin.
+      const apiPath = new URL(url).pathname;
+      const prefix = target.pathname.endsWith(apiPath) ? target.pathname.slice(0, -apiPath.length) : '';
+      return `${target.origin}${prefix}`;
+    } catch {
+      return null;
+    }
+  }
+
   private async request(path: string, method = 'GET', body?: unknown): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response;
+    const url = `${this.style.base(this.server)}${path}`;
     try {
-      response = await this.fetch(`${this.style.base(this.server)}${path}`, {
+      response = await this.fetch(url, {
         method,
         headers: { ...this.style.headers(this.token), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
         ...(body !== undefined && { body: JSON.stringify(body) }),
         signal: controller.signal,
+        // The token is never sent on to wherever a redirect points.
+        redirect: 'error',
       });
     } catch (error) {
       const host = new URL(this.server).host;
-      throw new HostingError(controller.signal.aborted ? `${host} did not answer in time` : `Could not reach ${host}: ${error instanceof Error ? error.message : String(error)}`);
+      if (controller.signal.aborted) throw new HostingError(`${host} did not answer in time`);
+      const moved = await this.redirectTarget(url);
+      if (moved) throw new HostingError(`${host} sends requests on to ${moved}: add the account with that address`);
+      throw new HostingError(`Could not reach ${host}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       clearTimeout(timer);
     }
@@ -207,7 +235,11 @@ export class HostingClient {
     try {
       return JSON.parse(text);
     } catch {
-      throw new HostingError('The server did not answer with JSON: is this the right server address for the service?');
+      throw new HostingError(
+        /<title>[^<]*bot/i.test(text)
+          ? 'The server answered with a bot check page instead of its API (its bot protection let no app through)'
+          : 'The server did not answer with JSON: is this the right server address for the service?',
+      );
     }
   }
 }

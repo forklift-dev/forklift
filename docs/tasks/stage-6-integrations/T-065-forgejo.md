@@ -83,6 +83,13 @@ updated: 2026-10-23
   Метки при создании issue не-участником Forgejo игнорирует сам (это не ошибка приложения). Осталась проверка на
   сервере владельца.
 - 2026-10-23: клиент обобщён под GitVerse (T-066): `src/main/hosting/client.ts` (`HostingClient`).
+- 2026-10-23: на сервере владельца (`v16.next.forgejo.org`) добавление падало с «The server did not answer with
+  JSON»: перед сервером защита от ботов Anubis, и на браузерный User-Agent Electron она отдаёт страницу проверки
+  (202, HTML). Запросы к API теперь идут с `User-Agent: Forklift/<версия>`, а страница проверки распознаётся
+  отдельным сообщением. Запрос с токеном больше не идёт за перенаправлениями (`redirect: 'error'`); куда ведёт
+  адрес, узнаётся отдельным запросом без токена (через `fetch` Node, так как `net.fetch` Electron не отдаёт
+  `Location`), и ошибка подсказывает правильный адрес (`next.forgejo.org` → `https://try.next.forgejo.org`).
+  Проверено вживую на `v16.next.forgejo.org` (неверный токен даёт «refused the token») и на `next.forgejo.org`.
 
 ## Промт
 

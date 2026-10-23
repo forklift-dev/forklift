@@ -134,7 +134,14 @@ async function start() {
     accounts: () => settings.values['integrations.accounts'],
     saveAccounts: (accounts) => settings.update({ values: { 'integrations.accounts': accounts } }),
     tokens: new TokenStore(join(app.getPath('userData'), 'hosting-tokens.json'), secretBox),
-    fetch: (url, init) => net.fetch(url, init),
+    // Chromium's network stack (system proxy and certificates). Only the token-less probe of where a redirect
+    // leads uses Node's fetch: Electron's cannot report a redirect's Location.
+    // An API client's own User-Agent: with Chromium's, servers behind bot protection (Anubis on
+    // next.forgejo.org) answer with a challenge page instead of JSON.
+    fetch: (url, init) => {
+      const request = { ...init, headers: { 'User-Agent': `Forklift/${app.getVersion()}`, ...init.headers } };
+      return init.redirect === 'manual' ? globalThis.fetch(url, request) : net.fetch(url, request);
+    },
   });
   // git asks the saved passwords first, then an account's token for its server (never kept twice).
   const gitCredentials = {
