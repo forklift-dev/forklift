@@ -1,0 +1,52 @@
+# Packages for every OS/CPU on local (self-hosted) runners, run by hand. Native modules cannot be
+# cross-compiled, so each target needs its own machine with the toolchain from README → Requirements and a
+# runner registered with these labels (host mode: `linux_x64:host`, …). GitVerse's cloud runner is only
+# ubuntu x64 in Docker and keeps 500 MB of artifacts in total, so packages are built here.
+name: Release build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.labels }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, labels: [self-hosted, linux_x64], arch: x64 }
+          - { name: linux-arm64, labels: [self-hosted, linux_arm64], arch: arm64 }
+          - { name: macos-arm64, labels: [self-hosted, macos_arm64], arch: arm64 }
+          - { name: macos-x64, labels: [self-hosted, macos_x64], arch: x64 }
+          - { name: windows-x64, labels: [self-hosted, windows_x64], arch: x64 }
+          - { name: windows-arm64, labels: [self-hosted, windows_arm64], arch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      # OpenSSL stays on the runner between builds (outside node_modules, which npm ci deletes).
+      - name: Install (compiles the native modules)
+        shell: bash
+        run: FORKLIFT_OPENSSL_CACHE="$HOME/.cache/forklift-openssl" npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      - name: Package
+        shell: bash
+        run: npm run dist -- --${{ matrix.arch }} --publish never
+
+      - name: Check fuses of the packaged app
+        run: node scripts/check-fuses.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forklift-${{ matrix.name }}
+          path: |
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.exe
+          if-no-files-found: error
+          retention-days: 7

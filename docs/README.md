@@ -36,7 +36,7 @@
 |---|---|---|
 | [T-001](tasks/stage-0-foundation/T-001-project-skeleton.md) | Каркас приложения | review |
 | [T-002](tasks/stage-0-foundation/T-002-nodegit-electron-build.md) | Сборка nodegit из исходников под Electron 45 | done |
-| [T-003](tasks/stage-0-foundation/T-003-ci-matrix.md) | CI: сборка и тесты на 6 платформах | todo |
+| [T-003](tasks/stage-0-foundation/T-003-ci-matrix.md) | CI: сборка и тесты на 6 платформах | blocked |
 | [T-004](tasks/stage-0-foundation/T-004-signing-notarization.md) | Подпись и нотаризация дистрибутивов | draft |
 | [T-005](tasks/stage-0-foundation/T-005-e2e-harness.md) | Сквозные проверки в репозитории | review |
 

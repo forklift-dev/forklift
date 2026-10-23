@@ -2,7 +2,7 @@
 // nodegit has no prebuilt binaries for current Electron releases, so every platform
 // (and every CPU architecture) compiles it locally or on its own CI runner.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -44,12 +44,20 @@ if (patchedFiles > 0) console.log(`Patched v8::External::Value() calls in ${patc
 // own script. We run it once up front instead of letting the gyp graph do it, because:
 // - parallel compile jobs do not wait for that gyp action ("openssl/des.h: No such file");
 // - its version check misparses 3.0.18 as 3.0.1 and rebuilds OpenSSL on every run.
-if (force || !existsSync(join(openSSLDir, 'include', 'openssl', 'ssl.h'))) {
+// CI keeps the built OpenSSL outside node_modules (npm ci wipes it): FORKLIFT_OPENSSL_CACHE names that folder.
+const openSSLCache = process.env.FORKLIFT_OPENSSL_CACHE;
+const hasOpenSSL = (dir) => existsSync(join(dir, 'include', 'openssl', 'ssl.h'));
+if (!force && openSSLCache && hasOpenSSL(openSSLCache) && !hasOpenSSL(openSSLDir)) {
+  cpSync(openSSLCache, openSSLDir, { recursive: true });
+  console.log(`OpenSSL restored from ${openSSLCache}`);
+}
+if (force || !hasOpenSSL(openSSLDir)) {
   const result = spawnSync(process.execPath, [join(nodegitDir, 'utils', 'acquireOpenSSL.mjs')], {
     cwd: nodegitDir,
     stdio: 'inherit',
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
+  if (openSSLCache) cpSync(openSSLDir, openSSLCache, { recursive: true });
 }
 
 // Inherited by node-gyp: a preset OpenSSL dir makes nodegit skip its own acquire action.

@@ -1,0 +1,49 @@
+# Checks on every push, on GitVerse's cloud runner: an ubuntu Docker container (the only cloud runner),
+# 30 minutes per job at most. Other platforms need local runners: see release.yaml.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The container may run as root without sudo. Electron's runtime libraries for the end-to-end tests too.
+      - name: Toolchain
+        run: |
+          SUDO=$(command -v sudo || true)
+          $SUDO apt-get update
+          DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y --no-install-recommends \
+            build-essential python3 perl libkrb5-dev git git-lfs xvfb xauth \
+            libgtk-3-0 libnss3 libasound2t64 libgbm1 libxss1 libxtst6 libsecret-1-0 libnotify4
+          git lfs install
+
+      # nodegit pins its OpenSSL (utils/acquireOpenSSL.mjs); built OpenSSL is kept outside node_modules,
+      # which npm ci deletes, and restored by scripts/rebuild-native.mjs.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/forklift-openssl
+          key: linux-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: linux-x64-
+
+      - name: Install (compiles the native modules)
+        run: FORKLIFT_OPENSSL_CACHE="$HOME/.cache/forklift-openssl" npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # tests/e2e/run.mjs starts its own xvfb.
+      - run: npm run test:e2e
