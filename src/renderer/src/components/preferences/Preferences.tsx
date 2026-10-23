@@ -12,6 +12,7 @@ import { invoke } from '../../api';
 import { useAppState } from '../../state';
 import { useCommand } from '../../useCommand';
 import { useConfirm } from '../ConfirmDialog';
+import { AccountsEditor } from './Accounts';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
 import { KeybindingsEditor } from './KeybindingsEditor';
@@ -92,6 +93,8 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
         return <KeybindingsEditor {...props} />;
       case 'profiles':
         return <ProfilesEditor {...props} />;
+      case 'accounts':
+        return <AccountsEditor {...(props as ControlProps<'integrations.accounts'>)} />;
     }
   };
 

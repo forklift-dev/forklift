@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { folderNameProblem, repoNameFromUrl, type CreateDefaults } from '../../../shared/repos';
 import { invoke } from '../api';
 import { useAppState } from '../state';
+import { HostingRepoPicker } from './HostingRepoPicker';
 
 export type NewRepoKind = 'clone' | 'init';
 
@@ -118,6 +119,7 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
       >
         <h2 id={`${id}-title`}>{kind === 'clone' ? 'Clone a repository' : 'Create a repository'}</h2>
         <fieldset disabled={busy} className="new-repo-fields">
+          {kind === 'clone' && <HostingRepoPicker selectedUrl={url.trim()} onPick={(repo) => setUrl(repo.cloneUrl)} />}
           {kind === 'clone' && (
             <label className="form-field">
               Repository URL

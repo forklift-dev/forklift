@@ -27,6 +27,9 @@ import { useRefActions } from './useRefActions';
 import { CommitPanel } from './CommitPanel';
 import { useConfirm } from './ConfirmDialog';
 import { DiffView, type DiffEditing } from './DiffView';
+import { useFormDialog } from './FormDialog';
+import { HostingView, type HostingItem } from './HostingView';
+import { useAppState } from '../state';
 
 interface RepoWorkspaceProps {
   data: RepoData;
@@ -44,6 +47,13 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const [conflictPath, setConflictPath] = useState<string | null>(null);
   const [rebaseBase, setRebaseBase] = useState<string | null>(null);
   const [fileHistory, setFileHistory] = useState<{ path: string; mode: 'history' | 'blame' } | null>(null);
+  const [hostingItem, setHostingItem] = useState<HostingItem | null>(null);
+  const [hostingReload, setHostingReload] = useState(0);
+  const accountIds = useAppState((s) => s.settings.values['integrations.accounts'].map((account) => account.id).join(','));
+  // The repository's server, when one of Preferences → Integrations matches its remotes.
+  const hostingContext = useCommand(accountIds ? 'hosting:context' : null, [repo], { reloadKey: JSON.stringify([data.remoteUrls, accountIds]), keepPrevious: true });
+  const hosting = accountIds ? (hostingContext.data ?? null) : null;
+  const { form: openForm, dialog: formDialog } = useFormDialog();
   const [filter, setFilterState] = useState<HistoryFilter>(() => loadFilter(data.root));
   const setFilter = (next: HistoryFilter) => {
     setFilterState(next);
@@ -114,6 +124,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   const openChange = (change: FileChange, staged: boolean) => {
     setFileHistory(null);
+    setHostingItem(null);
     if (change.kind === 'conflicted') {
       setDiffTarget(null);
       return setConflictPath(change.path);
@@ -133,7 +144,69 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const lfsPaths = useMemo(() => new Set(lfsInfo.data?.paths ?? []), [lfsInfo.data]);
   const lfsMissing = Boolean(lfsInfo.data && lfsInfo.data.patterns.length > 0 && !lfsInfo.data.installed);
   const head = data.branch.oid;
-  const centerFree = !fileHistory && !rebaseBase && !conflictPath && !diffTarget;
+  const centerFree = !fileHistory && !rebaseBase && !conflictPath && !diffTarget && !hostingItem;
+  const openHosting = useCallback((item: HostingItem) => {
+    setFileHistory(null);
+    setDiffTarget(null);
+    setConflictPath(null);
+    setHostingItem(item);
+  }, []);
+  const closeHosting = useCallback(() => setHostingItem(null), []);
+
+  const createPull = () => {
+    if (!hosting || !data.branch.head) return;
+    const remote = hosting.remote;
+    // The branch's name on the server: its upstream there, or the same name.
+    const upstream = data.branch.upstream;
+    const pushed = upstream?.startsWith(`${remote}/`) ? upstream.slice(remote.length + 1) : data.branch.head;
+    const unpushed = !upstream?.startsWith(`${remote}/`) ? `${data.branch.head} is not on ${remote} yet: push it first.` : data.branch.ahead > 0 ? `${data.branch.ahead} commit(s) of ${data.branch.head} are not pushed yet; the pull request will only have what is on ${remote}.` : null;
+    const bases = [...new Set([hosting.defaultBranch, ...data.remoteBranches.filter((branch) => branch.remote === remote).map((branch) => branch.name.slice(remote.length + 1)).filter((name) => name !== 'HEAD' && name !== pushed)])];
+    void openForm({
+      title: `Pull request from ${pushed}`,
+      detail: `${hosting.owner}/${hosting.name} on ${new URL(hosting.account.url).host}${unpushed ? `. ${unpushed}` : ''}`,
+      fields: [
+        { name: 'title', label: 'Title', initial: pushed.replace(/^[\w-]+\//, '').replace(/[-_]+/g, ' ') },
+        { name: 'base', label: 'Into', type: 'select', options: bases.map((name) => ({ value: name, label: name })), initial: hosting.defaultBranch },
+        { name: 'body', label: 'Description', type: 'textarea' },
+      ],
+      confirmLabel: 'Create pull request',
+      validate: async (values) => (String(values['title']).trim() ? null : 'A title is needed'),
+      submit: async (values) => {
+        try {
+          const pull = await invoke('hosting:createPull', repo, { head: pushed, base: String(values['base']), title: String(values['title']).trim(), body: String(values['body']) });
+          setHostingReload((n) => n + 1);
+          openHosting({ kind: 'pull', number: pull.number });
+          return null;
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      },
+    });
+  };
+
+  const createIssue = () => {
+    if (!hosting) return;
+    void openForm({
+      title: 'New issue',
+      detail: `${hosting.owner}/${hosting.name} on ${new URL(hosting.account.url).host}`,
+      fields: [
+        { name: 'title', label: 'Title' },
+        { name: 'body', label: 'Description', type: 'textarea' },
+      ],
+      confirmLabel: 'Create issue',
+      validate: async (values) => (String(values['title']).trim() ? null : 'A title is needed'),
+      submit: async (values) => {
+        try {
+          const issue = await invoke('hosting:createIssue', repo, { title: String(values['title']).trim(), body: String(values['body']) });
+          setHostingReload((n) => n + 1);
+          openHosting({ kind: 'issue', number: issue.number });
+          return null;
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      },
+    });
+  };
   const unstagedPaths = data.changes.filter((c) => c.unstaged).map((c) => c.path);
   const stagedPaths = data.changes.filter((c) => c.staged).map((c) => c.path);
   useCommandHandlers({
@@ -167,6 +240,15 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       run: () => data.branch.head && gitflow.finish(data.branch.head),
       enabled: () => Boolean(gitflow.config && data.branch.head && flowBranch(gitflow.config, data.branch.head)),
     },
+    'hosting.createPull': { run: createPull, enabled: () => Boolean(hosting && data.branch.head) },
+    'hosting.createIssue': { run: createIssue, enabled: () => Boolean(hosting) },
+    'hosting.showPulls': {
+      run: () => {
+        if (layout.leftHidden) togglePanel('left');
+        requestAnimationFrame(() => document.querySelector('.ref-section[aria-label="Pull requests"]')?.scrollIntoView({ block: 'start' }));
+      },
+      enabled: () => Boolean(hosting),
+    },
     'lfs.manage': { run: () => setLfsOpen(true) },
     'lfs.pull': { run: () => void run(() => invoke('lfs:download', repo, true)), enabled: () => Boolean(lfsInfo.data?.installed) },
     'lfs.fetch': { run: () => void run(() => invoke('lfs:download', repo, false)), enabled: () => Boolean(lfsInfo.data?.installed) },
@@ -180,7 +262,16 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       className="workspace"
       style={{ '--left': layout.leftHidden ? '0px' : `${layout.left}px`, '--right': layout.rightHidden ? '0px' : `${layout.right}px` } as CSSProperties}
     >
-      {layout.leftHidden ? <div /> : <LeftPanel data={data} actions={refActions} gitflow={gitflow} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />}
+      {layout.leftHidden ? <div /> : <LeftPanel
+          data={data}
+          actions={refActions}
+          gitflow={gitflow}
+          openMenu={openMenu}
+          onSelectCommit={showCommit}
+          graphFilter={filter}
+          onFilter={setFilter}
+          hosting={hosting && { context: hosting, reloadKey: hostingReload, selected: hostingItem, onOpen: openHosting, onRefresh: () => setHostingReload((n) => n + 1), onCreatePull: createPull, onCreateIssue: createIssue }}
+        />}
       <Splitter label="Resize the left panel" className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
@@ -192,7 +283,22 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           </button>
         </div>
       )}
-      {fileHistory ? (
+      {hostingItem && hosting ? (
+        <HostingView
+          key={`${hostingItem.kind}-${hostingItem.number}`}
+          repo={repo}
+          hosting={hosting}
+          item={hostingItem}
+          onChanged={() => setHostingReload((n) => n + 1)}
+          onOpen={openHosting}
+          onShowCommit={(sha) => {
+            setHostingItem(null);
+            showCommit(sha);
+          }}
+          run={run}
+          onClose={closeHosting}
+        />
+      ) : fileHistory ? (
         <FileHistoryView
           key={fileHistory.path}
           repo={repo}
@@ -307,6 +413,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               setDiffTarget({ kind: 'commit', sha: file.sourceSha ?? selectedCommit, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })
             }
             onFileHistory={(path) => setFileHistory({ path, mode: 'history' })}
+            onOpenIssue={hosting ? (number) => openHosting({ kind: 'issue', number }) : undefined}
             actions={selectedStash && (
               <>
                 <span className="stash-label">stash@{`{${selectedStash.index}}`}</span>
@@ -355,6 +462,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         )}
       </aside>
       {dialog}
+      {formDialog}
       {refActions.dialogs}
       {gitflow.dialogs}
       {menu}
@@ -374,6 +482,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           onClose={() => setFinding(false)}
           onShowCommit={(sha) => {
             setFileHistory(null);
+            setHostingItem(null);
             setDiffTarget(null);
             setConflictPath(null);
             showCommit(sha);

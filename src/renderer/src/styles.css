@@ -2070,6 +2070,41 @@ select {
   font-size: 12px;
 }
 
+.hosting-accounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(720px, 100%);
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.account-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-form .hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.account-form .form-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .ssh-keys {
   display: flex;
   flex-direction: column;
@@ -3174,4 +3209,207 @@ select {
 
 .terminal-view[hidden] {
   display: none;
+}
+
+/* Pull requests and issues (Preferences → Integrations) */
+.ref-section-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.hosting-number {
+  color: var(--fg-muted);
+}
+
+.ref-error {
+  padding: 4px 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.hosting-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hosting-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 16px 24px;
+}
+
+.hosting-body h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+}
+
+.hosting-body h3 .count {
+  color: var(--fg-muted);
+  font-weight: normal;
+}
+
+.hosting-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.hosting-state {
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  text-transform: capitalize;
+}
+
+.hosting-state.state-open {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.hosting-state.state-merged {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hosting-label {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+}
+
+.hosting-text {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.hosting-commits,
+.hosting-files,
+.hosting-discussion {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hosting-commits li,
+.hosting-files li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.hosting-commit-subject,
+.hosting-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hosting-comment {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.hosting-comment .hosting-text {
+  margin-top: 4px;
+}
+
+.hosting-comment-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hosting-comment-form textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.issue-ref {
+  font: inherit;
+}
+
+.hosting-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hosting-picker-head input {
+  flex: 1;
+  min-width: 0;
+}
+
+.hosting-repo-list {
+  max-height: 180px;
+  margin: 0;
+  padding: 2px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.hosting-repo-list button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  text-align: left;
+}
+
+.hosting-repo-list button:hover {
+  background: var(--bg-hover);
+}
+
+.hosting-repo-list button.selected {
+  background: var(--selection);
+}
+
+.hosting-repo-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hosting-repo-description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hosting-text .empty-note {
+  padding: 0;
+  text-align: left;
 }

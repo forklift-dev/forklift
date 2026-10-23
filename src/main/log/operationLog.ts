@@ -49,6 +49,12 @@ export const QUIET_COMMANDS = new Set([
   'gitflow:config',
   'hooks:list',
   'app:dismissNotices',
+  'hosting:repos',
+  'hosting:context',
+  'hosting:pulls',
+  'hosting:pull',
+  'hosting:issues',
+  'hosting:issue',
 ]);
 
 /**

@@ -115,7 +115,7 @@
 
 | ID | Задача | Статус |
 |---|---|---|
-| [T-065](tasks/stage-6-integrations/T-065-forgejo.md) | 1. Forgejo (и Gitea): вход, репозитории, pull requests, issues | draft |
+| [T-065](tasks/stage-6-integrations/T-065-forgejo.md) | 1. Forgejo (и Gitea): вход, репозитории, pull requests, issues | review |
 | [T-066](tasks/stage-6-integrations/T-066-gitverse.md) | 2. GitVerse: вход, репозитории, pull requests, issues | draft |
 | [T-060](tasks/stage-6-integrations/T-060-github.md) | 3. GitHub: вход, репозитории, pull requests, issues | draft |
 | [T-061](tasks/stage-6-integrations/T-061-gitlab.md) | 4. GitLab: вход, репозитории, merge requests, issues | draft |

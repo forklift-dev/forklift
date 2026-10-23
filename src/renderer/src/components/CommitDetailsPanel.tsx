@@ -3,6 +3,7 @@ import type { CommitFile, FileChangeStatus } from '../../../shared/diff';
 import type { SignatureStatus } from '../../../shared/profiles';
 import { useCommand } from '../useCommand';
 import { Avatar } from './Avatar';
+import { IssueRefs } from './HostingView';
 
 const STATUS_LABEL: Record<FileChangeStatus, string> = {
   added: 'A',
@@ -33,6 +34,8 @@ interface CommitDetailsPanelProps {
   /** Extra header content: actions for a stash. */
   actions?: ReactNode;
   onFileHistory?(path: string): void;
+  /** `#123` in the message opens that issue or pull request (when the repository's server is known). */
+  onOpenIssue?(number: number): void;
 }
 
 const SIGNATURE_TEXT: Record<SignatureStatus, string> = {
@@ -65,7 +68,7 @@ function Signature({ repo, sha }: { repo: string; sha: string }) {
   );
 }
 
-export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClose, actions, onFileHistory, onOpenIssue }: CommitDetailsPanelProps) {
   const { data, error } = useCommand('commit:details', [repo, sha]);
 
   if (error) return <div className="changes commit-details diff-message error">{error}</div>;
@@ -86,8 +89,14 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
         </button>
       </div>
       {actions && <div className="commit-details-actions">{actions}</div>}
-      <h2 className="commit-subject">{subject}</h2>
-      {body && <pre className="commit-body">{body}</pre>}
+      <h2 className="commit-subject">
+        <IssueRefs text={subject} onOpen={onOpenIssue} />
+      </h2>
+      {body && (
+        <pre className="commit-body">
+          <IssueRefs text={body} onOpen={onOpenIssue} />
+        </pre>
+      )}
       <dl className="commit-meta">
         <dt>Author</dt>
         <dd title={data.author.email} className="commit-person">

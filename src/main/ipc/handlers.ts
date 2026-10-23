@@ -39,6 +39,8 @@ import type { LfsService } from '../git/lfs';
 import type { GitflowService } from '../git/gitflow';
 import type { GitCli } from '../git/cli';
 import type { CredentialStore } from '../askpass/credentials';
+import type { HostingService } from '../hosting/service';
+import { PROVIDERS, type RepoHosting } from '../../shared/hosting';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -86,6 +88,7 @@ export interface HandlerDeps {
   /** Hands a credential answer to the waiting git process. */
   answerPrompt(id: number, answer: string | null, remember: boolean): void;
   credentials: Pick<CredentialStore, 'list' | 'remove'>;
+  hosting: HostingService;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -189,6 +192,22 @@ function parseCheckoutTarget(value: unknown): CheckoutTarget {
   throw new TypeError('target.kind must be branch, remote or commit');
 }
 
+const MAX_TEXT = 65_536;
+
+function parseText(value: unknown, what: string, required: boolean): string {
+  if (typeof value !== 'string' || value.length > MAX_TEXT || (required && !value.trim())) throw new TypeError(`${what} must be text${required ? ' (not empty)' : ''}`);
+  return value;
+}
+
+function assertNumber(value: unknown): asserts value is number {
+  if (!Number.isInteger(value) || (value as number) < 1) throw new TypeError('number must be a pull request or issue number');
+}
+
+function parseState(value: unknown): 'open' | 'closed' | 'all' {
+  if (value !== 'open' && value !== 'closed' && value !== 'all') throw new TypeError('state must be open, closed or all');
+  return value;
+}
+
 function assertVersion(value: unknown): asserts value is string {
   if (typeof value !== 'string' || value.length > 64) throw new TypeError('version must be a history version');
 }
@@ -214,7 +233,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -243,6 +262,13 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
 
   const recorder = new UndoRecorder(undo);
+
+  /** The tab's repository on its server; commands for pull requests and issues need one. */
+  const hostingOf = async (root: string): Promise<RepoHosting & { client: Awaited<ReturnType<HostingService['client']>> }> => {
+    const context = await hosting.context(root, repoData(root)?.remoteUrls ?? {});
+    if (!context) throw new Error('None of this repository\'s remotes is on a server added in Preferences → Integrations');
+    return { ...context, client: await hosting.client(context.account) };
+  };
 
   /** While `work` runs, the tab shows which of `names` hooks exist and run, and their output (last 200 lines). */
   const withHooks = async <T>(root: string, operation: HookActivity['operation'], names: string[], work: (onOutput?: (line: string) => void) => Promise<T>): Promise<T> => {
@@ -389,6 +415,103 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'credentials:remove'(_ctx, id) {
       assertString(id, 'id');
       await credentials.remove(id);
+    },
+
+    async 'hosting:add'(_ctx, provider, url, token) {
+      if (typeof provider !== 'string' || !Object.hasOwn(PROVIDERS, provider)) throw new TypeError('unknown service');
+      assertString(url, 'url');
+      assertString(token, 'token');
+      return hosting.add(provider, url, token);
+    },
+
+    async 'hosting:remove'(_ctx, accountId) {
+      assertString(accountId, 'account');
+      await hosting.remove(accountId);
+    },
+
+    async 'hosting:repos'(_ctx, accountId) {
+      assertString(accountId, 'account');
+      return hosting.repos(accountId);
+    },
+
+    async 'hosting:context'(_ctx, repo) {
+      const root = tab(repo);
+      return hosting.context(root, repoData(root)?.remoteUrls ?? {});
+    },
+
+    async 'hosting:pulls'(_ctx, repo, state) {
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.pulls(owner, name, parseState(state));
+    },
+
+    async 'hosting:pull'(_ctx, repo, number) {
+      assertNumber(number);
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.pull(owner, name, number);
+    },
+
+    async 'hosting:createPull'(_ctx, repo, pull) {
+      if (typeof pull !== 'object' || pull === null) throw new TypeError('pull must be an object');
+      const raw = pull as unknown as Record<string, unknown>;
+      const request = { head: parseName(raw['head'], 'head'), base: parseName(raw['base'], 'base'), title: parseText(raw['title'], 'title', true), body: parseText(raw['body'], 'description', false) };
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.createPull(owner, name, request);
+    },
+
+    async 'hosting:checkoutPull'(_ctx, repo, number) {
+      const root = tab(repo);
+      assertNumber(number);
+      const { client, owner, name, remote } = await hostingOf(root);
+      const pull = await client.pullSummary(owner, name, number);
+      if (!pull.headRepo) {
+        // A branch of this repository: fetch it and switch to it (a tracking branch when there is none yet).
+        const head = parseName(pull.head, 'branch');
+        await thenRefresh(root, async () => {
+          await network(root, 'fetch', (run) => remotes.networkCommand(root, ['fetch', '--progress', remote, `+refs/heads/${head}:refs/remotes/${remote}/${head}`], run));
+          const local = repoData(root)?.branches.some((branch) => branch.name === head);
+          const target = local ? ({ kind: 'branch', name: head } as const) : ({ kind: 'remote', name: `${remote}/${head}`, remote } as const);
+          report(await recorder.checkout(root, target, () => branches.checkout(root, target)));
+        });
+        return;
+      }
+      // From a fork: the server keeps its commits at refs/pull/<number>/head; a local branch pr/<number> holds them.
+      const local = `pr/${number}`;
+      await thenRefresh(root, async () => {
+        await network(root, 'fetch', (run) => remotes.networkCommand(root, ['fetch', '--progress', remote, `refs/pull/${number}/head`], run));
+        if (repoData(root)?.branches.some((branch) => branch.name === local)) {
+          store.dispatch(noticeAdded(`The branch ${local} already exists: it was checked out as it is, not moved to the pull request's latest commit.`));
+          report(await recorder.checkout(root, { kind: 'branch', name: local }, () => branches.checkout(root, { kind: 'branch', name: local })));
+          return;
+        }
+        const sha = (await gitCli.exec(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], { cwd: root })).stdout.trim();
+        report(await recorder.createBranch(root, local, sha, true, () => branches.create(root, local, sha, true)));
+      });
+    },
+
+    async 'hosting:issues'(_ctx, repo, state) {
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.issues(owner, name, parseState(state));
+    },
+
+    async 'hosting:issue'(_ctx, repo, number) {
+      assertNumber(number);
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.issue(owner, name, number);
+    },
+
+    async 'hosting:createIssue'(_ctx, repo, issue) {
+      if (typeof issue !== 'object' || issue === null) throw new TypeError('issue must be an object');
+      const raw = issue as unknown as Record<string, unknown>;
+      const request = { title: parseText(raw['title'], 'title', true), body: parseText(raw['body'], 'description', false) };
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.createIssue(owner, name, request);
+    },
+
+    async 'hosting:comment'(_ctx, repo, number, body) {
+      assertNumber(number);
+      const text = parseText(body, 'comment', true);
+      const { client, owner, name } = await hostingOf(tab(repo));
+      return client.comment(owner, name, number, text);
     },
 
     async 'rebase:plan'(_ctx, repo, base) {

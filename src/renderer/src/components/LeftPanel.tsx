@@ -6,6 +6,20 @@ import { copyText, type MenuItem } from './ContextMenu';
 import { headLabel, type RefActions } from './useRefActions';
 import type { Gitflow } from './useGitflow';
 import { flowBranch } from '../../../shared/gitflow';
+import type { RepoHosting } from '../../../shared/hosting';
+import type { HostingItem } from './HostingView';
+
+/** The repository's server (when an account matches its remotes): pull requests and issues sections. */
+export interface LeftPanelHosting {
+  context: RepoHosting;
+  /** Changes when the lists should be read again. */
+  reloadKey: number;
+  selected: HostingItem | null;
+  onOpen(item: HostingItem): void;
+  onRefresh(): void;
+  onCreatePull(): void;
+  onCreateIssue(): void;
+}
 
 interface LeftPanelProps {
   data: RepoData;
@@ -16,9 +30,10 @@ interface LeftPanelProps {
   onSelectCommit(sha: string): void;
   graphFilter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
+  hosting?: LeftPanelHosting | null;
 }
 
-type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules' | 'worktrees' | 'gitflow';
+type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'pulls' | 'issues' | 'submodules' | 'worktrees' | 'gitflow';
 
 const REF_MIME = 'application/x-forklift-ref';
 
@@ -47,7 +62,7 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
 }
 
 /** Left panel as in GitKraken: local branches, remote branches by remote, tags; filter and context actions. */
-export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, graphFilter, onFilter }: LeftPanelProps) {
+export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, graphFilter, onFilter, hosting }: LeftPanelProps) {
   /** Graph filter entries for a ref (full name). */
   const filterItems = (ref: string): MenuItem[] => {
     const hidden = graphFilter.hidden.includes(ref);
@@ -324,6 +339,8 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
           })}
         </Section>
 
+        {hosting && <HostingSections hosting={hosting} repo={data.root} collapsed={collapsed} onToggle={toggle} match={match} openMenu={openMenu} />}
+
         <Section
           id="submodules"
           title="Submodules"
@@ -473,5 +490,68 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
         </Section>
       </div>
     </aside>
+  );
+}
+
+function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }: {
+  hosting: LeftPanelHosting;
+  repo: string;
+  collapsed: Record<string, boolean>;
+  onToggle(id: SectionId): void;
+  match(text: string): boolean;
+  openMenu(event: MouseEvent, items: MenuItem[]): void;
+}) {
+  const pulls = useCommand('hosting:pulls', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
+  const issues = useCommand('hosting:issues', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
+  const server = new URL(hosting.context.account.url).host;
+  const buttons = (create: string, onCreate: () => void) => (
+    <span className="ref-section-actions">
+      <button type="button" className="icon-button" aria-label={`Refresh from ${server}`} title={`Refresh from ${server}`} onClick={hosting.onRefresh}>
+        <span className="codicon codicon-refresh" aria-hidden="true" />
+      </button>
+      <button type="button" className="icon-button" aria-label={create} title={create} onClick={onCreate}>
+        <span className="codicon codicon-add" aria-hidden="true" />
+      </button>
+    </span>
+  );
+  const item = (kind: HostingItem['kind'], entry: { number: number; title: string; author: string; webUrl: string }, icon: string, note: string) => {
+    const selected = hosting.selected?.kind === kind && hosting.selected.number === entry.number;
+    return (
+      <li
+        key={entry.number}
+        className={`ref-item hosting-item${selected ? ' current' : ''}`}
+        data-hosting={`${kind}-${entry.number}`}
+        title={`#${entry.number} ${entry.title} — ${entry.author}`}
+        onClick={() => hosting.onOpen({ kind, number: entry.number })}
+        onContextMenu={(event) =>
+          openMenu(event, [
+            { label: 'Show', onSelect: () => hosting.onOpen({ kind, number: entry.number }) },
+            { label: 'Copy link', onSelect: () => copyText(entry.webUrl) },
+            { label: 'Copy number', onSelect: () => copyText(`#${entry.number}`) },
+          ])
+        }
+      >
+        <span className={`codicon codicon-${icon}`} aria-hidden="true" />
+        <span className="ref-name">
+          <span className="hosting-number">#{entry.number}</span> {entry.title}
+        </span>
+        {note && <span className="submodule-state">{note}</span>}
+      </li>
+    );
+  };
+  const error = (text: string | null) => text && <li className="ref-error setting-error" title={text}>{text}</li>;
+  return (
+    <>
+      <Section id="pulls" title="Pull requests" count={pulls.data?.length ?? 0} collapsed={Boolean(collapsed['pulls'])} onToggle={onToggle} action={buttons('Create a pull request', hosting.onCreatePull)}>
+        {error(pulls.error)}
+        {pulls.data?.filter((pull) => match(`${pull.number} ${pull.title} ${pull.head}`)).map((pull) => item('pull', pull, 'git-pull-request', pull.draft ? 'draft' : pull.head))}
+        {pulls.data?.length === 0 && <li className="empty-note">No open pull requests</li>}
+      </Section>
+      <Section id="issues" title="Issues" count={issues.data?.length ?? 0} collapsed={Boolean(collapsed['issues'])} onToggle={onToggle} action={buttons('Create an issue', hosting.onCreateIssue)}>
+        {error(issues.error)}
+        {issues.data?.filter((issue) => match(`${issue.number} ${issue.title}`)).map((issue) => item('issue', issue, 'issues', issue.labels.map((label) => label.name).join(', ')))}
+        {issues.data?.length === 0 && <li className="empty-note">No open issues</li>}
+      </Section>
+    </>
   );
 }

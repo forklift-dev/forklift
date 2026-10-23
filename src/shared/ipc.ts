@@ -7,6 +7,7 @@ import type { FlowFinishOptions, FlowKind, GitflowConfig } from './gitflow';
 import type { HooksInfo } from './hooks';
 import type { LfsInfo } from './lfs';
 import type { SavedCredential } from './credentials';
+import type { HostingAccount, HostingComment, HostingProvider, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary, RepoHosting } from './hosting';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
@@ -99,6 +100,24 @@ export interface Commands {
   /** Saved HTTPS usernames and passwords (without the passwords). */
   'credentials:list': { args: []; result: SavedCredential[] };
   'credentials:remove': { args: [id: string]; result: void };
+  /** Checks the token with the server and adds the account (its token goes to the keychain, not the settings). */
+  'hosting:add': { args: [provider: HostingProvider, url: string, token: string]; result: HostingAccount };
+  'hosting:remove': { args: [accountId: string]; result: void };
+  /** Repositories the account can access, for the Clone dialog. */
+  'hosting:repos': { args: [accountId: string]; result: HostingRepo[] };
+  /** The server and repository behind the tab's remotes, or null when no account matches. */
+  'hosting:context': { args: [repo: string]; result: RepoHosting | null };
+  'hosting:pulls': { args: [repo: string, state: 'open' | 'closed' | 'all']; result: PullSummary[] };
+  'hosting:pull': { args: [repo: string, number: number]; result: PullDetails };
+  /** Opens a pull request from a branch already pushed to the server. */
+  'hosting:createPull': { args: [repo: string, pull: { head: string; base: string; title: string; body: string }]; result: PullSummary };
+  /** Fetches the pull request's branch and switches to it (a fork's: as local branch pr/<number>). */
+  'hosting:checkoutPull': { args: [repo: string, number: number]; result: void };
+  'hosting:issues': { args: [repo: string, state: 'open' | 'closed' | 'all']; result: IssueSummary[] };
+  'hosting:issue': { args: [repo: string, number: number]; result: IssueDetails };
+  'hosting:createIssue': { args: [repo: string, issue: { title: string; body: string }]; result: IssueSummary };
+  /** Comments on a pull request or an issue (they share numbers). */
+  'hosting:comment': { args: [repo: string, number: number, body: string]; result: HostingComment };
   /** Commits after `base` up to HEAD (oldest first) for the interactive rebase editor. */
   'rebase:plan': { args: [repo: string, base: string]; result: RebaseCommit[] };
   /** Runs an edited plan ('conflicts': git stopped, the operation banner continues it). */
@@ -274,6 +293,18 @@ const commandChannelSet = {
   'askpass:answer': true,
   'credentials:list': true,
   'credentials:remove': true,
+  'hosting:add': true,
+  'hosting:remove': true,
+  'hosting:repos': true,
+  'hosting:context': true,
+  'hosting:pulls': true,
+  'hosting:pull': true,
+  'hosting:createPull': true,
+  'hosting:checkoutPull': true,
+  'hosting:issues': true,
+  'hosting:issue': true,
+  'hosting:createIssue': true,
+  'hosting:comment': true,
   'rebase:plan': true,
   'rebase:interactive': true,
   'conflict:file': true,

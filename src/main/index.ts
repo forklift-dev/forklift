@@ -16,7 +16,9 @@ import { TERMINAL_INPUT_CHANNEL } from '../shared/terminal';
 import { isTrustedSender } from './origin';
 import { RemoteService } from './git/remote';
 import { runAskpassClient, runCredentialClient } from './askpass/client';
-import { CredentialStore } from './askpass/credentials';
+import { CredentialStore, type SecretBox } from './askpass/credentials';
+import { HostingService } from './hosting/service';
+import { TokenStore } from './hosting/tokens';
 import { ASKPASS_FLAG, CREDENTIAL_ARG } from './askpass/protocol';
 import { AskpassServer, type PromptAnswer } from './askpass/server';
 import { createGitService } from './git/service';
@@ -115,7 +117,7 @@ async function start() {
   // Credential prompts: shown in the window; answers go straight to the waiting git process. Passwords the
   // user asks to remember are kept by the app's credential helper, encrypted with the system keychain.
   const waiting = new Map<number, (answer: PromptAnswer | null) => void>();
-  const credentials = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
+  const secretBox: SecretBox = {
     // Linux without a keyring falls back to "basic_text" (no real protection): then nothing is stored.
     available: async () =>
       (await safeStorage.isAsyncEncryptionAvailable()) &&
@@ -125,14 +127,31 @@ async function start() {
       const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(data);
       return { text: result, reencrypt: shouldReEncrypt };
     },
+  };
+  const credentials = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), secretBox);
+  // Hosting accounts (Preferences → Integrations): their tokens are encrypted like the passwords.
+  const hosting = new HostingService({
+    accounts: () => settings.values['integrations.accounts'],
+    saveAccounts: (accounts) => settings.update({ values: { 'integrations.accounts': accounts } }),
+    tokens: new TokenStore(join(app.getPath('userData'), 'hosting-tokens.json'), secretBox),
+    fetch: (url, init) => net.fetch(url, init),
   });
+  // git asks the saved passwords first, then an account's token for its server (never kept twice).
+  const gitCredentials = {
+    get: async (fields: Record<string, string>) => (await credentials.get(fields)) ?? (await hosting.credential(fields)),
+    store: async (fields: Record<string, string>) => {
+      if ((await hosting.credential(fields))?.password === fields['password']) return;
+      await credentials.store(fields);
+    },
+    erase: (fields: Record<string, string>) => credentials.erase(fields),
+  };
   // Asks the keychain once (KDE Wallet or GNOME Keyring may show their unlock dialog then).
   void credentials.available().then(
     (available) => store.dispatch(secretStorageChecked(available)),
     () => store.dispatch(secretStorageChecked(false)),
   );
   const askpass = new AskpassServer({
-    credentials,
+    credentials: gitCredentials,
     scriptDir: join(app.getPath('userData'), 'askpass'),
     command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
     ask: (prompt) =>
@@ -182,7 +201,7 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

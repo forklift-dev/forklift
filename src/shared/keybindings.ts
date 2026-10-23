@@ -66,6 +66,9 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'lfs.manage', title: 'Track or untrack files…', category: 'LFS' },
   { id: 'lfs.pull', title: 'Pull LFS objects', category: 'LFS' },
   { id: 'lfs.fetch', title: 'Fetch LFS objects', category: 'LFS' },
+  { id: 'hosting.createPull', title: 'Create a pull request…', category: 'Integrations' },
+  { id: 'hosting.createIssue', title: 'Create an issue…', category: 'Integrations' },
+  { id: 'hosting.showPulls', title: 'Show pull requests', category: 'Integrations' },
   { id: 'repo.close', title: 'Close the open view (diff, file history…)', category: 'View', hidden: true },
 ];
 
