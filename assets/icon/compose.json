@@ -1,0 +1,29 @@
+{
+  "size": 1024,
+  "layers": [
+    {
+      "name": "background",
+      "file": "layers/background.png",
+      "scale": 1,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "name": "forklift",
+      "file": "layers/forklift.png",
+      "scale": 0.86,
+      "x": 28,
+      "y": 175,
+      "solidify": true,
+      "shadow": true
+    },
+    {
+      "name": "load",
+      "file": "layers/git.png",
+      "scale": 0.34,
+      "x": 571,
+      "y": 275,
+      "solidify": true
+    }
+  ]
+}

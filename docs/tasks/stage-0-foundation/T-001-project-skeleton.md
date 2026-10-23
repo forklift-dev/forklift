@@ -35,7 +35,7 @@ updated: 2026-10-22
 - [x] `npm run dist` собирает AppImage (138 МБ); fuses в бинарнике совпадают с `electron-builder.yml` (REA `inspect_electron_fuses`)
 - [x] Сквозная проверка упакованного приложения (`dist/linux-unpacked/forklift`): 11/11
 - [ ] deb-пакет: нужны `homepage` и email мейнтейнера в `package.json` — **данные владельца**
-- [ ] Иконка приложения (сейчас стандартная иконка Electron)
+- [x] Иконка приложения (сейчас стандартная иконка Electron) — 2026-10-23: погрузчик (вид сбоку) поднимает значок git; три слоя в `assets/icon` (фон, погрузчик, груз), сгенерированы Codex, собираются `scripts/build-icon.py` в `build/icon.png`, `icon.ico`, `icons/*`; на Linux иконка и у окна
 
 ## Критерии готовности
 

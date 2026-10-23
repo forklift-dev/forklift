@@ -21,6 +21,11 @@ files:
   - '!node_modules/node-pty/{deps,src,scripts,third_party}/**'
   - '!node_modules/node-pty/build/{Release/obj.target,Release/.deps,deps,*.mk,Makefile}/**'
 
+# The window icon on Linux (the app icon itself comes from build/icon.png, see assets/icon).
+extraResources:
+  - from: build/icons/512x512.png
+    to: icon.png
+
 asar: true
 asarUnpack:
   - '**/*.node'
@@ -51,6 +56,7 @@ win:
   target: nsis
 
 linux:
+  icon: build/icons
   # deb also needs `homepage` and a maintainer email in package.json (owner's decision, see T-001).
   target: AppImage
   category: Development
