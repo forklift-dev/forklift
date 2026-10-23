@@ -6,6 +6,7 @@ import type { RebaseCommit, RebaseStep } from './rebase';
 import type { FlowFinishOptions, FlowKind, GitflowConfig } from './gitflow';
 import type { HooksInfo } from './hooks';
 import type { LfsInfo } from './lfs';
+import type { SavedCredential } from './credentials';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
@@ -93,7 +94,11 @@ export interface Commands {
   /** Cancels the tab's running fetch/pull/push. */
   'remote:cancel': { args: [repo: string]; result: void };
   /** Answers a credential prompt (`null`: cancel). The answer is passed to git and kept nowhere. */
-  'askpass:answer': { args: [id: number, answer: string | null]; result: void };
+  /** `remember`: keep the username and password git confirms (in the app's keychain-encrypted store). */
+  'askpass:answer': { args: [id: number, answer: string | null, remember?: boolean]; result: void };
+  /** Saved HTTPS usernames and passwords (without the passwords). */
+  'credentials:list': { args: []; result: SavedCredential[] };
+  'credentials:remove': { args: [id: string]; result: void };
   /** Commits after `base` up to HEAD (oldest first) for the interactive rebase editor. */
   'rebase:plan': { args: [repo: string, base: string]; result: RebaseCommit[] };
   /** Runs an edited plan ('conflicts': git stopped, the operation banner continues it). */
@@ -267,6 +272,8 @@ const commandChannelSet = {
   'remote:setUrl': true,
   'remote:remove': true,
   'askpass:answer': true,
+  'credentials:list': true,
+  'credentials:remove': true,
   'rebase:plan': true,
   'rebase:interactive': true,
   'conflict:file': true,

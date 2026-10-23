@@ -124,6 +124,9 @@ export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false
     // Chromium refuses to start as root with its sandbox on; CI containers (GitVerse's cloud runner) run as
     // root. Tests only: the app itself never turns the sandbox off.
     ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+    // Never the user's keychain (KDE Wallet, GNOME Keyring): tests run with the user's desktop session and
+    // would open its dialogs and store test secrets there.
+    '--password-store=basic',
     ...args,
   ];
   const child = spawn(await electronBinary(), argv, { cwd: projectDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });

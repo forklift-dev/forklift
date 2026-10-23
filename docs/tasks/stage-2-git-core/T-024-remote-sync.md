@@ -70,6 +70,21 @@ updated: 2026-10-23
 - 2026-10-23: stash apply: случай «рабочая копия применилась, индекс — нет» («Index was not unstashed», без
   конфликтов) считается `applied-unstaged`, stash не удаляется.
 
+- 2026-10-23 (после замечания владельца: логин/пароль для репозитория на Forgejo не сохранялись и спрашивались
+  снова): так и было задумано — сохранял только системный credential helper, а у владельца его для таких хостов
+  нет. Теперь приложение само выступает credential helper'ом своих команд git: `-c credential.helper=!'<обёртка
+  askpass>' credential` (git config пользователя не меняется; его собственные helper'ы спрашиваются раньше).
+  В диалоге пароля — флажок «Remember» (включён). Пароль сохраняется, только когда git сообщил об успехе
+  (`store`), и стирается, если git его отверг (`erase`). Хранится в `userData/credentials.json`, зашифрованный
+  safeStorage (асинхронный API Electron 45: KDE Wallet, GNOME Keyring, Keychain, DPAPI). Если на Linux связки
+  ключей нет (`basic_text`), ничего не сохраняется, и об этом сказано в диалоге. Фоновый auto-fetch пользуется
+  сохранённым, но ничего не спрашивает. Список с кнопкой Forget — в Preferences → Profiles and keys → Saved
+  passwords. В журнале операций этот `-c` не показывается. Windows не проверен (helper через sh из git for Windows).
+- 2026-10-23: сквозные тесты запускали Electron с окружением рабочего стола владельца, поэтому Chromium обращался
+  к его KDE Wallet (окна кошелька, сохранённые пароли тестов). Теперь харнесс передаёт `--password-store=basic`;
+  набор `credentials` проверяет запоминание на basic-хранилище (только в dev-сборке,
+  `FORKLIFT_TEST_BASIC_SECRETS=1`).
+
 ## Промт
 
 ```text

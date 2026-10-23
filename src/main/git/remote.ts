@@ -159,14 +159,12 @@ export class RemoteService {
   }
 
   private async network(root: string, args: string[], run: RemoteRun, interactive = true, promptRepo: string | null = root): Promise<string> {
-    // In the background nothing may ask: an empty askpass fails at once, and ssh is told never to ask.
-    const session = interactive
-      ? this.askpass.session(promptRepo)
-      : { env: { GIT_ASKPASS: '', SSH_ASKPASS: '', SSH_ASKPASS_REQUIRE: 'never' }, dispose: () => {} };
+    // In the background nobody is asked: saved credentials work, prompts are refused, ssh never asks.
+    const session = this.askpass.session(promptRepo, { interactive });
     // Cancelling the operation also withdraws its open credential prompts.
     run.signal.addEventListener('abort', () => session.dispose(), { once: true });
     try {
-      const { stdout } = await this.git.exec(args, {
+      const { stdout } = await this.git.exec([...(session.gitArgs ?? []), ...args], {
         cwd: root,
         env: session.env,
         signal: run.signal,

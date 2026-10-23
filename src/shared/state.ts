@@ -167,6 +167,8 @@ export interface AppInfo {
   userThemes: UserThemesState;
   /** Changes whenever the operation log does (windows then read the new entries). */
   logVersion: number;
+  /** Passwords can be remembered (the system keychain is available to the app). */
+  secretStorage: boolean;
 }
 
 /** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */

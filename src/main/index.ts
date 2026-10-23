@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, net, safeStorage, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
 import { BranchService } from './git/branches';
@@ -15,9 +15,10 @@ import { TerminalService } from './terminal/service';
 import { TERMINAL_INPUT_CHANNEL } from '../shared/terminal';
 import { isTrustedSender } from './origin';
 import { RemoteService } from './git/remote';
-import { runAskpassClient } from './askpass/client';
-import { ASKPASS_FLAG } from './askpass/protocol';
-import { AskpassServer } from './askpass/server';
+import { runAskpassClient, runCredentialClient } from './askpass/client';
+import { CredentialStore } from './askpass/credentials';
+import { ASKPASS_FLAG, CREDENTIAL_ARG } from './askpass/protocol';
+import { AskpassServer, type PromptAnswer } from './askpass/server';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
@@ -41,7 +42,7 @@ import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected, logChanged, noticeAdded, promptAdded, promptRemoved, userThemesRead } from './store';
+import { createAppStore, gitCliDetected, logChanged, noticeAdded, secretStorageChecked, promptAdded, promptRemoved, userThemesRead } from './store';
 import { ThemeLibrary } from './themes';
 import { OperationLog } from './log/operationLog';
 import { AvatarService } from './avatars/service';
@@ -111,9 +112,27 @@ async function start() {
   const branches = new BranchService(gitCli, repoQueue, stashes);
   const conflicts = new ConflictService(gitCli, repoQueue);
   const commitOps = new CommitOps(gitCli, repoQueue);
-  // Credential prompts: shown in the window; answers go straight to the waiting git process.
-  const waiting = new Map<number, (answer: string | null) => void>();
+  // Credential prompts: shown in the window; answers go straight to the waiting git process. Passwords the
+  // user asks to remember are kept by the app's credential helper, encrypted with the system keychain.
+  const waiting = new Map<number, (answer: PromptAnswer | null) => void>();
+  const credentials = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
+    // Linux without a keyring falls back to "basic_text" (no real protection): then nothing is stored.
+    available: async () =>
+      (await safeStorage.isAsyncEncryptionAvailable()) &&
+      (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text' || (!app.isPackaged && process.env['FORKLIFT_TEST_BASIC_SECRETS'] === '1')),
+    encrypt: (text) => safeStorage.encryptStringAsync(text),
+    decrypt: async (data) => {
+      const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(data);
+      return { text: result, reencrypt: shouldReEncrypt };
+    },
+  });
+  // Asks the keychain once (KDE Wallet or GNOME Keyring may show their unlock dialog then).
+  void credentials.available().then(
+    (available) => store.dispatch(secretStorageChecked(available)),
+    () => store.dispatch(secretStorageChecked(false)),
+  );
   const askpass = new AskpassServer({
+    credentials,
     scriptDir: join(app.getPath('userData'), 'askpass'),
     command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
     ask: (prompt) =>
@@ -123,13 +142,13 @@ async function start() {
       }).finally(() => {
         waiting.delete(prompt.id);
         store.dispatch(promptRemoved(prompt.id));
-      }) as Promise<string | null>,
+      }) as Promise<PromptAnswer | null>,
     onCancel: (id) => waiting.get(id)?.(null),
   });
   await askpass.start();
   app.on('will-quit', () => void askpass.stop());
   const remotes = new RemoteService(gitCli, askpass, repoQueue);
-  const answerPrompt = (id: number, answer: string | null) => waiting.get(id)?.(answer);
+  const answerPrompt = (id: number, answer: string | null, remember: boolean) => waiting.get(id)?.(answer === null ? null : { answer, remember });
   const networkOps = new NetworkOps(store);
   const terminals = new TerminalService();
   app.on('will-quit', () => terminals.dispose());
@@ -163,7 +182,7 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -216,11 +235,18 @@ async function start() {
 }
 
 if (askpassMode) {
-  const prompt = process.argv[process.argv.length - 1] ?? '';
-  void runAskpassClient(prompt === ASKPASS_FLAG ? '' : prompt, process.env, (text) => process.stdout.write(text)).then((code) => {
-    // Let stdout drain before leaving.
-    process.stdout.write('', () => process.exit(code));
-  });
+  const extra = process.argv.slice(process.argv.indexOf(ASKPASS_FLAG) + 1);
+  const finish = (code: number) => process.stdout.write('', () => process.exit(code)); // let stdout drain
+  if (extra[0] === CREDENTIAL_ARG && extra.length === 2) {
+    // git's credential helper protocol: fields on stdin, the action as the argument.
+    let input = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk: string) => (input += chunk));
+    process.stdin.on('end', () => void runCredentialClient(extra[1]!, input, process.env, (text) => process.stdout.write(text)).then(finish));
+  } else {
+    const prompt = process.argv[process.argv.length - 1] ?? '';
+    void runAskpassClient(prompt === ASKPASS_FLAG ? '' : prompt, process.env, (text) => process.stdout.write(text)).then(finish);
+  }
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

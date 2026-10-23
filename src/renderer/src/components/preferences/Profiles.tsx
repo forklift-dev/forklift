@@ -148,6 +148,7 @@ export function ProfilesEditor({ value, save }: ControlProps) {
         Add a profile
       </button>
       <SshKeys data={keys.data} error={keys.error} onChanged={() => setReload((n) => n + 1)} />
+      <SavedPasswords />
     </div>
   );
 }
@@ -246,6 +247,39 @@ function SshKeys({ data, error, onChanged }: { data: KeysInfo | undefined; error
         </button>
       )}
       {status && <p className={status.error ? 'setting-error' : 'setting-ok'}>{status.text}</p>}
+    </div>
+  );
+}
+
+/** HTTPS usernames and passwords the app remembered; each can be forgotten. */
+function SavedPasswords() {
+  const [reload, setReload] = useState(0);
+  const { data } = useCommand('credentials:list', [], { reloadKey: reload, keepPrevious: true });
+  const available = useAppState((s) => s.app.secretStorage);
+  return (
+    <div className="ssh-keys saved-passwords">
+      <h3>Saved passwords</h3>
+      <p className="hint">
+        {available
+          ? 'For HTTPS remotes, when you tick “Remember” in the sign-in dialog. Encrypted with the system keychain; git’s own credential helpers are asked first.'
+          : 'No system keychain is available to Forklift, so passwords are not saved (they are asked each time, unless your git credential helper keeps them).'}
+      </p>
+      <ul className="ssh-key-list">
+        {data?.map((entry) => (
+          <li key={entry.id} data-credential={entry.host}>
+            <span className="codicon codicon-lock" aria-hidden="true" />
+            <span className="ssh-key-name">{entry.username}</span>
+            <span className="ssh-key-meta">
+              {entry.protocol}://{entry.host}
+              {entry.path && `/${entry.path}`}
+            </span>
+            <button type="button" onClick={() => void invoke('credentials:remove', entry.id).then(() => setReload((n) => n + 1))}>
+              Forget
+            </button>
+          </li>
+        ))}
+        {data && data.length === 0 && <li className="empty-note">Nothing saved</li>}
+      </ul>
     </div>
   );
 }

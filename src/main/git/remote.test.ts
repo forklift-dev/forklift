@@ -141,14 +141,14 @@ describe('remote management and background fetch', () => {
     expect(sh(mine, 'remote')).toBe('origin');
   });
 
-  it('background fetch never opens an askpass session', async () => {
-    let sessions = 0;
-    const counting = new RemoteService(new GitCli(directRunner(env)), { session: () => (sessions++, { env: {}, dispose: () => {} }) });
+  it('background fetch opens a session that may not ask (saved credentials only)', async () => {
+    const sessions: Array<{ interactive?: boolean } | undefined> = [];
+    const counting = new RemoteService(new GitCli(directRunner(env)), { session: (_repo, options) => (sessions.push(options), { env: {}, dispose: () => {} }) });
     theirCommit('t.txt', 'x\n', 'theirs');
     await counting.fetch(mine, null, false, run(), false);
-    expect(sessions).toBe(0);
+    expect(sessions).toEqual([{ interactive: false }]);
     expect(sh(mine, 'rev-parse', 'origin/main')).toBe(sh(theirs, 'rev-parse', 'HEAD'));
     await counting.fetch(mine, null, false, run());
-    expect(sessions).toBe(1);
+    expect(sessions[1]).toEqual({ interactive: true });
   });
 });

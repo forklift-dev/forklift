@@ -38,6 +38,7 @@ import type { WorktreeService } from '../git/worktrees';
 import type { LfsService } from '../git/lfs';
 import type { GitflowService } from '../git/gitflow';
 import type { GitCli } from '../git/cli';
+import type { CredentialStore } from '../askpass/credentials';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -83,7 +84,8 @@ export interface HandlerDeps {
   /** Working-tree files of a repository (tracked and untracked, not ignored). */
   listFiles(root: string): Promise<{ paths: string[]; truncated: boolean }>;
   /** Hands a credential answer to the waiting git process. */
-  answerPrompt(id: number, answer: string | null): void;
+  answerPrompt(id: number, answer: string | null, remember: boolean): void;
+  credentials: Pick<CredentialStore, 'list' | 'remove'>;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -212,7 +214,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -373,10 +375,20 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       networkOps.cancel(tab(repo));
     },
 
-    async 'askpass:answer'(_ctx, id, answer) {
+    async 'askpass:answer'(_ctx, id, answer, remember) {
       if (!Number.isInteger(id)) throw new TypeError('id must be a prompt id');
       if (answer !== null && (typeof answer !== 'string' || answer.length > 10_000 || /[\r\n\0]/.test(answer))) throw new TypeError('answer must be one line');
-      answerPrompt(id, answer);
+      if (remember !== undefined && typeof remember !== 'boolean') throw new TypeError('remember must be a boolean');
+      answerPrompt(id, answer, remember === true);
+    },
+
+    async 'credentials:list'() {
+      return credentials.list();
+    },
+
+    async 'credentials:remove'(_ctx, id) {
+      assertString(id, 'id');
+      await credentials.remove(id);
     },
 
     async 'rebase:plan'(_ctx, repo, base) {

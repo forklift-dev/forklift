@@ -4,6 +4,10 @@ import { maskCredentials, type LogEntry, type LogPage } from '../../shared/log';
 const MAX_ENTRIES = 3000;
 const MAX_OUTPUT = 8 * 1024;
 
+/** The app's own credential helper (`-c credential.helper=!…forklift-askpass…`) is left out of command lines. */
+const withoutHelper = (args: readonly string[]) =>
+  args.filter((arg, i) => !(arg === '-c' && /^credential\.helper=.*forklift-askpass/.test(args[i + 1] ?? '')) && !(args[i - 1] === '-c' && /^credential\.helper=.*forklift-askpass/.test(arg)));
+
 const tail = (text: string) => (text.length > MAX_OUTPUT ? `…${text.slice(-MAX_OUTPUT)}` : text);
 
 /** Window commands whose runs are not worth logging: frequent reads that change nothing. */
@@ -37,6 +41,7 @@ export const QUIET_COMMANDS = new Set([
   'log:clear',
   'terminal:resize',
   'askpass:answer',
+  'credentials:list',
   'avatars:get',
   'submodule:list',
   'worktree:list',
@@ -76,7 +81,7 @@ export class OperationLog {
   git(run: { args: readonly string[]; cwd: string; readOnly: boolean; durationMs: number; exitCode: number | null; ok: boolean; stdout: string; stderr: string }): void {
     const entry = this.add({
       kind: 'git',
-      title: maskCredentials(`git ${run.args.join(' ')}`),
+      title: maskCredentials(`git ${withoutHelper(run.args).join(' ')}`),
       repo: run.cwd,
       parent: this.context.getStore() ?? null,
       status: run.ok ? 'ok' : 'error',

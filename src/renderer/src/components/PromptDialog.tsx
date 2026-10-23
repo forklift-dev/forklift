@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AskPrompt } from '../../../shared/state';
 import { invoke } from '../api';
+import { useAppState } from '../state';
 
 const TITLES: Record<AskPrompt['kind'], string> = {
   username: 'Sign in',
@@ -12,10 +13,13 @@ const TITLES: Record<AskPrompt['kind'], string> = {
 
 /**
  * A question from git or ssh during a fetch, pull or push (credentials, a key passphrase, a new host key).
- * The answer goes straight to the waiting git process; it is not kept anywhere in the app.
+ * The answer goes straight to the waiting git process; a password is kept (encrypted with the system keychain)
+ * only when "Remember" is on and git reports that it worked.
  */
 export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName: string | null }) {
   const [value, setValue] = useState('');
+  const canRemember = useAppState((s) => s.app.secretStorage) && prompt.kind === 'password';
+  const [remember, setRemember] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const secret = prompt.kind === 'password' || prompt.kind === 'passphrase';
 
@@ -23,7 +27,7 @@ export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName
     inputRef.current?.focus();
   }, []);
 
-  const answer = (text: string | null) => void invoke('askpass:answer', prompt.id, text);
+  const answer = (text: string | null) => void invoke('askpass:answer', prompt.id, text, text !== null && canRemember && remember);
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -68,7 +72,13 @@ export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName
               value={value}
               onChange={(event) => setValue(event.target.value)}
             />
-            {secret && <p className="prompt-note">Saved only if your git credential helper stores it.</p>}
+            {canRemember && (
+              <label className="checkbox-label prompt-remember">
+                <input type="checkbox" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                Remember (in the system keychain, once git accepts it)
+              </label>
+            )}
+            {secret && !canRemember && prompt.kind === 'password' && <p className="prompt-note">Not saved: no system keychain is available. Your git credential helper may still save it.</p>}
             <div className="modal-actions">
               <button type="button" onClick={() => answer(null)}>
                 Cancel

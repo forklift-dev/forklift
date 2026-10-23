@@ -9,7 +9,7 @@ import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0 } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0, secretStorage: false } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -36,10 +36,13 @@ const appSlice = createSlice({
     logChanged: (state) => {
       state.logVersion++;
     },
+    secretStorageChecked: (state, action: PayloadAction<boolean>) => {
+      state.secretStorage = action.payload;
+    },
   },
 });
 
-export const { cloneActivity, gitCliDetected, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, userThemesRead } = appSlice.actions;
+export const { cloneActivity, gitCliDetected, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, secretStorageChecked, userThemesRead } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,
