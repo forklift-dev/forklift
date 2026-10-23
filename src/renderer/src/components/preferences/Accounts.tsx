@@ -68,7 +68,16 @@ export function AccountsEditor({ value }: ControlProps<'integrations.accounts'>)
         >
           <label>
             Service
-            <select value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value as HostingProvider })}>
+            <select
+              name="provider"
+              value={form.provider}
+              onChange={(event) => {
+                const provider = event.target.value as HostingProvider;
+                // The service's own server is filled in, unless the user typed another address.
+                const typed = form.url.trim() && form.url !== PROVIDERS[form.provider].server;
+                setForm({ ...form, provider, url: typed ? form.url : (PROVIDERS[provider].server ?? '') });
+              }}
+            >
               {(Object.keys(PROVIDERS) as HostingProvider[]).map((id) => (
                 <option key={id} value={id}>
                   {PROVIDERS[id].name}

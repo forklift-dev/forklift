@@ -1,4 +1,4 @@
-import type { HostingComment, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary } from '../../shared/hosting';
+import type { HostingComment, HostingProvider, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary } from '../../shared/hosting';
 
 export type Fetch = (url: string, init: { method?: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{
   status: number;
@@ -24,15 +24,57 @@ const login = (user: unknown) => str((user as Json | null)?.['login']);
 
 const PAGE = 50;
 
-/** Forgejo's REST API (Gitea-compatible, /api/v1), with a personal access token. */
-export class ForgejoClient {
+/** How a service's REST API differs; the paths and fields are the same (GitVerse follows Gitea and GitHub). */
+interface ApiStyle {
+  /** API root for a server address. */
+  base(server: string): string;
+  headers(token: string): Record<string, string>;
+  /** Name of the page size parameter. */
+  pageSize: string;
+  /** Extra filter for listing issues without pull requests, if the service has one. */
+  issuesOnly: string;
+  /** The message of an error response. */
+  errorMessage(body: Json): string;
+}
+
+const STYLES: Record<HostingProvider, ApiStyle> = {
+  // Forgejo and Gitea: /api/v1 on the server, "token" authorization.
+  forgejo: {
+    base: (server) => `${server}/api/v1`,
+    headers: (token) => ({ Authorization: `token ${token}`, Accept: 'application/json' }),
+    pageSize: 'limit',
+    issuesOnly: '&type=issues',
+    errorMessage: (body) => str(body['message']),
+  },
+  // GitVerse: the public instance serves its API from api.gitverse.ru (other installations under /api), Bearer
+  // tokens, and the API version in Accept (https://gitverse.ru/docs/developers/public-api/).
+  gitverse: {
+    base: (server) => (new URL(server).host === 'gitverse.ru' ? 'https://api.gitverse.ru' : `${server}/api`),
+    headers: (token) => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.gitverse.object+json;version=1' }),
+    pageSize: 'per_page',
+    issuesOnly: '',
+    errorMessage: (body) => str((body['error'] as Json | undefined)?.['message']) || str(body['message']),
+  },
+};
+
+/** A Gitea-style REST API (Forgejo, Gitea, GitVerse) with a personal access token. */
+export class HostingClient {
+  private readonly style: ApiStyle;
+
   constructor(
+    provider: HostingProvider,
     /** Server address, e.g. https://code.example.com */
     private readonly server: string,
     private readonly token: string,
     private readonly fetch: Fetch,
     private readonly timeoutMs = 20_000,
-  ) {}
+  ) {
+    this.style = STYLES[provider];
+  }
+
+  private page(page: number) {
+    return `page=${page}&${this.style.pageSize}=${PAGE}`;
+  }
 
   /** The token's user: checks the address and the token. */
   async user(): Promise<{ login: string; name: string }> {
@@ -44,7 +86,7 @@ export class ForgejoClient {
   async repos(): Promise<HostingRepo[]> {
     const repos: HostingRepo[] = [];
     for (let page = 1; page <= 20; page++) {
-      const batch = (await this.request(`/user/repos?page=${page}&limit=${PAGE}`)) as Json[];
+      const batch = (await this.request(`/user/repos?${this.page(page)}`)) as Json[];
       for (const repo of batch) {
         repos.push({
           fullName: str(repo['full_name']),
@@ -69,7 +111,7 @@ export class ForgejoClient {
   }
 
   async pulls(owner: string, name: string, state: 'open' | 'closed' | 'all'): Promise<PullSummary[]> {
-    const list = (await this.request(`/repos/${seg(owner)}/${seg(name)}/pulls?state=${state}&sort=recentupdate&page=1&limit=${PAGE}`)) as Json[];
+    const list = (await this.request(`/repos/${seg(owner)}/${seg(name)}/pulls?state=${state}&${this.page(1)}`)) as Json[];
     return list.map((pull) => toPull(pull, `${owner}/${name}`));
   }
 
@@ -77,8 +119,8 @@ export class ForgejoClient {
     const base = `/repos/${seg(owner)}/${seg(name)}`;
     const [pull, commits, files, comments] = await Promise.all([
       this.request(`${base}/pulls/${number}`) as Promise<Json>,
-      this.request(`${base}/pulls/${number}/commits?page=1&limit=${PAGE}`) as Promise<Json[]>,
-      this.request(`${base}/pulls/${number}/files?page=1&limit=${PAGE}`).catch(() => []) as Promise<Json[]>,
+      this.request(`${base}/pulls/${number}/commits?${this.page(1)}`) as Promise<Json[]>,
+      this.request(`${base}/pulls/${number}/files?${this.page(1)}`).catch(() => []) as Promise<Json[]>,
       this.comments(owner, name, number),
     ]);
     return {
@@ -105,8 +147,9 @@ export class ForgejoClient {
   }
 
   async issues(owner: string, name: string, state: 'open' | 'closed' | 'all'): Promise<IssueSummary[]> {
-    const list = (await this.request(`/repos/${seg(owner)}/${seg(name)}/issues?state=${state}&type=issues&page=1&limit=${PAGE}`)) as Json[];
-    return list.map(toIssue);
+    const list = (await this.request(`/repos/${seg(owner)}/${seg(name)}/issues?state=${state}${this.style.issuesOnly}&${this.page(1)}`)) as Json[];
+    // Pull requests are issues too; services without a filter list both.
+    return list.map(toIssue).filter((issue) => !issue.isPull);
   }
 
   async issue(owner: string, name: string, number: number): Promise<IssueDetails> {
@@ -132,9 +175,9 @@ export class ForgejoClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response;
     try {
-      response = await this.fetch(`${this.server}/api/v1${path}`, {
+      response = await this.fetch(`${this.style.base(this.server)}${path}`, {
         method,
-        headers: { Authorization: `token ${this.token}`, Accept: 'application/json', ...(body !== undefined && { 'Content-Type': 'application/json' }) },
+        headers: { ...this.style.headers(this.token), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
         ...(body !== undefined && { body: JSON.stringify(body) }),
         signal: controller.signal,
       });
@@ -148,19 +191,23 @@ export class ForgejoClient {
     if (!response.ok) {
       let message = '';
       try {
-        message = str((JSON.parse(text) as Json)['message']);
+        message = this.style.errorMessage(JSON.parse(text) as Json);
       } catch {
         // not JSON
       }
       if (response.status === 401) throw new HostingError('The server refused the token (wrong, expired or revoked)', 401);
       if (response.status === 403) throw new HostingError(`Not allowed${message ? `: ${message}` : ' (does the token have the needed access?)'}`, 403);
+      if (response.status === 429) {
+        const wait = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
+        throw new HostingError(`Too many requests to the server${Number.isFinite(wait) ? `: try again in ${Math.ceil(wait / 60)} min` : ', try again later'}`, 429);
+      }
       if (response.status === 404) throw new HostingError(`Not found on the server${message ? `: ${message}` : ''}`, 404);
       throw new HostingError(`The server answered ${response.status}${message ? `: ${message}` : ''}`, response.status);
     }
     try {
       return JSON.parse(text);
     } catch {
-      throw new HostingError('The server did not answer with JSON: is this the address of a Forgejo or Gitea server?');
+      throw new HostingError('The server did not answer with JSON: is this the right server address for the service?');
     }
   }
 }
@@ -169,7 +216,8 @@ const seg = (part: string) => encodeURIComponent(part);
 
 function toPull(pull: Json, baseRepo: string): PullSummary {
   const head = (pull['head'] ?? {}) as Json;
-  const headRepo = str((head['repo'] as Json | null)?.['full_name']);
+  const headRepoJson = (head['repo'] ?? null) as Json | null;
+  const headRepo = str(headRepoJson?.['full_name']);
   return {
     number: num(pull['number']),
     title: str(pull['title']),
@@ -178,6 +226,7 @@ function toPull(pull: Json, baseRepo: string): PullSummary {
     draft: pull['draft'] === true || /^(WIP|\[WIP\]):?\s/i.test(str(pull['title'])),
     head: str(head['ref']),
     headRepo: headRepo && headRepo !== baseRepo ? headRepo : null,
+    headCloneUrl: str(headRepoJson?.['clone_url']) || null,
     base: str(((pull['base'] ?? {}) as Json)['ref']),
     comments: num(pull['comments']),
     createdAt: str(pull['created_at']),

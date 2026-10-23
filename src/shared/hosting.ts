@@ -1,10 +1,11 @@
 // Hosting services (Forgejo first; GitVerse, GitHub, GitLab later): accounts, and what the app shows of them.
 // Tokens never appear here: main keeps them encrypted (safeStorage) and uses them itself.
 
-export type HostingProvider = 'forgejo';
+export type HostingProvider = 'forgejo' | 'gitverse';
 
-export const PROVIDERS: Record<HostingProvider, { name: string; tokenHelp: string }> = {
+export const PROVIDERS: Record<HostingProvider, { name: string; tokenHelp: string; /** The service's own server, filled in for the user. */ server?: string }> = {
   forgejo: { name: 'Forgejo / Gitea', tokenHelp: 'Settings → Applications → Generate new token (repository and issue access, read and write)' },
+  gitverse: { name: 'GitVerse', server: 'https://gitverse.ru', tokenHelp: 'gitverse.ru/settings/tokens → create a token with write access (it is shown only once)' },
 };
 
 /** An account on a server (stored in the settings; its token separately). */
@@ -57,6 +58,8 @@ export interface PullSummary {
   head: string;
   /** owner/name of the head repository when it is a fork. */
   headRepo: string | null;
+  /** HTTPS clone URL of the head repository (to fetch a fork's branch when the server has no refs/pull/N/head). */
+  headCloneUrl: string | null;
   base: string;
   comments: number;
   createdAt: string;
@@ -115,13 +118,13 @@ export function parseAccounts(value: unknown): HostingAccount[] {
     const { id, provider, url, username, name } = raw as Record<string, unknown>;
     if (typeof id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(id) || ids.has(id)) throw new TypeError(`Account ${index + 1} needs a unique id`);
     ids.add(id);
-    if (provider !== 'forgejo') throw new TypeError(`Account ${index + 1}: unknown service`);
+    if (typeof provider !== 'string' || !Object.hasOwn(PROVIDERS, provider)) throw new TypeError(`Account ${index + 1}: unknown service`);
     const normalized = typeof url === 'string' ? normalizeServerUrl(url) : null;
     if (!normalized || normalized !== url) throw new TypeError(`Account ${index + 1}: "${String(url)}" is not a server address`);
     for (const [field, text] of Object.entries({ username, name })) {
       if (typeof text !== 'string' || text.length > 200 || /[\0\r\n]/.test(text)) throw new TypeError(`Account ${index + 1}: ${field} must be one line`);
     }
-    return { id, provider, url: normalized, username: username as string, name: name as string };
+    return { id, provider: provider as HostingProvider, url: normalized, username: username as string, name: name as string };
   });
 }
 

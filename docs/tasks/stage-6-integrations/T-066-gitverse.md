@@ -2,7 +2,7 @@
 id: T-066
 title: "GitVerse: вход, репозитории, pull requests, issues"
 stage: 6 — Интеграции с хостингами
-status: draft
+status: review
 depends_on: [T-065]
 updated: 2026-10-23
 ---
@@ -23,10 +23,10 @@ updated: 2026-10-23
 
 ## Этапы
 
-- [ ] Разведка API GitVerse, запись результатов в «Нюансы»
-- [ ] Провайдер GitVerse в общем слое (учётная запись, токен в safeStorage)
-- [ ] Clone из списка репозиториев, панель PR, issues — как в T-065
-- [ ] Тесты на имитации API; ручная проверка на аккаунте владельца
+- [x] Разведка API GitVerse, запись результатов в «Нюансы»
+- [x] Провайдер GitVerse в общем слое (учётная запись, токен в safeStorage)
+- [x] Clone из списка репозиториев, панель PR, issues — как в T-065
+- [x] Тесты на имитации API; ручная проверка на аккаунте владельца
 
 ## Критерии готовности
 
@@ -36,6 +36,33 @@ updated: 2026-10-23
 ## Нюансы
 
 - draft до согласования; не начинать без владельца (нужен тестовый токен).
+- 2026-10-23: владелец: «идем дальше» после T-065 — начато; ручная проверка ждёт токена владельца.
+- 2026-10-23: разведка (официальная спецификация OpenAPI 2.0 `gitverse.ru/gitverse/rest-api-description`,
+  `v1/openapi-1.12.json`; документация `gitverse.ru/docs/developers/public-api/`; клиент сообщества `gv`):
+  - API публичного GitVerse — `https://api.gitverse.ru` (у других установок, как в `gv`, — `<сервер>/api`), git —
+    на `gitverse.ru`; авторизация `Authorization: Bearer <токен>`, обязателен `Accept:
+    application/vnd.gitverse.object+json;version=1` (MAJOR-версия API; старые живут 6 месяцев после новой).
+  - Пути и поля повторяют Gitea/GitHub: `/user`, `/user/repos`, `/repos/{o}/{r}`, `/pulls`, `/pulls/{n}`,
+    `/pulls/{n}/commits|files`, `/issues`, `/issues/{n}`, `/issues/{n}/comments`; пагинация `page` + `per_page`
+    (и заголовок `Link`); ошибки — `{"error": {"code", "message", "status"}}` (проверено запросом без токена: 401
+    `UNAUTHORIZED`).
+  - Список `/issues` по умолчанию с pull requests (`type=issues+pulls`), PR отличаются полем `pull_request`.
+  - Слияния PR через API нет (только «смержен ли»); OAuth нет — только персональные токены
+    (`gitverse.ru/settings/tokens`, показываются один раз); лимит 2000 запросов в час на пользователя, сверх —
+    429 и `Retry-After`.
+  - `refs/pull/N/head` в документации не упомянут (`gv` пробует его и откатывается на ветку форка).
+- 2026-10-23: сделано: клиент T-065 обобщён (`src/main/hosting/client.ts`, `HostingClient` + стиль API на
+  провайдера: корень API, заголовки, имя параметра размера страницы, фильтр issues, формат ошибок); провайдер
+  `gitverse` в `PROVIDERS` с сервером `https://gitverse.ru` по умолчанию (подставляется в форму). Issues без PR —
+  фильтром на клиенте для любого провайдера. 429 — понятное сообщение с ожиданием. Checkout PR из форка: сначала
+  `refs/pull/N/head`, если нет — ветка форка по его `clone_url`, **только** с того же сервера (протокол и хост
+  совпадают, без логина в URL), чтобы git не увести на другой хост или транспорт. git получает логин учётной
+  записи и токен (как для Forgejo; `gv` шлёт `x-access-token`, если логина не знает — GitVerse имя не проверяет).
+- 2026-10-23: проверено: юнит-тесты клиента на имитации в обоих вариантах (Forgejo и GitVerse), сквозной набор
+  `gitverse` (9 проверок: форма с сервером GitVerse, Bearer и Accept во всех запросах, списки, issues без PR,
+  checkout PR из форка без `refs/pull`, git с токеном без вопросов). **Осталось:** проверка на аккаунте
+  владельца — нужен токен GitVerse (`gitverse.ru/settings/tokens`, с записью) и репозиторий с PR/issues; там же
+  выяснить, отдаёт ли GitVerse `refs/pull/N/head`.
 
 ## Промт
 

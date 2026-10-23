@@ -1,11 +1,16 @@
 // A small Forgejo for tests: the /api/v1 endpoints Forklift uses (token auth), and git over smart HTTP
-// (basic auth with the user's name and token) for the repositories under `gitRoot`.
+// (basic auth with the user's name and token) for the repositories under `gitRoot`. `flavor: 'gitverse'`
+// answers like GitVerse instead: the API under /api, Bearer tokens, the version in Accept, errors as
+// {"error": {...}}, and issue lists that include pull requests.
 import { createServer } from 'node:http';
 import { gitBackend } from './gitHttp.mjs';
 
 const DAY = '2026-10-2';
 
-export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullName = 'Ada Lovelace', gitRoot = null } = {}) {
+export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullName = 'Ada Lovelace', gitRoot = null, flavor = 'forgejo' } = {}) {
+  const gitverse = flavor === 'gitverse';
+  const prefix = gitverse ? '/api' : '/api/v1';
+  const authorization = gitverse ? `Bearer ${token}` : `token ${token}`;
   const requests = [];
   let base = '';
   const repo = (owner, name, updated) => ({
@@ -26,7 +31,7 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
   };
   const pulls = [
     { number: 1, title: 'Add the feature', body: 'It adds **the feature**.', user: { login: 'bob' }, state: 'open', merged: false, mergeable: true, head: { ref: 'feature', repo: { full_name: 'ada/demo' } }, base: { ref: 'main' } },
-    { number: 2, title: 'WIP: Fix from a fork', body: '', user: { login: 'eve' }, state: 'open', merged: false, mergeable: null, head: { ref: 'fix', repo: { full_name: 'eve/demo' } }, base: { ref: 'main' } },
+    { number: 2, title: 'WIP: Fix from a fork', body: '', user: { login: 'eve' }, state: 'open', merged: false, mergeable: null, head: { ref: 'fix', repo: { full_name: 'eve/demo', clone_url: '' } }, base: { ref: 'main' } },
     { number: 5, title: 'Old change', body: '', user: { login: 'ada' }, state: 'closed', merged: true, head: { ref: 'old', repo: { full_name: 'ada/demo' } }, base: { ref: 'main' } },
   ];
   const issues = [
@@ -34,7 +39,7 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
     { number: 4, title: 'Closed idea', body: '', user: { login: 'ada' }, state: 'closed', labels: [] },
   ];
   let next = 6;
-  const pullJson = (p) => ({ ...p, html_url: `${base}/ada/demo/pulls/${p.number}`, comments: (comments[p.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${p.number}T08:00:00Z` });
+  const pullJson = (p) => ({ ...p, head: { ...p.head, repo: { ...p.head.repo, clone_url: `${base}/${p.head.repo.full_name}.git` } }, html_url: `${base}/ada/demo/pulls/${p.number}`, comments: (comments[p.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${p.number}T08:00:00Z` });
   const issueJson = (i) => ({ ...i, html_url: `${base}/ada/demo/issues/${i.number}`, comments: (comments[i.number] ?? []).length, created_at: `${DAY}0T08:00:00Z`, updated_at: `${DAY}${i.number}T08:00:00Z` });
   const byState = (list, state) => list.filter((item) => state === 'all' || item.state === (state ?? 'open'));
 
@@ -51,7 +56,11 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
       pulls.unshift(created);
       return pullJson(created);
     }],
-    ['GET', /^\/repos\/ada\/demo\/issues$/, (_m, q) => byState(issues, q.get('state')).map(issueJson)],
+    ['GET', /^\/repos\/ada\/demo\/issues$/, (_m, q) => [
+      ...byState(issues, q.get('state')).map(issueJson),
+      // GitVerse has no type filter here: pull requests come too.
+      ...(gitverse ? byState(pulls, q.get('state')).map((p) => ({ ...issueJson({ ...p, labels: [] }), pull_request: { merged: p.merged } })) : []),
+    ]],
     ['GET', /^\/repos\/ada\/demo\/issues\/(\d+)$/, (m) => {
       const found = issues.find((i) => i.number === Number(m[1]));
       if (found) return issueJson(found);
@@ -74,16 +83,18 @@ export async function startForgejoMock({ token = 'tok-ada', user = 'ada', fullNa
   const basic = `Basic ${Buffer.from(`${user}:${token}`).toString('base64')}`;
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    if (!url.pathname.startsWith('/api/v1/')) {
+    if (!url.pathname.startsWith(`${prefix}/`)) {
       requests.push({ method: req.method, path: url.pathname, git: true, authorized: req.headers.authorization === basic });
       if (!gitRoot) return res.writeHead(404).end();
       if (req.headers.authorization !== basic) return res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="forgejo"' }).end();
       return gitBackend(req, res, gitRoot, user);
     }
-    const path = url.pathname.slice('/api/v1'.length);
-    requests.push({ method: req.method, path, authorized: req.headers.authorization === `token ${token}` });
-    const send = (status, data) => res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(data));
-    if (req.headers.authorization !== `token ${token}`) return send(401, { message: 'token is required' });
+    const path = url.pathname.slice(prefix.length);
+    requests.push({ method: req.method, path, authorized: req.headers.authorization === authorization, accept: req.headers.accept });
+    const send = (status, data) =>
+      res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(gitverse && status >= 400 ? { error: { code: 'ERROR', message: data.message, status } } : data));
+    if (req.headers.authorization !== authorization) return send(401, { message: 'token is required' });
+    if (gitverse && req.headers.accept !== 'application/vnd.gitverse.object+json;version=1') return send(400, { message: 'The request format is invalid' });
     let raw = '';
     req.on('data', (chunk) => (raw += chunk));
     req.on('end', () => {

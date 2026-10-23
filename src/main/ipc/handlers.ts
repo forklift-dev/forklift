@@ -461,7 +461,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'hosting:checkoutPull'(_ctx, repo, number) {
       const root = tab(repo);
       assertNumber(number);
-      const { client, owner, name, remote } = await hostingOf(root);
+      const { client, owner, name, remote, account } = await hostingOf(root);
       const pull = await client.pullSummary(owner, name, number);
       if (!pull.headRepo) {
         // A branch of this repository: fetch it and switch to it (a tracking branch when there is none yet).
@@ -477,7 +477,18 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       // From a fork: the server keeps its commits at refs/pull/<number>/head; a local branch pr/<number> holds them.
       const local = `pr/${number}`;
       await thenRefresh(root, async () => {
-        await network(root, 'fetch', (run) => remotes.networkCommand(root, ['fetch', '--progress', remote, `refs/pull/${number}/head`], run));
+        await network(root, 'fetch', async (run) => {
+          try {
+            await remotes.networkCommand(root, ['fetch', '--progress', remote, `refs/pull/${number}/head`], run);
+          } catch (error) {
+            // Not every service publishes that ref: then the fork's branch itself, from the same server only
+            // (the URL comes from the server; git must not be pointed at another host or transport).
+            const fork = pull.headCloneUrl ? new URL(pull.headCloneUrl) : null;
+            const server = new URL(account.url);
+            if (run.signal.aborted || !fork || fork.protocol !== server.protocol || fork.host !== server.host || fork.username || fork.password) throw error;
+            await remotes.networkCommand(root, ['fetch', '--progress', fork.href, `refs/heads/${parseName(pull.head, 'branch')}`], run);
+          }
+        });
         if (repoData(root)?.branches.some((branch) => branch.name === local)) {
           store.dispatch(noticeAdded(`The branch ${local} already exists: it was checked out as it is, not moved to the pull request's latest commit.`));
           report(await recorder.checkout(root, { kind: 'branch', name: local }, () => branches.checkout(root, { kind: 'branch', name: local })));

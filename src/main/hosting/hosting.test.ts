@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startForgejoMock, type ForgejoMock } from '../../../tests/e2e/forgejoMock.mjs';
 import type { HostingAccount } from '../../shared/hosting';
-import { ForgejoClient, type Fetch } from './forgejo';
+import { HostingClient, type Fetch } from './client';
 import { HostingService } from './service';
 import { TokenStore } from './tokens';
 
@@ -27,9 +27,16 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('ForgejoClient', () => {
+describe.each(['forgejo', 'gitverse'] as const)('HostingClient (%s)', (provider) => {
+  let served: ForgejoMock;
+  beforeEach(async () => {
+    served = await startForgejoMock({ flavor: provider });
+  });
+  afterEach(() => served.close());
+  const connect = (token = 'tok-ada', fetcher = fetch, timeout?: number) => new HostingClient(provider, served.url, token, fetcher, timeout);
+
   it('reads the user, repositories (newest first), pull requests and issues', async () => {
-    const client = new ForgejoClient(mock.url, 'tok-ada', fetch);
+    const client = connect();
     expect(await client.user()).toEqual({ login: 'ada', name: 'Ada Lovelace' });
     expect((await client.repos()).map((repo) => repo.fullName)).toEqual(['ada/secret', 'ada/demo', 'team/tools']);
     const pulls = await client.pulls('ada', 'demo', 'open');
@@ -37,6 +44,7 @@ describe('ForgejoClient', () => {
       [1, 'feature', null, false],
       [2, 'fix', 'eve/demo', true],
     ]);
+    expect(pulls[1]?.headCloneUrl).toBe(`${served.url}/eve/demo.git`);
     expect((await client.pulls('ada', 'demo', 'closed'))[0]?.state).toBe('merged');
     const pull = await client.pull('ada', 'demo', 1);
     expect(pull).toMatchObject({ body: 'It adds **the feature**.', mergeable: true, files: [{ path: 'src/feature.txt', additions: 3 }], discussion: [{ author: 'bob', body: 'Looks good to me' }] });
@@ -50,7 +58,7 @@ describe('ForgejoClient', () => {
   });
 
   it('creates pull requests, issues and comments', async () => {
-    const client = new ForgejoClient(mock.url, 'tok-ada', fetch);
+    const client = connect();
     const pull = await client.createPull('ada', 'demo', { head: 'topic', base: 'main', title: 'Topic', body: 'Why' });
     expect(pull).toMatchObject({ title: 'Topic', head: 'topic', base: 'main', state: 'open', author: 'ada' });
     const issue = await client.createIssue('ada', 'demo', { title: 'New bug', body: '' });
@@ -60,14 +68,30 @@ describe('ForgejoClient', () => {
   });
 
   it('explains failures', async () => {
-    await expect(new ForgejoClient(mock.url, 'wrong', fetch).user()).rejects.toThrow(/refused the token/);
-    await expect(new ForgejoClient(mock.url, 'tok-ada', fetch).pull('ada', 'demo', 99)).rejects.toThrow(/Not found/);
-    await expect(new ForgejoClient('http://127.0.0.1:1', 'tok-ada', fetch).user()).rejects.toThrow(/Could not reach 127\.0\.0\.1:1/);
+    await expect(connect('wrong').user()).rejects.toThrow(/refused the token/);
+    await expect(connect().pull('ada', 'demo', 99)).rejects.toThrow(/Not found on the server: The target/);
+    await expect(new HostingClient(provider, 'http://127.0.0.1:1', 'tok-ada', fetch).user()).rejects.toThrow(/Could not reach 127\.0\.0\.1:1/);
     const html: Fetch = async () => ({ status: 200, ok: true, headers: { get: () => null }, text: async () => '<html>' });
-    await expect(new ForgejoClient(mock.url, 't', html).user()).rejects.toThrow(/not answer with JSON/);
+    await expect(connect('t', html).user()).rejects.toThrow(/not answer with JSON/);
     const silent: Fetch = (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new Error('aborted'))));
-    await expect(new ForgejoClient(mock.url, 't', silent, 20).user()).rejects.toThrow(/did not answer in time/);
+    await expect(connect('t', silent, 20).user()).rejects.toThrow(/did not answer in time/);
   });
+});
+
+
+it('GitVerse: the API of gitverse.ru is api.gitverse.ru, with Bearer and the API version in Accept', async () => {
+  const seen: Array<{ url: string; headers: Record<string, string> }> = [];
+  const record: Fetch = async (url, init) => {
+    seen.push({ url, headers: init.headers });
+    return { status: 200, ok: true, headers: { get: () => null }, text: async () => '{"login":"ada","full_name":""}' };
+  };
+  expect(await new HostingClient('gitverse', 'https://gitverse.ru', 'tok', record).user()).toEqual({ login: 'ada', name: 'ada' });
+  expect(seen[0]).toEqual({ url: 'https://api.gitverse.ru/user', headers: { Authorization: 'Bearer tok', Accept: 'application/vnd.gitverse.object+json;version=1' } });
+});
+
+it('explains rate limits', async () => {
+  const limited: Fetch = async () => ({ status: 429, ok: false, headers: { get: (name) => (name === 'Retry-After' ? '600' : null) }, text: async () => '{"error":{"message":"rate limit"}}' });
+  await expect(new HostingClient('gitverse', 'https://gitverse.ru', 'tok', limited).user()).rejects.toThrow(/Too many requests to the server: try again in 10 min/);
 });
 
 describe('HostingService', () => {
