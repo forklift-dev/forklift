@@ -1,5 +1,6 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
 import type { CheckoutTarget } from './branches';
+import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { HistoryPage } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -40,6 +41,14 @@ export interface Commands {
   /** Applies a stash and drops it if it applied cleanly (otherwise it is kept, with a notice). */
   'stash:pop': { args: [repo: string, sha: string]; result: void };
   'stash:drop': { args: [repo: string, sha: string]; result: void };
+  /** Versions of a conflicted file for the conflict editor. */
+  'conflict:file': { args: [repo: string, path: string]; result: ConflictFile };
+  /** Writes the edited result (refused if the file changed since `expectedHash`); optionally marks it resolved. */
+  'conflict:save': { args: [repo: string, path: string, text: string, expectedHash: string | null, markResolved: boolean]; result: void };
+  /** Resolves a file with one side's whole version (or its deletion). */
+  'conflict:take': { args: [repo: string, path: string, side: ConflictSide]; result: void };
+  /** Continues, aborts or skips the merge/rebase/cherry-pick/revert in progress. */
+  'operation:run': { args: [repo: string, action: OperationAction]; result: void };
   /** Shows a folder picker; resolves to the chosen path or null when cancelled. */
   'repo:pick': { args: [purpose: 'open' | 'scan']; result: string | null };
   /** Opens the repository containing `path` in a tab (or switches to its tab); resolves to the tab id. */
@@ -111,6 +120,10 @@ const commandChannelSet = {
   'stash:apply': true,
   'stash:pop': true,
   'stash:drop': true,
+  'conflict:file': true,
+  'conflict:save': true,
+  'conflict:take': true,
+  'operation:run': true,
   'repo:pick': true,
   'repo:open': true,
   'repo:activate': true,

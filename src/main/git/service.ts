@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { basename } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
-import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, StashInfo, TagInfo } from '../../shared/state';
+import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, RepoOperation, StashInfo, TagInfo } from '../../shared/state';
 import { readCommitDetails, readFileDiff, readStashDetails } from './diff';
 import { INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
@@ -48,12 +49,13 @@ export function createGitService(): GitService {
       const repo = await Repository.open(root);
       const head = repo.headUnborn() ? null : await repo.head();
       const stashes = await readStashes(repo);
-      const [branch, refs, changes, version, remotes] = await Promise.all([
+      const [branch, refs, changes, version, remotes, operation] = await Promise.all([
         readBranch(repo, head),
         readRefs(repo, head),
         readChanges(repo),
         historyVersion(repo, stashes),
         Remote.list(repo) as Promise<string[]>,
+        readOperation(repo),
       ]);
       return {
         root,
@@ -64,6 +66,7 @@ export function createGitService(): GitService {
         tags: refs.tags,
         remotes: [...remotes].sort(),
         stashes,
+        operation,
         refs: Object.fromEntries(refs.labels),
         historyVersion: version,
         changes,
@@ -111,6 +114,44 @@ async function readBranch(repo: Repository, head: Reference | null): Promise<Bra
     info.behind = counts.behind;
   }
   return info;
+}
+
+// git_repository_state_t
+const STATE = { MERGE: 1, REVERT: 2, REVERT_SEQUENCE: 3, CHERRYPICK: 4, CHERRYPICK_SEQUENCE: 5, REBASE: 7, REBASE_INTERACTIVE: 8, REBASE_MERGE: 9 };
+
+const readText = (path: string) => readFile(path, 'utf8').then((text) => text.trim(), () => '');
+
+/** Which operation is in progress, from git's state files. */
+async function readOperation(repo: Repository): Promise<RepoOperation | null> {
+  const gitDir = repo.path();
+  const state = repo.state();
+  const short = async (file: string) => (await readText(join(gitDir, file))).slice(0, 7) || undefined;
+  if (state === STATE.MERGE) {
+    // MERGE_MSG starts with "Merge branch 'feature'" (or remote-tracking branch, or commit).
+    const message = await readText(join(gitDir, 'MERGE_MSG'));
+    const subject = /^Merge (?:remote-tracking )?(?:branch|tag|commit) '([^']+)'/.exec(message)?.[1] ?? (await short('MERGE_HEAD'));
+    return { kind: 'merge', ...(subject && { subject }) };
+  }
+  if (state === STATE.CHERRYPICK || state === STATE.CHERRYPICK_SEQUENCE) {
+    const subject = await short('CHERRY_PICK_HEAD');
+    return { kind: 'cherry-pick', ...(subject && { subject }) };
+  }
+  if (state === STATE.REVERT || state === STATE.REVERT_SEQUENCE) {
+    const subject = await short('REVERT_HEAD');
+    return { kind: 'revert', ...(subject && { subject }) };
+  }
+  if (state === STATE.REBASE || state === STATE.REBASE_INTERACTIVE || state === STATE.REBASE_MERGE) {
+    for (const dir of ['rebase-merge', 'rebase-apply']) {
+      const step = Number(await readText(join(gitDir, dir, dir === 'rebase-merge' ? 'msgnum' : 'next')));
+      const total = Number(await readText(join(gitDir, dir, dir === 'rebase-merge' ? 'end' : 'last')));
+      if (step && total) {
+        const branch = (await readText(join(gitDir, dir, 'head-name'))).replace(/^refs\/heads\//, '');
+        return { kind: 'rebase', step, total, ...(branch && { subject: branch }) };
+      }
+    }
+    return { kind: 'rebase' };
+  }
+  return null;
 }
 
 /** The stash list, newest first (stash@{0}). */

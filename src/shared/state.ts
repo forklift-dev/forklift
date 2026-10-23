@@ -68,6 +68,16 @@ export interface StashInfo {
   time: number;
 }
 
+/** A multi-step git operation in progress (it stopped for conflicts or for the user). */
+export interface RepoOperation {
+  kind: 'merge' | 'rebase' | 'cherry-pick' | 'revert';
+  /** Rebase progress: the commit being applied, of how many. */
+  step?: number;
+  total?: number;
+  /** What is being merged/picked/applied, as git names it (branch or short sha). */
+  subject?: string;
+}
+
 export interface RepoData {
   root: string;
   name: string;
@@ -78,6 +88,7 @@ export interface RepoData {
   remotes: string[];
   /** Newest first. */
   stashes: StashInfo[];
+  operation: RepoOperation | null;
   /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
   refs: Record<string, string[]>;
   /**

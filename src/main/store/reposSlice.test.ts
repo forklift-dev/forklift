@@ -15,6 +15,7 @@ const data = (root: string): RepoData => ({
       tags: [],
       remotes: [],
       stashes: [],
+      operation: null,
   changes: [],
   loadedAt: 1,
 });

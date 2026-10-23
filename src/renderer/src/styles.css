@@ -567,9 +567,12 @@ button:disabled {
 
 .diff-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 8px;
-  flex: none;
+  gap: 6px 8px;
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 12px;
 }
 
@@ -1405,4 +1408,101 @@ select {
   margin-left: 6px;
   font-size: 11px;
   color: var(--fg-muted);
+}
+
+/* Center column: banner + graph, diff or conflict editor */
+.center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.center > .commits,
+.center > .diff-view,
+.center > .conflict-view {
+  flex: 1;
+  min-height: 0;
+}
+
+.operation-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--tag-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.operation-text {
+  flex: 1;
+}
+
+/* Conflict editor */
+.conflict-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.conflict-body {
+  flex: 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.3fr);
+  min-height: 0;
+}
+
+.conflict-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.conflict-sides .conflict-pane + .conflict-pane {
+  border-left: 1px solid var(--border);
+}
+
+.conflict-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.conflict-pane-title {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conflict-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.monaco-editor .conflict-ours {
+  background: rgb(46 160 67 / 18%);
+}
+
+.monaco-editor .conflict-theirs {
+  background: rgb(47 111 222 / 18%);
+}
+
+.monaco-editor .conflict-base {
+  background: rgb(128 128 128 / 15%);
+}
+
+.monaco-editor .conflict-marker {
+  background: rgb(229 165 10 / 22%);
+}
+
+.dirty-mark {
+  color: var(--accent);
+  margin-left: 6px;
 }

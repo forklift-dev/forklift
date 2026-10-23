@@ -40,6 +40,7 @@ function setup(repos: string[]) {
       tags: [],
       remotes: [],
       stashes: [],
+      operation: null,
       changes: [],
       loadedAt: Date.now(),
     }),

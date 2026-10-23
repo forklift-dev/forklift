@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Diff, type Blob, type Commit, type Repository, type Tree } from '@axosoft/nodegit';
+import { Diff, type Blob, type Commit, type IndexEntry, type Repository, type Tree } from '@axosoft/nodegit';
 import {
   MAX_DIFF_FILE_BYTES,
   type CommitDetails,
@@ -149,13 +149,22 @@ async function fromTree(repo: Repository, tree: Tree | undefined, path: string):
   return fromBlob(path, await repo.getBlob(entry.id()));
 }
 
-async function fromIndex(repo: Repository, path: string): Promise<FileVersion> {
+/** A file in the index; stage 0 is the normal entry (absent while conflicted), 1–3 are base/ours/theirs of a conflict. */
+export async function fromIndex(repo: Repository, path: string, stage: 0 | 1 | 2 | 3 = 0): Promise<FileVersion> {
   const index = await repo.refreshIndex();
-  const entry = index.getByPath(path, 0); // stage 0: absent while the file is conflicted
+  let entry: IndexEntry | undefined;
+  if (stage === 0) {
+    entry = index.getByPath(path, 0);
+  } else {
+    // The binding's getByPath ignores the stage argument; conflictGet returns all three stages.
+    const conflict = (await index.conflictGet(path).catch(() => null)) as unknown as Record<string, IndexEntry | undefined> | null;
+    const key = stage === 1 ? 'ancestor_out' : stage === 2 ? 'our_out' : 'their_out';
+    entry = conflict?.[key];
+  }
   return entry ? fromBlob(path, await repo.getBlob(entry.id)) : missing(path);
 }
 
-async function fromWorkingTree(root: string, path: string): Promise<FileVersion> {
+export async function fromWorkingTree(root: string, path: string): Promise<FileVersion> {
   const fullPath = join(root, path);
   const stats = await lstat(fullPath).catch(() => null);
   if (!stats) return missing(path);

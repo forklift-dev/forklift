@@ -6,6 +6,7 @@ import { BranchService } from './git/branches';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
 import { RepoQueue } from './git/repoQueue';
 import { StashService } from './git/stash';
+import { ConflictService } from './git/conflicts';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
@@ -71,10 +72,11 @@ async function start() {
   const staging = new StagingService(gitCli, git, repoQueue);
   const stashes = new StashService(gitCli, repoQueue);
   const branches = new BranchService(gitCli, repoQueue, stashes);
+  const conflicts = new ConflictService(gitCli, repoQueue);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

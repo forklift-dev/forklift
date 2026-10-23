@@ -6,6 +6,8 @@ import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
 import { CommitGraph } from './CommitGraph';
+import { ConflictView } from './ConflictView';
+import { OperationBanner } from './OperationBanner';
 import { copyText, useContextMenu } from './ContextMenu';
 import { LeftPanel } from './LeftPanel';
 import { useRefActions } from './useRefActions';
@@ -26,6 +28,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const repo = data.root;
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
+  const [conflictPath, setConflictPath] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
   const { open: openMenu, menu } = useContextMenu();
@@ -63,7 +66,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   return (
     <main className="workspace">
       <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={setSelectedCommit} />
-      {diffTarget ? (
+      <div className="center">
+      <OperationBanner repo={repo} data={data} run={run} />
+      {conflictPath ? (
+        <ConflictView key={conflictPath} repo={repo} path={conflictPath} run={run} runInBackground={runInBackground} onClose={() => setConflictPath(null)} />
+      ) : diffTarget ? (
         <DiffView
           key={JSON.stringify(diffTarget)}
           repo={repo}
@@ -120,6 +127,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           }}
         />
       )}
+      </div>
       <aside className="side">
         {selectedCommit ? (
           <CommitDetailsPanel
@@ -155,6 +163,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               changes={data.changes}
               selected={worktreeDiff && { path: worktreeDiff.path, staged: worktreeDiff.staged }}
               onShowDiff={(change, staged) => {
+                if (change.kind === 'conflicted') {
+                  setDiffTarget(null);
+                  return setConflictPath(change.path);
+                }
+                setConflictPath(null);
                 // A rename already in the index is under its new name there, so the unstaged side needs no old path.
                 const oldPath = staged || !change.staged ? change.origPath : undefined;
                 setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
