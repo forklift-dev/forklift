@@ -2,7 +2,7 @@
 id: T-046
 title: "Gitflow"
 stage: 4 — Репозитории
-status: todo
+status: review
 depends_on: [T-023, T-033]
 updated: 2026-10-23
 ---
@@ -19,10 +19,10 @@ Gitflow: инициализация, start/finish для feature/release/hotfix,
 
 ## Этапы
 
-- [ ] Конфигурация gitflow.* в git config
-- [ ] start/finish через наши операции веток и merge (без зависимости от git-flow CLI)
-- [ ] Панель Gitflow в левой панели
-- [ ] Тесты сценариев
+- [x] Конфигурация gitflow.* в git config
+- [x] start/finish через наши операции веток и merge (без зависимости от git-flow CLI)
+- [x] Панель Gitflow в левой панели
+- [x] Тесты сценариев
 
 ## Критерии готовности
 
@@ -32,6 +32,21 @@ Gitflow: инициализация, start/finish для feature/release/hotfix,
 ## Нюансы
 
 - nodegit-flow (ISC) можно использовать как справочник поведения.
+- 2026-10-23: настройки — в git config репозитория, ключи как у git-flow (`gitflow.branch.master|develop`,
+  `gitflow.prefix.feature|release|hotfix|versiontag`), так что git-flow CLI и GitKraken видят ту же настройку.
+  Setup создаёт develop из production, если его нет.
+- 2026-10-23: start — ветка `<префикс><имя>` от develop (hotfix — от production) и checkout; второй незаконченный
+  release/hotfix не начинается. finish (только при чистом дереве): feature → `merge --no-ff` в develop; release и
+  hotfix → `merge --no-ff` в production, аннотированный тег `<префикс тега><версия>` (сообщение по умолчанию
+  «Release x» / «Hotfix x»), затем тег вливается обратно в develop (как back-merge у git-flow AVH); ветка
+  удаляется (`branch -d`), если не выбрано «Keep the branch»; в конце checkout develop.
+- 2026-10-23: каждый шаг finish пропускается, если уже сделан (ветка уже в целевой, тег есть): при конфликте
+  merge остаётся в репозитории (баннер операции), после разрешения и коммита тот же Finish доделывает остальное.
+  Особый случай git-flow «hotfix при открытом release вливается в release, а не в develop» не сделан.
+- 2026-10-23: UI — раздел GITFLOW в левой панели («Set up Gitflow…», «+» со Start feature/release/hotfix и
+  настройками, открытые ветки с Finish/Check out/Delete) и команды палитры (Set up, Start…, Finish the current…).
+- 2026-10-23: проверено: юнит-тесты (`gitflow.test.ts`: setup, полный цикл feature/release/hotfix, keep branch,
+  конфликт и повторный finish, отказы) и сквозной набор `gitflow` (8 проверок через UI и палитру).
 
 ## Промт
 

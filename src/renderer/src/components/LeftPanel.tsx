@@ -4,10 +4,13 @@ import type { RepoData } from '../../../shared/state';
 import { useCommand } from '../useCommand';
 import { copyText, type MenuItem } from './ContextMenu';
 import { headLabel, type RefActions } from './useRefActions';
+import type { Gitflow } from './useGitflow';
+import { flowBranch } from '../../../shared/gitflow';
 
 interface LeftPanelProps {
   data: RepoData;
   actions: RefActions;
+  gitflow: Gitflow;
   openMenu(event: MouseEvent, items: MenuItem[]): void;
   /** Shows a commit in the graph. */
   onSelectCommit(sha: string): void;
@@ -15,7 +18,7 @@ interface LeftPanelProps {
   onFilter(filter: HistoryFilter): void;
 }
 
-type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules' | 'worktrees';
+type SectionId = 'local' | 'remote' | 'tags' | 'stashes' | 'submodules' | 'worktrees' | 'gitflow';
 
 const REF_MIME = 'application/x-forklift-ref';
 
@@ -44,7 +47,7 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
 }
 
 /** Left panel as in GitKraken: local branches, remote branches by remote, tags; filter and context actions. */
-export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter, onFilter }: LeftPanelProps) {
+export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, graphFilter, onFilter }: LeftPanelProps) {
   /** Graph filter entries for a ref (full name). */
   const filterItems = (ref: string): MenuItem[] => {
     const hidden = graphFilter.hidden.includes(ref);
@@ -76,6 +79,11 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
   const worktreeList = useCommand('worktree:list', [data.root], { reloadKey: data.loadedAt, keepPrevious: true });
   // A single working tree is the repository itself: the section shows once there are linked ones.
   const worktrees = (worktreeList.data ?? []).filter((tree) => match(tree.path) || match(tree.branch ?? ''));
+  const flowConfig = gitflow.config;
+  const flows = flowConfig ? data.branches.flatMap((branch) => {
+    const flow = flowBranch(flowConfig, branch.name);
+    return flow && match(branch.name) ? [{ ...flow, branch }] : [];
+  }) : [];
   const remotes = data.remotes.length ? data.remotes : [...new Set(data.remoteBranches.map((branch) => branch.remote))];
 
   /** What dropping branch `dragged` on local branch `target` can do: git merges and rebases the checked-out branch. */
@@ -358,6 +366,65 @@ export function LeftPanel({ data, actions, openMenu, onSelectCommit, graphFilter
               </li>
             );
           })}
+        </Section>
+
+        <Section
+          id="gitflow"
+          title="Gitflow"
+          count={flows.length}
+          collapsed={Boolean(collapsed['gitflow'])}
+          onToggle={toggle}
+          action={
+            flowConfig ? (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Start a feature, release or hotfix"
+                title="Start a feature, release or hotfix"
+                onClick={(event) =>
+                  openMenu(event, [
+                    { label: 'Start a feature…', onSelect: () => gitflow.start('feature') },
+                    { label: 'Start a release…', onSelect: () => gitflow.start('release') },
+                    { label: 'Start a hotfix…', onSelect: () => gitflow.start('hotfix') },
+                    'separator',
+                    { label: 'Gitflow settings…', onSelect: gitflow.init },
+                  ])
+                }
+              >
+                <span className="codicon codicon-add" aria-hidden="true" />
+              </button>
+            ) : undefined
+          }
+        >
+          {flowConfig === null && (
+            <li className="ref-item gitflow-setup">
+              <button type="button" className="link-button" onClick={gitflow.init}>
+                Set up Gitflow…
+              </button>
+            </li>
+          )}
+          {flows.map(({ kind, name, branch }) => (
+            <li
+              key={branch.name}
+              className={`ref-item gitflow ${kind}${branch.current ? ' current' : ''}`}
+              data-flow={branch.name}
+              title={branch.name}
+              onClick={() => onSelectCommit(branch.sha)}
+              onDoubleClick={() => !branch.current && actions.checkout({ kind: 'branch', name: branch.name })}
+              onContextMenu={(event) =>
+                openMenu(event, [
+                  { label: `Finish ${kind} ${name}…`, onSelect: () => gitflow.finish(branch.name) },
+                  { label: `Check out ${branch.name}`, disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
+                  'separator',
+                  { label: 'Delete…', danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
+                ])
+              }
+            >
+              <span className={`codicon ${kind === 'feature' ? 'codicon-sparkle' : kind === 'release' ? 'codicon-rocket' : 'codicon-flame'}`} aria-hidden="true" />
+              <span className="ref-name">{name}</span>
+              <span className="submodule-state">{kind}</span>
+            </li>
+          ))}
         </Section>
 
         <Section

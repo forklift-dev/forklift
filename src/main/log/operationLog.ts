@@ -41,6 +41,7 @@ export const QUIET_COMMANDS = new Set([
   'submodule:list',
   'worktree:list',
   'lfs:info',
+  'gitflow:config',
   'app:dismissNotices',
 ]);
 

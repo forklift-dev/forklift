@@ -7,6 +7,8 @@ import type { FileChange, RepoData } from '../../../shared/state';
 import { useCommandHandlers } from '../commands';
 import { FinderPalette } from './FinderPalette';
 import { LfsDialog } from './LfsDialog';
+import { useGitflow } from './useGitflow';
+import { flowBranch } from '../../../shared/gitflow';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
@@ -77,6 +79,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
+  const gitflow = useGitflow(repo, data);
   const { open: openMenu, menu } = useContextMenu();
   const closeDiff = useCallback(() => setDiffTarget(null), []);
   const worktreeDiff = diffTarget?.kind === 'worktree' ? diffTarget : null;
@@ -148,6 +151,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     },
     'history.goToHead': { run: () => head && showCommit(head), enabled: () => Boolean(head) },
     'history.showAll': { run: () => setFilter(NO_FILTER), enabled: () => filter.solo.length > 0 || filter.hidden.length > 0 },
+    'gitflow.init': { run: gitflow.init },
+    'gitflow.feature': { run: () => gitflow.start('feature'), enabled: () => Boolean(gitflow.config) },
+    'gitflow.release': { run: () => gitflow.start('release'), enabled: () => Boolean(gitflow.config) },
+    'gitflow.hotfix': { run: () => gitflow.start('hotfix'), enabled: () => Boolean(gitflow.config) },
+    'gitflow.finish': {
+      run: () => data.branch.head && gitflow.finish(data.branch.head),
+      enabled: () => Boolean(gitflow.config && data.branch.head && flowBranch(gitflow.config, data.branch.head)),
+    },
     'lfs.manage': { run: () => setLfsOpen(true) },
     'lfs.pull': { run: () => void run(() => invoke('lfs:download', repo, true)), enabled: () => Boolean(lfsInfo.data?.installed) },
     'lfs.fetch': { run: () => void run(() => invoke('lfs:download', repo, false)), enabled: () => Boolean(lfsInfo.data?.installed) },
@@ -158,7 +169,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   return (
     <main className="workspace">
-      <LeftPanel data={data} actions={refActions} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
+      <LeftPanel data={data} actions={refActions} gitflow={gitflow} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
       {lfsMissing && !lfsWarningHidden && (
@@ -332,6 +343,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       </aside>
       {dialog}
       {refActions.dialogs}
+      {gitflow.dialogs}
       {menu}
       {lfsOpen && <LfsDialog repo={repo} info={lfsInfo.data} onClose={() => setLfsOpen(false)} />}
       {finding && (

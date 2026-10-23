@@ -3,6 +3,7 @@ import type { CheckoutTarget } from './branches';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
+import type { FlowFinishOptions, FlowKind, GitflowConfig } from './gitflow';
 import type { LfsInfo } from './lfs';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
@@ -176,6 +177,12 @@ export interface Commands {
   'submodule:sync': { args: [repo: string]; result: void };
   /** Removes a submodule (staged, to be committed) and its clone in .git/modules. */
   'submodule:remove': { args: [repo: string, path: string]; result: void };
+  /** Gitflow settings from git config, or null when not set up. */
+  'gitflow:config': { args: [repo: string]; result: GitflowConfig | null };
+  'gitflow:init': { args: [repo: string, config: GitflowConfig]; result: void };
+  /** Creates and checks out the flow branch; resolves to its name. */
+  'gitflow:start': { args: [repo: string, kind: FlowKind, name: string]; result: string };
+  'gitflow:finish': { args: [repo: string, branch: string, options: FlowFinishOptions]; result: void };
   /** git-lfs version, LFS patterns, and which of `paths` are in LFS. */
   'lfs:info': { args: [repo: string, paths: string[]]; result: LfsInfo };
   'lfs:track': { args: [repo: string, pattern: string]; result: void };
@@ -291,6 +298,10 @@ const commandChannelSet = {
   'settings:browseExecutable': true,
   'themes:openFolder': true,
   'avatars:get': true,
+  'gitflow:config': true,
+  'gitflow:init': true,
+  'gitflow:start': true,
+  'gitflow:finish': true,
   'lfs:info': true,
   'lfs:track': true,
   'lfs:untrack': true,

@@ -36,6 +36,7 @@ import type { AvatarService } from '../avatars/service';
 import type { SubmoduleService } from '../git/submodules';
 import type { WorktreeService } from '../git/worktrees';
 import type { LfsService } from '../git/lfs';
+import type { GitflowService } from '../git/gitflow';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -69,6 +70,7 @@ export interface HandlerDeps {
   submodules: SubmoduleService;
   worktrees: WorktreeService;
   lfs: LfsService;
+  gitflow: GitflowService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -205,7 +207,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -846,6 +848,30 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       assertString(path, 'path');
       await thenRefresh(root, () => submodules.remove(root, path));
+    },
+
+    async 'gitflow:config'(_ctx, repo) {
+      return gitflow.config(tab(repo));
+    },
+
+    async 'gitflow:init'(_ctx, repo, config) {
+      const root = tab(repo);
+      await thenRefresh(root, () => gitflow.init(root, config));
+    },
+
+    async 'gitflow:start'(_ctx, repo, kind, name) {
+      const root = tab(repo);
+      if (kind !== 'feature' && kind !== 'release' && kind !== 'hotfix') throw new TypeError('kind must be feature, release or hotfix');
+      return thenRefresh(root, () => gitflow.start(root, kind, name));
+    },
+
+    async 'gitflow:finish'(_ctx, repo, branch, options) {
+      const root = tab(repo);
+      const raw = (typeof options === 'object' && options !== null ? options : {}) as Record<string, unknown>;
+      const { keepBranch, tagMessage } = raw;
+      if (typeof keepBranch !== 'boolean') throw new TypeError('keepBranch must be a boolean');
+      if (tagMessage !== undefined && (typeof tagMessage !== 'string' || tagMessage.length > 2000)) throw new TypeError('tagMessage must be text');
+      await thenRefresh(root, () => gitflow.finish(root, branch, { keepBranch, ...(typeof tagMessage === 'string' && { tagMessage }) }));
     },
 
     async 'lfs:info'(_ctx, repo, paths) {
