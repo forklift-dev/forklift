@@ -18,6 +18,12 @@ Each variant places its layers, first at the bottom: `scale` (around the layer's
 `solidify` makes the nearly opaque inside of generated pictures fully opaque and drops faint halos; `shadow`
 adds a soft contact shadow under the layer; `clip` cuts everything to that layer's shape.
 
+## Alternatives
+
+- `layers/forklift_alt.png` — the owner's alternative (256×256, a forklift in 3/4 view holding a glowing git
+  badge, no tile), kept to try later; not used by `compose.json`. A larger original (1254×1254) exists
+  outside the repository.
+
 ## Changing a layer
 
 1. Replace the file (same size, transparent background).
