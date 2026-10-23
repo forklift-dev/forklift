@@ -8,7 +8,7 @@ interface CommitPanelProps {
   stagedCount: number;
   /** HEAD commit, or null in a repository without commits (nothing to amend). */
   headSha: string | null;
-  onCommit(message: string, amend: boolean): Promise<boolean>;
+  onCommit(message: string, amend: boolean, skipHooks: boolean): Promise<boolean>;
   /** A message git prepared (merge, squash): the form starts with it. */
   preparedMessage?: string | null;
   /** Changes when the repository was read again (the identity may have changed). */
@@ -47,6 +47,10 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
   const [description, setDescription] = useState(preparedBody.join('\n').trim());
   const [amend, setAmend] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
+  const hooks = useCommand('hooks:list', [repo], { reloadKey: loadedAt, keepPrevious: true });
+  const verifyHooks = (hooks.data?.hooks ?? []).filter((hook) => hook === 'pre-commit' || hook === 'commit-msg');
+  const running = useAppState((s) => (s.repo.hooks?.operation === 'commit' ? s.repo.hooks : null));
 
   const canCommit = summary.trim() !== '' && (amend || stagedCount > 0) && !committing;
 
@@ -65,12 +69,14 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
     if (!canCommit) return;
     setCommitting(true);
     const message = description.trim() ? `${summary.trim()}\n\n${description.trim()}\n` : `${summary.trim()}\n`;
-    const ok = await onCommit(message, amend);
+    const ok = await onCommit(message, amend, skipHooks && verifyHooks.length > 0);
     setCommitting(false);
     if (ok) {
       setSummary('');
       setDescription('');
       setAmend(false);
+      // Skipping hooks is a one-off choice.
+      setSkipHooks(false);
     }
   };
 
@@ -107,7 +113,18 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
         onKeyDown={onKeyDown}
       />
       <CommitIdentity repo={repo} reloadKey={loadedAt} />
+      {running && (
+        <div className="hook-activity" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" /> Running {running.hooks.join(', ')} hook{running.hooks.length === 1 ? '' : 's'}…
+          {running.output.length > 0 && <pre className="hook-output">{running.output.slice(-8).join('\n')}</pre>}
+        </div>
+      )}
       <div className="commit-actions">
+        {verifyHooks.length > 0 && (
+          <label className={skipHooks ? 'skip-hooks on' : 'skip-hooks'} title={`Commit with --no-verify: the ${verifyHooks.join(' and ')} hook${verifyHooks.length === 1 ? '' : 's'} (${hooks.data?.dir}) will not check this commit`}>
+            <input type="checkbox" name="skipHooks" checked={skipHooks} onChange={(event) => setSkipHooks(event.target.checked)} /> Skip hooks
+          </label>
+        )}
         <label title={headSha ? 'Replace the last commit' : 'Nothing to amend yet'}>
           <input type="checkbox" checked={amend} disabled={!headSha} onChange={(event) => void toggleAmend(event.target.checked)} /> Amend
         </label>

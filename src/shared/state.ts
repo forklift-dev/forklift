@@ -1,6 +1,7 @@
 // Application state owned by the main process and replicated to every renderer.
 import type { CloneActivity } from './repos';
 import type { UserThemesState } from './themes';
+import type { HookActivity } from './hooks';
 import type { SettingsState } from './settings';
 
 export type ChangeKind =
@@ -121,6 +122,8 @@ export interface RemoteActivity {
 export interface RepoState {
   /** Network operation in progress (it can be cancelled). */
   remote?: RemoteActivity | null;
+  /** Hooks running in a commit or push. */
+  hooks?: HookActivity | null;
   /** Labels of what Undo and Redo would do ("commit “Fix x”"), null when nothing. */
   undo?: { undo: string | null; redo: string | null };
   path: string | null;

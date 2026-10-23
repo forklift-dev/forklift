@@ -14,6 +14,8 @@ export interface RemoteProgress {
 export interface RemoteRun {
   signal: AbortSignal;
   onProgress(progress: RemoteProgress): void;
+  /** Other output lines (e.g. what a pre-push hook prints). */
+  onOutput?(line: string): void;
 }
 
 export class RemoteError extends Error {
@@ -171,6 +173,7 @@ export class RemoteService {
         onStderrLine: (line) => {
           const progress = parseProgress(line);
           if (progress) run.onProgress(progress);
+          else if (line.trim()) run.onOutput?.(line);
         },
       });
       return stdout;

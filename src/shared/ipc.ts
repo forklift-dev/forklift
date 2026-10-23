@@ -4,6 +4,7 @@ import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
 import type { FlowFinishOptions, FlowKind, GitflowConfig } from './gitflow';
+import type { HooksInfo } from './hooks';
 import type { LfsInfo } from './lfs';
 import type { LogEntry, LogPage } from './log';
 import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './profiles';
@@ -24,7 +25,10 @@ export interface Commands {
   /** Stage, unstage or discard picked lines of one file. */
   'index:applyLines': { args: [repo: string, request: LineActionRequest]; result: void };
   /** Commits the index (hooks run); returns the new commit hash. */
-  'commit:create': { args: [repo: string, message: string, amend: boolean]; result: string };
+  /** `skipHooks`: `--no-verify` (pre-commit and commit-msg hooks do not run). */
+  'commit:create': { args: [repo: string, message: string, amend: boolean, options?: { skipHooks?: boolean }]; result: string };
+  /** Hooks git would run in this repository (honouring core.hooksPath). */
+  'hooks:list': { args: [repo: string]; result: HooksInfo };
   /** Rows `start…start+count` of the commit history with graph layout; `version` is RepoData.historyVersion. */
   'history:rows': { args: [repo: string, version: string, start: number, count: number, filter: HistoryFilter]; result: HistoryPage };
   /** Row index of a commit in the history (same version and filter), or -1. */
@@ -228,6 +232,7 @@ const commandChannelSet = {
   'index:discard': true,
   'index:applyLines': true,
   'commit:create': true,
+  'hooks:list': true,
   'commit:details': true,
   'history:rows': true,
   'history:locate': true,

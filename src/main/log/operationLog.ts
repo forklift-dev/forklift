@@ -42,6 +42,7 @@ export const QUIET_COMMANDS = new Set([
   'worktree:list',
   'lfs:info',
   'gitflow:config',
+  'hooks:list',
   'app:dismissNotices',
 ]);
 

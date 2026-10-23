@@ -61,6 +61,7 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
   const repoName = useAppState((s) => s.repo.data?.name ?? '');
   const repo = useAppState((s) => s.repo.data?.root ?? null);
   const clone = useAppState((s) => s.app.clone);
+  const pushHooks = useAppState((s) => (s.repo.hooks?.operation === 'push' ? s.repo.hooks : null));
   const [toasts, setToasts] = useState<Toast[]>([]);
   // Entries below the cursor are settled and were looked at; null until the first read (old entries never toast).
   const cursor = useRef<number | null>(null);
@@ -97,8 +98,9 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
     remote && {
       key: 'remote',
       text: `${{ fetch: 'Fetching', pull: 'Pulling', push: 'Pushing', submodules: 'Updating submodules of' }[remote.kind]} ${repoName}`,
-      phase: remote.phase,
-      percent: remote.percent,
+      // A pre-push hook runs before anything is sent: show what it prints.
+      phase: pushHooks ? `${pushHooks.hooks.join(', ')} hook${pushHooks.output.length ? `: ${pushHooks.output.at(-1)}` : '…'}` : remote.phase,
+      percent: pushHooks ? null : remote.percent,
       cancel: () => repo && void invoke('remote:cancel', repo),
     },
     clone && { key: 'clone', text: `Cloning ${baseName(clone.target)}`, phase: clone.phase, percent: clone.percent, cancel: () => void invoke('repo:cancelClone') },

@@ -37,9 +37,12 @@ import type { SubmoduleService } from '../git/submodules';
 import type { WorktreeService } from '../git/worktrees';
 import type { LfsService } from '../git/lfs';
 import type { GitflowService } from '../git/gitflow';
+import type { GitCli } from '../git/cli';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
-import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
+import { hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
+import { listHooks } from '../git/hooks';
+import { COMMIT_HOOKS, PUSH_HOOKS, type HookActivity } from '../../shared/hooks';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 
@@ -71,6 +74,8 @@ export interface HandlerDeps {
   worktrees: WorktreeService;
   lfs: LfsService;
   gitflow: GitflowService;
+  /** The git CLI (hooks listing). */
+  gitCli: GitCli;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -207,7 +212,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -236,6 +241,28 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
 
   const recorder = new UndoRecorder(undo);
+
+  /** While `work` runs, the tab shows which of `names` hooks exist and run, and their output (last 200 lines). */
+  const withHooks = async <T>(root: string, operation: HookActivity['operation'], names: string[], work: (onOutput?: (line: string) => void) => Promise<T>): Promise<T> => {
+    const present = (await listHooks(gitCli, root).catch(() => ({ hooks: [] as string[] }))).hooks.filter((hook) => names.includes(hook));
+    if (!present.length) return work();
+    let output: string[] = [];
+    let timer: NodeJS.Timeout | null = null;
+    const publish = () => {
+      timer = null;
+      store.dispatch(hookActivity({ id: root, activity: { operation, hooks: present, output } }));
+    };
+    publish();
+    try {
+      return await work((line) => {
+        output = [...output, line].slice(-200);
+        timer ??= setTimeout(publish, 100);
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+      store.dispatch(hookActivity({ id: root, activity: null }));
+    }
+  };
   const network = <T>(root: string, kind: NetworkKind, work: (run: RemoteRun) => Promise<T>) => networkOps.run(root, kind, work);
 
   const stashName = (root: string, sha: string) => {
@@ -303,7 +330,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (remote !== null) parseName(remote, 'remote');
       if (typeof force !== 'boolean') throw new TypeError('force must be a boolean');
       try {
-        await thenRefresh(root, () => network(root, 'push', (run) => remotes.push(root, remote, force, run)));
+        await thenRefresh(root, () => withHooks(root, 'push', [...PUSH_HOOKS], (onOutput) => network(root, 'push', (run) => remotes.push(root, remote, force, { ...run, onOutput }))));
       } catch (error) {
         // The window offers pulling or a force push for this case.
         if ((error as { rejected?: boolean }).rejected) throw new Error(`Rejected: ${(error as Error).message}`, { cause: error });
@@ -515,12 +542,24 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       await thenRefresh(root, () => staging.applyLines(root, parseLineActionRequest(request)));
     },
 
-    async 'commit:create'(_ctx, repo, message, amend) {
+    async 'commit:create'(_ctx, repo, message, amend, options) {
       const root = tab(repo);
       if (typeof message !== 'string' || message.trim() === '') throw new TypeError('Commit message is empty');
       if (typeof amend !== 'boolean') throw new TypeError('amend must be a boolean');
+      const skipHooks = options === undefined ? false : (options as { skipHooks?: unknown } | null)?.skipHooks;
+      if (skipHooks !== undefined && typeof skipHooks !== 'boolean') throw new TypeError('skipHooks must be a boolean');
       const subject = message.trim().split('\n')[0]!.slice(0, 60);
-      return thenRefresh(root, () => recorder.commit(root, `${amend ? 'amend' : 'commit'} “${subject}”`, () => staging.commit(root, message, amend)));
+      // With --no-verify only prepare-commit-msg and post-commit still run.
+      const hooks = skipHooks ? ['prepare-commit-msg', 'post-commit'] : [...COMMIT_HOOKS];
+      return thenRefresh(root, () =>
+        withHooks(root, 'commit', hooks, (onOutput) =>
+          recorder.commit(root, `${amend ? 'amend' : 'commit'} “${subject}”`, () => staging.commit(root, message, amend, { skipHooks: skipHooks === true, onOutput })),
+        ),
+      );
+    },
+
+    async 'hooks:list'(_ctx, repo) {
+      return listHooks(gitCli, tab(repo));
     },
 
     async 'history:rows'(_ctx, repo, version, start, count, filter) {

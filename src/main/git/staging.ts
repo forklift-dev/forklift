@@ -56,11 +56,19 @@ export class StagingService {
     return this.serial(root, () => this.applyLinesNow(root, request));
   }
 
-  /** Commits the index with hooks and signing as configured; returns the new HEAD. */
-  commit(root: string, message: string, amend: boolean): Promise<string> {
+  /**
+   * Commits the index with hooks and signing as configured; returns the new HEAD. `skipHooks` is
+   * `--no-verify` (pre-commit and commit-msg do not run); `onOutput` gets hook and git output as it comes.
+   */
+  commit(root: string, message: string, amend: boolean, options: { skipHooks?: boolean; onOutput?(line: string): void } = {}): Promise<string> {
     return this.serial(root, async () => {
       try {
-        await this.git.exec(['commit', '--file=-', ...(amend ? ['--amend'] : [])], { cwd: root, input: message });
+        await this.git.exec(['commit', '--file=-', ...(amend ? ['--amend'] : []), ...(options.skipHooks ? ['--no-verify'] : [])], {
+          cwd: root,
+          input: message,
+          onStdoutLine: options.onOutput,
+          onStderrLine: options.onOutput,
+        });
       } catch (error) {
         if (!(error instanceof GitCliError) || error.exitCode === null) throw error;
         // Hook output is what the user needs here, not just git's last line.
