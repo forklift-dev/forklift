@@ -165,6 +165,8 @@ export interface Commands {
   'log:clear': { args: []; result: void };
   /** Saves the log as text where the user chooses; resolves to the file, or null when cancelled. */
   'log:export': { args: []; result: string | null };
+  /** Gravatar pictures (data: URLs) by email; empty unless the setting is on. */
+  'avatars:get': { args: [emails: string[]]; result: Record<string, string> };
   /** Opens userData/themes in the file manager. */
   'themes:openFolder': { args: []; result: void };
   /** Editors, terminals and git diff/merge tools found on this machine (git config as seen from `repo`). */
@@ -264,6 +266,7 @@ const commandChannelSet = {
   'settings:dismissProblems': true,
   'settings:browseExecutable': true,
   'themes:openFolder': true,
+  'avatars:get': true,
   'log:entries': true,
   'log:operation': true,
   'log:clear': true,

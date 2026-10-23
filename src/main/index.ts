@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { ExternalTools } from './external/tools';
 import { BranchService } from './git/branches';
@@ -44,6 +44,7 @@ import { ToolActions } from './settings/toolActions';
 import { createAppStore, gitCliDetected, logChanged, noticeAdded, promptAdded, promptRemoved, userThemesRead } from './store';
 import { ThemeLibrary } from './themes';
 import { OperationLog } from './log/operationLog';
+import { AvatarService } from './avatars/service';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
@@ -158,7 +159,7 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli);
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { CommitFile, FileChangeStatus } from '../../../shared/diff';
 import type { SignatureStatus } from '../../../shared/profiles';
 import { useCommand } from '../useCommand';
+import { Avatar } from './Avatar';
 
 const STATUS_LABEL: Record<FileChangeStatus, string> = {
   added: 'A',
@@ -89,13 +90,15 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
       {body && <pre className="commit-body">{body}</pre>}
       <dl className="commit-meta">
         <dt>Author</dt>
-        <dd title={data.author.email}>
+        <dd title={data.author.email} className="commit-person">
+          <Avatar name={data.author.name} email={data.author.email} size={20} />
           {data.author.name} · {dateFormat.format(data.author.time * 1000)}
         </dd>
         {!sameCommitter && (
           <>
             <dt>Committer</dt>
-            <dd title={data.committer.email}>
+            <dd title={data.committer.email} className="commit-person">
+              <Avatar name={data.committer.name} email={data.committer.email} size={20} />
               {data.committer.name} · {dateFormat.format(data.committer.time * 1000)}
             </dd>
           </>

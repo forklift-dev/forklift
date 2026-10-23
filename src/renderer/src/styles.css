@@ -1349,6 +1349,45 @@ select {
   resize: vertical;
 }
 
+/* Avatars */
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.avatar.initials {
+  /* Lane colors of the theme; the page background reads on all of them. */
+  background: var(--lane);
+  color: var(--bg);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.cell.author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.author-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commit-person {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Operation log */
 .error-details {
   margin-left: 12px;

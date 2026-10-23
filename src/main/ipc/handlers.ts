@@ -32,6 +32,7 @@ import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
 import type { ProfileService } from '../profiles/service';
 import type { OperationLog } from '../log/operationLog';
+import type { AvatarService } from '../avatars/service';
 import { writeFile } from 'node:fs/promises';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
@@ -61,6 +62,7 @@ export interface HandlerDeps {
   creator: RepoCreator;
   profiles: ProfileService;
   log: OperationLog;
+  avatars: AvatarService;
   /** The environment shells start with (the user's login-shell environment once resolved). */
   shellEnv(): Promise<Record<string, string>>;
   /** Told about fetches done by hand (they reset the auto-fetch clock). */
@@ -197,7 +199,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -806,6 +808,10 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (result.canceled || !result.filePath) return null;
       await writeFile(result.filePath, `${log.text()}\n`, { mode: 0o600 });
       return result.filePath;
+    },
+
+    async 'avatars:get'(_ctx, emails) {
+      return avatars.get(emails);
     },
 
     async 'themes:openFolder'() {

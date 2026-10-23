@@ -3,6 +3,7 @@ import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
 import type { HistoryFilter, HistoryRow } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
 import { historyPages } from '../history';
+import { Avatar } from './Avatar';
 
 export const ROW_HEIGHT = 28;
 const LANE_WIDTH = 14;
@@ -222,7 +223,8 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
           {row.subject}
         </div>
         <div className="cell author" title={row.authorEmail}>
-          {row.authorName}
+          <Avatar name={row.authorName} email={row.authorEmail} />
+          <span className="author-name">{row.authorName}</span>
         </div>
         <div className="cell date">{dateFormat.format(row.authorTime * 1000)}</div>
         <div className="cell sha">{row.hash.slice(0, 7)}</div>

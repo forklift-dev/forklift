@@ -114,6 +114,13 @@ export const SETTING_FIELDS = {
     label: 'Editor theme',
     description: 'Colors of diffs, blame and the conflict editor.',
   },
+  'ui.gravatar': {
+    section: 'ui',
+    type: 'boolean',
+    default: false,
+    label: 'Load avatars from Gravatar',
+    description: 'Off: authors are shown with colored initials and nothing is sent anywhere. On: Forklift asks gravatar.com for a picture by a hash of each author’s email, and keeps the answers for a week.',
+  },
   'git.executable': {
     section: 'git',
     type: 'string',
