@@ -4,7 +4,10 @@ import { invoke } from './api';
 import { Preferences } from './components/preferences/Preferences';
 import { RepositoriesScreen } from './components/RepositoriesScreen';
 import { RepoWorkspace } from './components/RepoWorkspace';
+import { useContextMenu } from './components/ContextMenu';
+import { PromptDialog } from './components/PromptDialog';
 import { TabBar } from './components/TabBar';
+import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
 
@@ -26,6 +29,7 @@ export function App() {
   const tabs = useAppState((s) => s.tabs);
   const repo = useAppState((s) => s.repo);
   const notices = useAppState((s) => s.app.notices);
+  const prompts = useAppState((s) => s.app.prompts);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>('repo');
@@ -108,6 +112,8 @@ export function App() {
     if (path) void run(() => invoke('repo:open', path)).then((ok) => ok && setScreen('repo'));
   };
 
+  const remoteActions = useRemoteActions(tabs.activeId, repo.data, run);
+  const { open: openMenu, menu } = useContextMenu();
   const busy = isPending || repo.loading;
   const error = actionError;
   const data = repo.data;
@@ -143,6 +149,11 @@ export function App() {
         onPreferences={() => setScreen('preferences')}
         onStash={() => activeId && run(() => invoke('stash:push', activeId, { message: '', includeUntracked: true, stagedOnly: false }))}
         onPop={() => activeId && data?.stashes[0] && run(() => invoke('stash:pop', activeId, data.stashes[0]!.sha))}
+        remote={showRepositories ? null : (repo.remote ?? null)}
+        onPull={() => remoteActions.pull()}
+        onPullMenu={(event) => remoteActions.pullMenu(event, openMenu)}
+        onPush={remoteActions.push}
+        onCancelRemote={() => activeId && void invoke('remote:cancel', activeId)}
       />
       {notices.length > 0 && (
         <div className="error-banner notices" role="alert">
@@ -153,6 +164,11 @@ export function App() {
         </div>
       )}
       {error && <div className="error-banner">{error}</div>}
+      {remoteActions.dialogs}
+      {menu}
+      {prompts[0] && (
+        <PromptDialog key={prompts[0].id} prompt={prompts[0]} repoName={tabs.tabs.find((tab) => tab.id === prompts[0]!.repo)?.name ?? null} />
+      )}
       {screen === 'preferences' && <Preferences repo={data} onClose={() => setScreen('repo')} />}
       {screen !== 'preferences' && showRepositories && (
         <RepositoriesScreen

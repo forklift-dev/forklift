@@ -8,6 +8,7 @@ import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
+import type { RemoteProgress, RemoteService } from '../git/remote';
 import type { DiffTools } from '../external/diffTools';
 import type { ExternalTools } from '../external/tools';
 import type { GitService } from '../git/service';
@@ -20,7 +21,7 @@ import { noticeAdded, noticesDismissed, type AppStore } from '../store';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
-import { loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
+import { loadRepo, remoteActivity, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 
@@ -38,6 +39,9 @@ export interface HandlerDeps {
   stashes: StashService;
   conflicts: ConflictService;
   commitOps: CommitOps;
+  remotes: RemoteService;
+  /** Hands a credential answer to the waiting git process. */
+  answerPrompt(id: number, answer: string | null): void;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -152,7 +156,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
@@ -177,6 +181,33 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   /** Switch results that need the user's attention (a conflict, a kept stash) become a notice. */
   const report = (result: SwitchResult) => {
     if (result.message) store.dispatch(noticeAdded(result.message));
+  };
+
+  // One network operation per tab: its cancel handle, and progress updates at most every 100 ms.
+  const running = new Map<string, AbortController>();
+  const network = async <T>(root: string, kind: 'fetch' | 'pull' | 'push', work: (run: { signal: AbortSignal; onProgress(p: RemoteProgress): void }) => Promise<T>): Promise<T> => {
+    if (running.has(root)) throw new Error('A fetch, pull or push is already running in this repository');
+    const controller = new AbortController();
+    running.set(root, controller);
+    let last = 0;
+    store.dispatch(remoteActivity({ id: root, activity: { kind, phase: null, percent: null } }));
+    try {
+      return await work({
+        signal: controller.signal,
+        onProgress: ({ phase, percent }) => {
+          const now = Date.now();
+          if (now - last < 100 && percent !== 100) return;
+          last = now;
+          store.dispatch(remoteActivity({ id: root, activity: { kind, phase, percent } }));
+        },
+      });
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`The ${kind} was cancelled`, { cause: error });
+      throw error;
+    } finally {
+      running.delete(root);
+      store.dispatch(remoteActivity({ id: root, activity: null }));
+    }
   };
 
   const stashName = (root: string, sha: string) => {
@@ -219,6 +250,42 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'branch:rebase'(_ctx, repo, onto) {
       const root = tab(repo);
       return thenRefresh(root, () => commitOps.rebase(root, parseName(onto, 'ref')));
+    },
+
+    async 'remote:fetch'(_ctx, repo, remote, prune) {
+      const root = tab(repo);
+      if (remote !== null) parseName(remote, 'remote');
+      if (typeof prune !== 'boolean') throw new TypeError('prune must be a boolean');
+      await thenRefresh(root, () => network(root, 'fetch', (run) => remotes.fetch(root, remote, prune, run)));
+    },
+
+    async 'remote:pull'(_ctx, repo, rebase) {
+      const root = tab(repo);
+      if (typeof rebase !== 'boolean') throw new TypeError('rebase must be a boolean');
+      return thenRefresh(root, () => network(root, 'pull', (run) => remotes.pull(root, rebase, run)));
+    },
+
+    async 'remote:push'(_ctx, repo, remote, force) {
+      const root = tab(repo);
+      if (remote !== null) parseName(remote, 'remote');
+      if (typeof force !== 'boolean') throw new TypeError('force must be a boolean');
+      try {
+        await thenRefresh(root, () => network(root, 'push', (run) => remotes.push(root, remote, force, run)));
+      } catch (error) {
+        // The window offers pulling or a force push for this case.
+        if ((error as { rejected?: boolean }).rejected) throw new Error(`Rejected: ${(error as Error).message}`, { cause: error });
+        throw error;
+      }
+    },
+
+    async 'remote:cancel'(_ctx, repo) {
+      running.get(tab(repo))?.abort();
+    },
+
+    async 'askpass:answer'(_ctx, id, answer) {
+      if (!Number.isInteger(id)) throw new TypeError('id must be a prompt id');
+      if (answer !== null && (typeof answer !== 'string' || answer.length > 10_000 || /[\r\n\0]/.test(answer))) throw new TypeError('answer must be one line');
+      answerPrompt(id, answer);
     },
 
     async 'conflict:file'(_ctx, repo, path) {

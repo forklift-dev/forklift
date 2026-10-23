@@ -42,6 +42,7 @@ function setup(repos: string[]) {
       stashes: [],
       operation: null,
       preparedMessage: null,
+      pullRebase: false,
       changes: [],
       loadedAt: Date.now(),
     }),

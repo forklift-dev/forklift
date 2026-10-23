@@ -1,4 +1,5 @@
-import type { RepoData } from '../../../shared/state';
+import type { MouseEvent } from 'react';
+import type { RemoteActivity, RepoData } from '../../../shared/state';
 
 interface ToolbarProps {
   repo: RepoData | null;
@@ -10,9 +11,19 @@ interface ToolbarProps {
   onPreferences(): void;
   onStash(): void;
   onPop(): void;
+  remote: RemoteActivity | null;
+  /** Pull with the repository's default (merge or rebase). */
+  onPull(): void;
+  /** The Pull ▾ menu: fetch, pull with merge, pull with rebase. */
+  onPullMenu(event: MouseEvent): void;
+  onPush(): void;
+  onCancelRemote(): void;
 }
 
-export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences, onStash, onPop }: ToolbarProps) {
+const VERB = { fetch: 'Fetching', pull: 'Pulling', push: 'Pushing' } as const;
+
+export function Toolbar(props: ToolbarProps) {
+  const { repo, busy, onOpen, onRefresh, onClose, onOpenTerminal, onPreferences, onStash, onPop, remote, onPull, onPullMenu, onPush, onCancelRemote } = props;
   const branch = repo?.branch;
   return (
     <header className="toolbar">
@@ -31,6 +42,29 @@ export function Toolbar({ repo, busy, onOpen, onRefresh, onClose, onOpenTerminal
       </div>
       <div className="toolbar-actions">
         {busy && <span className="spinner" aria-label="Loading" />}
+        {remote ? (
+          <span className="remote-activity" role="status">
+            <span className="spinner" aria-hidden="true" />
+            {VERB[remote.kind]}
+            {remote.phase && ` · ${remote.phase}`}
+            {remote.percent !== null && ` ${remote.percent}%`}
+            <button type="button" onClick={onCancelRemote}>
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <span className="split-button">
+            <button type="button" onClick={onPull} disabled={!repo || !repo.branch.head} title={repo?.pullRebase ? 'Pull (rebase)' : 'Pull (merge)'}>
+              Pull
+            </button>
+            <button type="button" className="split-arrow" onClick={onPullMenu} disabled={!repo} aria-label="More pull options">
+              <span className="codicon codicon-chevron-down" aria-hidden="true" />
+            </button>
+          </span>
+        )}
+        <button type="button" onClick={onPush} disabled={!repo || !repo.branch.head || Boolean(remote)} title="Push the current branch">
+          Push
+        </button>
         <button type="button" onClick={onOpen} disabled={busy}>
           Open…
         </button>

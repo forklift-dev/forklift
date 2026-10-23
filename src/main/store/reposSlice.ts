@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { basename } from 'node:path';
-import { EMPTY_REPO_STATE, type RepoData, type RepoState, type TabInfo, type TabsState } from '../../shared/state';
+import { EMPTY_REPO_STATE, type RemoteActivity, type RepoData, type RepoState, type TabInfo, type TabsState } from '../../shared/state';
 import type { ThunkExtra } from './types';
 
 /** Every open repository by tab id (its root), plus the tab bar the windows see. */
@@ -62,6 +62,10 @@ export const reposSlice = createSlice({
         state.view.activeId = (state.view.tabs[index] ?? state.view.tabs[index - 1])?.id ?? null;
       }
     },
+    remoteActivity: (state, action: PayloadAction<{ id: string; activity: RemoteActivity | null }>) => {
+      const repo = state.byId[action.payload.id];
+      if (repo) repo.remote = action.payload.activity;
+    },
     tabMoved: (state, action: PayloadAction<{ id: string; index: number }>) => {
       const from = state.view.tabs.findIndex((t) => t.id === action.payload.id);
       if (from < 0) return;
@@ -108,4 +112,4 @@ export const reposSlice = createSlice({
   },
 });
 
-export const { tabOpened, tabActivated, tabClosed, tabMoved } = reposSlice.actions;
+export const { tabOpened, tabActivated, tabClosed, tabMoved, remoteActivity } = reposSlice.actions;

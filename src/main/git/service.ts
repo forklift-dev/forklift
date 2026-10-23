@@ -58,6 +58,7 @@ export function createGitService(): GitService {
         readOperation(repo),
         readPreparedMessage(repo),
       ]);
+      const pullRebase = await readPullRebase(repo, branch.head);
       return {
         root,
         name: basename(root),
@@ -69,6 +70,7 @@ export function createGitService(): GitService {
         stashes,
         operation,
         preparedMessage,
+        pullRebase,
         refs: Object.fromEntries(refs.labels),
         historyVersion: version,
         changes,
@@ -122,6 +124,16 @@ async function readBranch(repo: Repository, head: Reference | null): Promise<Bra
 const STATE = { MERGE: 1, REVERT: 2, REVERT_SEQUENCE: 3, CHERRYPICK: 4, CHERRYPICK_SEQUENCE: 5, REBASE: 7, REBASE_INTERACTIVE: 8, REBASE_MERGE: 9 };
 
 const readText = (path: string) => readFile(path, 'utf8').then((text) => text.trim(), () => '');
+
+/** branch.<name>.rebase, else pull.rebase: "true", "merges" and "interactive" all mean rebasing. */
+async function readPullRebase(repo: Repository, branch: string | null): Promise<boolean> {
+  const config = await repo.config();
+  for (const key of [...(branch ? [`branch.${branch}.rebase`] : []), 'pull.rebase']) {
+    const value = await config.getStringBuf(key).then((buf) => String(buf), () => null);
+    if (value !== null) return !/^(false|no|off|0)$/i.test(value.trim());
+  }
+  return false;
+}
 
 /** MERGE_MSG or SQUASH_MSG without git's comment lines. */
 async function readPreparedMessage(repo: Repository): Promise<string | null> {

@@ -1,5 +1,5 @@
 import { combineReducers, configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { EMPTY_REPO_STATE, type AppInfo, type AppState, type GitCliInfo } from '../../shared/state';
+import { EMPTY_REPO_STATE, type AppInfo, type AppState, type AskPrompt, type GitCliInfo } from '../../shared/state';
 import { librarySlice } from './librarySlice';
 import { reposSlice } from './reposSlice';
 import { settingsSlice } from './settingsSlice';
@@ -7,7 +7,7 @@ import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [] } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [] } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -19,10 +19,16 @@ const appSlice = createSlice({
     noticesDismissed: (state) => {
       state.notices = [];
     },
+    promptAdded: (state, action: PayloadAction<AskPrompt>) => {
+      state.prompts.push(action.payload);
+    },
+    promptRemoved: (state, action: PayloadAction<number>) => {
+      state.prompts = state.prompts.filter((prompt) => prompt.id !== action.payload);
+    },
   },
 });
 
-export const { gitCliDetected, noticeAdded, noticesDismissed } = appSlice.actions;
+export const { gitCliDetected, noticeAdded, noticesDismissed, promptAdded, promptRemoved } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,

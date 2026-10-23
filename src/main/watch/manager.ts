@@ -21,6 +21,8 @@ export class WatchManager {
   constructor(
     private readonly store: AppStore,
     private readonly startWatcher: typeof RepoWatcher.start = RepoWatcher.start,
+    /** Operations of the app itself (stash, checkout…): a refresh waits for them instead of showing their middle. */
+    private readonly idle: (root: string) => Promise<void> = async () => {},
   ) {}
 
   start(): void {
@@ -55,6 +57,8 @@ export class WatchManager {
     }
     if (!id) return;
     const refresher = new Refresher(async () => {
+      // The operation re-reads the repository itself when it ends.
+      await this.idle(id);
       if (this.store.getState().repos.byId[id]) await this.store.dispatch(refreshRepo(id));
     });
     const watcher = this.startWatcher(id, {

@@ -89,6 +89,8 @@ export interface RepoData {
   /** Newest first. */
   stashes: StashInfo[];
   operation: RepoOperation | null;
+  /** Whether a plain pull rebases (branch.<name>.rebase, else pull.rebase); the UI offers both either way. */
+  pullRebase: boolean;
   /** A commit message git prepared (MERGE_MSG of a merge or cherry-pick, SQUASH_MSG of a squash), to prefill the form. */
   preparedMessage: string | null;
   /** `git log --decorate` labels by commit sha: `HEAD -> main`, `origin/main`, `tag: v1.0`. */
@@ -102,8 +104,17 @@ export interface RepoData {
   loadedAt: number;
 }
 
+/** A fetch, pull or push running for a tab, with git's progress. */
+export interface RemoteActivity {
+  kind: 'fetch' | 'pull' | 'push';
+  phase: string | null;
+  percent: number | null;
+}
+
 /** One open repository (a tab). */
 export interface RepoState {
+  /** Network operation in progress (it can be cancelled). */
+  remote?: RemoteActivity | null;
   path: string | null;
   loading: boolean;
   error: string | null;
@@ -119,6 +130,18 @@ export interface GitCliInfo {
   meetsMinimum: boolean;
 }
 
+export type AskPromptKind = 'username' | 'password' | 'passphrase' | 'confirm' | 'other';
+
+/** A question from git or ssh waiting for the user (the answer never enters the state). */
+export interface AskPrompt {
+  id: number;
+  kind: AskPromptKind;
+  /** As git or ssh wrote it, e.g. "Password for 'https://ada@example.com': ". */
+  prompt: string;
+  /** Repository (tab id) the operation runs in. */
+  repo: string | null;
+}
+
 export interface AppInfo {
   version: string;
   platform: string;
@@ -126,6 +149,7 @@ export interface AppInfo {
   gitCli?: GitCliInfo;
   /** Problems outside any window action (e.g. a repository named on the command line could not be opened). */
   notices: string[];
+  prompts: AskPrompt[];
 }
 
 /** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */

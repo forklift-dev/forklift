@@ -90,6 +90,8 @@ export class StashService {
     }
     const conflicts = [...output(result).matchAll(/CONFLICT \([^)]*\): .*? in (.+)$/gm)].map((match) => match[1]!.trim());
     if (conflicts.length) return { outcome: 'conflicts', detail: conflicts.join(', ') };
+    // No conflict, the working tree changes applied, only restoring the index failed: the stash stays (it holds the index).
+    if (/Index was not unstashed/i.test(output(result))) return { outcome: 'applied-unstaged', detail: null };
     const reason = output(result).split('\n').map((line) => line.trim()).find((line) => /^(error|fatal):/.test(line)) ?? 'git stash apply failed';
     return { outcome: 'failed', detail: reason.replace(/^(error|fatal):\s*/, '') };
   }

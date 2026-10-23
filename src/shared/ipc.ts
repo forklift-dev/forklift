@@ -51,6 +51,19 @@ export interface Commands {
   'branch:merge': { args: [repo: string, ref: string, mode: 'default' | 'no-ff' | 'ff-only' | 'squash', message: string | null]; result: 'done' | 'conflicts' };
   /** Rebases the current branch onto a branch or commit. */
   'branch:rebase': { args: [repo: string, onto: string]; result: 'done' | 'conflicts' };
+  /** Fetches one remote or all (`remote` null), optionally pruning deleted remote branches. */
+  'remote:fetch': { args: [repo: string, remote: string | null, prune: boolean]; result: void };
+  /** Pulls into the current branch with merge or rebase ('conflicts': git stopped, see RepoData.operation). */
+  'remote:pull': { args: [repo: string, rebase: boolean]; result: 'done' | 'conflicts' };
+  /**
+   * Pushes the current branch to its upstream, or to `remote` (becoming the upstream) when it has none.
+   * A rejected push fails with a message starting "Rejected:"; `force` retries with --force-with-lease.
+   */
+  'remote:push': { args: [repo: string, remote: string | null, force: boolean]; result: void };
+  /** Cancels the tab's running fetch/pull/push. */
+  'remote:cancel': { args: [repo: string]; result: void };
+  /** Answers a credential prompt (`null`: cancel). The answer is passed to git and kept nowhere. */
+  'askpass:answer': { args: [id: number, answer: string | null]; result: void };
   /** Versions of a conflicted file for the conflict editor. */
   'conflict:file': { args: [repo: string, path: string]; result: ConflictFile };
   /** Writes the edited result (refused if the file changed since `expectedHash`); optionally marks it resolved. */
@@ -135,6 +148,11 @@ const commandChannelSet = {
   'commit:reset': true,
   'branch:merge': true,
   'branch:rebase': true,
+  'remote:fetch': true,
+  'remote:pull': true,
+  'remote:push': true,
+  'remote:cancel': true,
+  'askpass:answer': true,
   'conflict:file': true,
   'conflict:save': true,
   'conflict:take': true,

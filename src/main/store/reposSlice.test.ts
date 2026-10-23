@@ -17,6 +17,7 @@ const data = (root: string): RepoData => ({
       stashes: [],
       operation: null,
       preparedMessage: null,
+      pullRebase: false,
   changes: [],
   loadedAt: 1,
 });

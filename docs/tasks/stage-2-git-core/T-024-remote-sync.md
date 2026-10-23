@@ -2,9 +2,9 @@
 id: T-024
 title: Fetch, pull (merge и rebase), push; учётные данные в UI
 stage: 2 — Основная работа внутри приложения
-status: todo
+status: review
 depends_on: [T-012, T-011]
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # T-024. Fetch, pull (merge и rebase), push; учётные данные в UI
@@ -21,17 +21,54 @@ updated: 2026-10-22
 
 ## Этапы
 
-- [ ] Fetch/pull/push через GitCli с `--progress`, разбор прогресса в состояние, отмена (AbortSignal)
-- [ ] Pull: merge или rebase; конфликты → T-025; остановленный rebase — продолжить/прервать
-- [ ] Учётные данные: системный credential helper (GCM, osxkeychain, libsecret) + свой `GIT_ASKPASS`-мост
-      для логина/пароля/passphrase в UI
-- [ ] SSH: ssh-agent (`SSH_AUTH_SOCK` из окружения shell, T-011), подтверждение нового хоста
-- [ ] Секреты не попадают в состояние и логи
+- [x] Fetch/pull/push через GitCli с `--progress`, разбор прогресса в состояние (`RepoState.remote`), отмена (AbortSignal)
+- [x] Pull: merge или rebase (по умолчанию — `branch.<name>.rebase`/`pull.rebase`); конфликты → T-025 (баннер)
+- [x] Учётные данные: системный credential helper + свой askpass-мост для логина/пароля/passphrase в UI
+- [x] SSH: ssh-agent из окружения; подтверждение нового хоста — тот же мост (диалог «Trust this host») — **проверить вручную**
+- [x] Секреты не попадают в состояние и логи
+- [x] Push: upstream или выбор удалённого (`--set-upstream`); отклонённый push → предложение force-with-lease
+
+## Дизайн askpass-моста (2026-10-23)
+
+- git и ssh спрашивают логин/пароль/passphrase через программу из `GIT_ASKPASS` / `SSH_ASKPASS`
+  (`SSH_ASKPASS_REQUIRE=force`, OpenSSH ≥ 8.4): `<программа> "<текст вопроса>"`, ответ — в stdout, код ≠ 0 — отказ.
+- **Программа — сам Forklift** в режиме `--forklift-askpass`: тот же исполняемый файл, без окна, без блокировки
+  единственного экземпляра. Отдельный бинарник не нужен (не надо собирать под 6 платформ), Node-скрипт нельзя:
+  fuse `RunAsNode` закрыт (T-001), открывать его ради askpass — ослабление безопасности. git вызывает askpass без
+  дополнительных аргументов, поэтому в `userData` пишется обёртка: `forklift-askpass.sh` (POSIX, `exec "<exe>"
+  [<app>] --forklift-askpass "$@"`) или `forklift-askpass.cmd` на Windows.
+- **Канал**: main слушает UNIX-сокет в личной папке `0700` (`$XDG_RUNTIME_DIR` или временная папка) или
+  именованный канал `\\.\pipe\forklift-askpass-<random>` на Windows. Каждый сетевой запуск git получает
+  `FORKLIFT_ASKPASS_SOCKET` и одноразовый `FORKLIFT_ASKPASS_TOKEN`; запрос без известного токена отклоняется, вопрос
+  связан с конкретной операцией и вкладкой. Протокол: одна строка JSON `{token, prompt}` → `{answer}` или `{cancel}`.
+- **Окно**: вопрос (без ответа) кладётся в реплицируемое состояние (`app.prompts`: id, текст, тип —
+  username/password/passphrase/confirm-host, репозиторий); окно показывает диалог; ответ уходит командой
+  `askpass:answer(id, answer | null)` и **нигде не хранится** (ни в состоянии, ни в логах; в журнал IPC пишутся
+  только ошибки без аргументов). Отмена операции отменяет и её вопросы.
+- **Системные credential helper'ы** (GCM, osxkeychain, libsecret, store) работают как обычно — git спрашивает их
+  раньше askpass и сохраняет в них введённые данные (`credential approve`); ничего отключать не нужно.
+- **SSH**: ssh-agent берётся из окружения (`SSH_AUTH_SOCK` из login-shell, T-011); подтверждение нового ключа хоста
+  (`Are you sure you want to continue connecting (yes/no/[fingerprint])?`) приходит тем же askpass — диалог Да/Нет.
 
 ## Нюансы
 
 - askpass-мост GitKraken (`rust-socket-bridge`) проприетарный — свой: маленький askpass-скрипт, связь с
   приложением через сокет/именованный канал. Дизайн описать в задаче до реализации.
+- 2026-10-23: режим `--forklift-askpass` стартует за ~0,2 с и работает даже без дисплея (выход до инициализации
+  окон). Проверено: юнит-тест с настоящим `git credential fill` и сквозной набор `remote` с HTTP-сервером
+  (`git http-backend` за Basic-авторизацией, `tests/e2e/gitHttp.mjs`): логин и пароль в диалоге (пароль — маскированное
+  поле), неверный пароль, отмена, push, отклонённый push. Упакованная сборка (`E2E_BINARY`) — тоже зелёная.
+- 2026-10-23: **Windows**: обёртка `forklift-askpass.cmd` и именованный канал написаны, но не проверены — проверить
+  вместе с T-003. SSH (passphrase, новый хост) сквозным тестом не покрыт (нужен sshd) — проверить вручную.
+- 2026-10-23: pull — с `--autostash` (как merge/rebase в T-033). Fast-forward-only отдельно не предлагается
+  (решение владельца).
+- 2026-10-23: во время вопроса git кнопка Cancel тулбара закрыта модальным диалогом — отмена через Cancel в диалоге
+  (git получает отказ и завершается). Cancel в тулбаре — для долгих fetch/push без вопросов.
+- 2026-10-23: попутно: тихое обновление по слежению за файлами теперь ждёт окончания операций самого приложения
+  (`RepoQueue.idle`), чтобы не показывать их промежуточное состояние. Сквозные тесты ждут окончания операции
+  (индикатор занятости), а не первого изменения на экране: иначе git-команды теста шли параллельно с операцией.
+- 2026-10-23: stash apply: случай «рабочая копия применилась, индекс — нет» («Index was not unstashed», без
+  конфликтов) считается `applied-unstaged`, stash не удаляется.
 
 ## Промт
 

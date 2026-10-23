@@ -49,7 +49,15 @@ export function createRepo({ prefix = 'forklift-repo-', dir } = {}) {
   const root = dir ?? tempDir(prefix);
   mkdirSync(root, { recursive: true });
   const env = { ...process.env, ...GIT_IDENTITY, HOME: root };
-  const git = (...args) => execFileSync('git', args, { cwd: root, env, stdio: 'pipe' }).toString().replace(/\n$/, '');
+  const git = (...args) => {
+    try {
+      return execFileSync('git', args, { cwd: root, env, stdio: 'pipe' }).toString().replace(/\n$/, '');
+    } catch (error) {
+      // Say why: git's own message, not just "Command failed".
+      if (error.stderr?.length) error.message = `${error.message}\n${error.stderr.toString().trim()}`;
+      throw error;
+    }
+  };
   /** Like git(), but a non-zero exit (e.g. a conflicting merge) is not an error. */
   git.allowFail = (...args) => {
     try {

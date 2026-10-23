@@ -1506,3 +1506,40 @@ select {
   color: var(--accent);
   margin-left: 6px;
 }
+
+/* Network operations and prompts */
+.split-button {
+  display: inline-flex;
+}
+
+.split-button > button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.split-button > .split-arrow {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+  padding: 4px 6px;
+}
+
+.remote-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.prompt-text {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.prompt-repo {
+  color: var(--fg-muted);
+  font-weight: normal;
+}
+
+.prompt-note {
+  font-size: 12px;
+}

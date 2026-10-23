@@ -8,6 +8,10 @@ import { RepoQueue } from './git/repoQueue';
 import { StashService } from './git/stash';
 import { ConflictService } from './git/conflicts';
 import { CommitOps } from './git/commitOps';
+import { RemoteService } from './git/remote';
+import { runAskpassClient } from './askpass/client';
+import { ASKPASS_FLAG } from './askpass/protocol';
+import { AskpassServer } from './askpass/server';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { StagingService } from './git/staging';
@@ -26,11 +30,13 @@ import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected, noticeAdded } from './store';
+import { createAppStore, gitCliDetected, noticeAdded, promptAdded, promptRemoved } from './store';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
 
-registerAppScheme();
+// Started by git or ssh to ask for credentials (see AskpassServer): no window, no single-instance lock.
+const askpassMode = process.argv.includes(ASKPASS_FLAG);
+if (!askpassMode) registerAppScheme();
 
 let mainWindow: BrowserWindow | null = null;
 /** Opens a folder named by a later launch (`forklift <path>` while running); set once the app is ready. */
@@ -75,10 +81,29 @@ async function start() {
   const branches = new BranchService(gitCli, repoQueue, stashes);
   const conflicts = new ConflictService(gitCli, repoQueue);
   const commitOps = new CommitOps(gitCli, repoQueue);
+  // Credential prompts: shown in the window; answers go straight to the waiting git process.
+  const waiting = new Map<number, (answer: string | null) => void>();
+  const askpass = new AskpassServer({
+    scriptDir: join(app.getPath('userData'), 'askpass'),
+    command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
+    ask: (prompt) =>
+      new Promise((resolve) => {
+        waiting.set(prompt.id, resolve);
+        store.dispatch(promptAdded(prompt));
+      }).finally(() => {
+        waiting.delete(prompt.id);
+        store.dispatch(promptRemoved(prompt.id));
+      }) as Promise<string | null>,
+    onCancel: (id) => waiting.get(id)?.(null),
+  });
+  await askpass.start();
+  app.on('will-quit', () => void askpass.stop());
+  const remotes = new RemoteService(gitCli, askpass, repoQueue);
+  const answerPrompt = (id: number, answer: string | null) => waiting.get(id)?.(answer);
   const toolActions = new ToolActions(gitCli, tools, diffTools, settings);
   const scanner = new RepoScanner();
   const history = new HistoryService();
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps }), replication);
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, answerPrompt }), replication);
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -87,7 +112,7 @@ async function start() {
   const cliPath = pathFromArgv(process.argv, app.isPackaged, process.cwd());
   if (cliPath) void repoSession.open(git, cliPath, report);
   // Changes made outside the app (editors, git in a terminal) show up by themselves.
-  const watch = new WatchManager(store);
+  const watch = new WatchManager(store, undefined, (root) => repoQueue.idle(root));
   watch.start();
   app.on('browser-window-focus', () => watch.refreshActive());
   app.on('will-quit', () => void watch.stop());
@@ -130,7 +155,13 @@ async function start() {
   app.on('activate', showMainWindow);
 }
 
-if (!app.requestSingleInstanceLock()) {
+if (askpassMode) {
+  const prompt = process.argv[process.argv.length - 1] ?? '';
+  void runAskpassClient(prompt === ASKPASS_FLAG ? '' : prompt, process.env, (text) => process.stdout.write(text)).then((code) => {
+    // Let stdout drain before leaving.
+    process.stdout.write('', () => process.exit(code));
+  });
+} else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv, cwd) => {
