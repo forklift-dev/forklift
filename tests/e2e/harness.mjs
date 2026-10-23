@@ -295,6 +295,18 @@ export class CdpSession {
     await this.clickAt(box.x, box.y);
   }
 
+  /** Drags the centre of an element `dx` pixels sideways with the mouse, in a few steps. */
+  async drag(expression, dx, dy = 0) {
+    const box = await this.evaluate(`(() => { const el = (${expression}); if (!(el instanceof Element)) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    if (!box) throw new Error(`not found: ${expression}`);
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y });
+    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', buttons: 1, clickCount: 1 });
+    for (let step = 1; step <= 5; step++) {
+      await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x + (dx * step) / 5, y: box.y + (dy * step) / 5, button: 'left', buttons: 1 });
+    }
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x + dx, y: box.y + dy, button: 'left', buttons: 0, clickCount: 1 });
+  }
+
   /** Types into the focused element. */
   insertText(text) {
     return this.send('Input.insertText', { text });

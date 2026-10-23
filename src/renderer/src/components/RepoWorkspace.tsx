@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { LIMITS, resetPanelWidth, setPanelWidth, togglePanel, useLayout } from '../layout';
+import { Splitter } from './Splitter';
 import { NO_FILTER, type HistoryFilter } from '../../../shared/history';
 import { useCommand } from '../useCommand';
 import { HistoryBar, type SearchState } from './HistoryBar';
@@ -122,6 +124,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     setDiffTarget({ kind: 'worktree', path: change.path, staged, ...(oldPath && { oldPath }) });
   };
 
+  const layout = useLayout();
   const [finding, setFinding] = useState(false);
   const [switchingBranch, setSwitchingBranch] = useState(false);
   const [lfsOpen, setLfsOpen] = useState(false);
@@ -135,6 +138,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const stagedPaths = data.changes.filter((c) => c.staged).map((c) => c.path);
   useCommandHandlers({
     'palette.find': { run: () => setFinding(true) },
+    'view.toggleLeftPanel': { run: () => togglePanel('left') },
+    'view.toggleRightPanel': { run: () => togglePanel('right') },
     'branch.switch': { run: () => setSwitchingBranch(true) },
     'repo.stageAll': { run: () => void run(() => invoke('index:stage', repo, unstagedPaths)), enabled: () => unstagedPaths.length > 0 },
     'repo.unstageAll': { run: () => void run(() => invoke('index:unstage', repo, stagedPaths)), enabled: () => stagedPaths.length > 0 },
@@ -171,8 +176,12 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const selectedStash = data.stashes.find((stash) => stash.sha === selectedCommit) ?? null;
 
   return (
-    <main className="workspace">
-      <LeftPanel data={data} actions={refActions} gitflow={gitflow} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />
+    <main
+      className="workspace"
+      style={{ '--left': layout.leftHidden ? '0px' : `${layout.left}px`, '--right': layout.rightHidden ? '0px' : `${layout.right}px` } as CSSProperties}
+    >
+      {layout.leftHidden ? <div /> : <LeftPanel data={data} actions={refActions} gitflow={gitflow} openMenu={openMenu} onSelectCommit={showCommit} graphFilter={filter} onFilter={setFilter} />}
+      <Splitter label="Resize the left panel" className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
       {lfsMissing && !lfsWarningHidden && (
@@ -286,7 +295,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         </>
       )}
       </div>
-      <aside className="side">
+      <Splitter label="Resize the right panel" className="right" value={layout.rightHidden ? 0 : layout.right} min={LIMITS.right[0]} max={LIMITS.right[1]} direction={-1} onChange={(width) => setPanelWidth('right', width)} onReset={() => resetPanelWidth('right')} />
+      <aside className="side" hidden={layout.rightHidden}>
         {selectedCommit ? (
           <CommitDetailsPanel
             key={selectedCommit}

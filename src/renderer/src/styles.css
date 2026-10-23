@@ -314,11 +314,47 @@ button:disabled {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  /* Widths from the layout (src/renderer/src/layout.ts); a narrow window keeps room for the graph. */
+  grid-template-columns: min(var(--left, 220px), 32vw) 0 minmax(360px, 1fr) 0 min(var(--right, 320px), 40vw);
   min-height: 0;
 }
 
+.side[hidden] {
+  display: none;
+}
+
+.splitter {
+  position: relative;
+  z-index: 3;
+  cursor: col-resize;
+  outline: none;
+}
+
+/* A grab area wider than the border it sits on. */
+.splitter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+}
+
+.splitter:hover::before,
+.splitter:focus-visible::before {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  left: -2px;
+  width: 4px;
+}
+
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 .commits {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -384,7 +420,7 @@ button:disabled {
 }
 
 .cell.refs {
-  width: 170px;
+  width: var(--col-refs, 170px);
   display: flex;
   gap: 4px;
 }
@@ -392,6 +428,78 @@ button:disabled {
 .cell.graph {
   padding: 0;
   height: var(--row-height, 28px);
+}
+
+.hide-author .cell.author,
+.hide-date .cell.date,
+.hide-sha .cell.sha {
+  display: none;
+}
+
+/* Lanes wider than the column scroll sideways (shift+wheel over the graph, or the bar under it). */
+.commit-row .cell.graph .graph-cell {
+  transform: translateX(calc(var(--graph-scroll, 0) * -1px));
+}
+
+.commit-header .cell {
+  position: relative;
+  /* The column resizers sit on the borders, a little outside the cells. */
+  overflow: visible;
+}
+
+.col-resizer {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 8px;
+  z-index: 2;
+  cursor: col-resize;
+  outline: none;
+}
+
+.col-resizer.end {
+  right: -4px;
+}
+
+.col-resizer.start {
+  left: -4px;
+}
+
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--border);
+}
+
+.col-resizer:hover::after,
+.col-resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+.graph-scrollbar {
+  position: absolute;
+  bottom: 2px;
+  height: 6px;
+  z-index: 2;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fg-muted) 15%, transparent);
+}
+
+.graph-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: var(--scrollbar);
+  cursor: grab;
+}
+
+.graph-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
 }
 
 .commit-row .cell.graph {
@@ -408,16 +516,16 @@ button:disabled {
 }
 
 .cell.author {
-  width: 140px;
+  width: var(--col-author, 140px);
 }
 
 .cell.date {
-  width: 150px;
+  width: var(--col-date, 150px);
   color: var(--fg-muted);
 }
 
 .cell.sha {
-  width: 80px;
+  width: var(--col-sha, 80px);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   color: var(--fg-muted);
 }

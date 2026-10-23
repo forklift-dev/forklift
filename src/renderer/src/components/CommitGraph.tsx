@@ -7,6 +7,9 @@ import { historyPages } from '../history';
 import { Avatar, useAvatarPicture } from './Avatar';
 import { edgePath, graphStyle, laneX, type GraphStyle } from '../graphStyles';
 import { useAppState } from '../state';
+import { DEFAULT_LAYOUT, LIMITS, resetColumns, setColumnWidth, toggleColumn, useLayout, type ColumnId } from '../layout';
+import { Splitter } from './Splitter';
+import { useContextMenu } from './ContextMenu';
 
 const MAX_GRAPH_LANES = 16;
 const OVERSCAN = 20;
@@ -146,7 +149,38 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
   }, [pages, first, last, offset]);
 
   const lanes = Math.min(MAX_GRAPH_LANES, Math.max(pages.maxWidth, 1));
-  const graphWidth = lanes * style.laneWidth + 4;
+  // The lanes need `lanesWidth`; the column is that wide unless the user set its width (then it scrolls).
+  const lanesWidth = lanes * style.laneWidth + 4;
+  const layout = useLayout();
+  const graphWidth = layout.columns.graph ?? lanesWidth;
+  const maxGraphScroll = Math.max(0, lanesWidth - graphWidth);
+  const [graphScrollState, setGraphScroll] = useState(0);
+  const graphScroll = Math.min(graphScrollState, maxGraphScroll);
+  const svgWidth = Math.max(lanesWidth, graphWidth);
+  const { open: openMenu, menu } = useContextMenu();
+  const headerMenu = (event: MouseEvent) =>
+    openMenu(event, [
+      { label: `${layout.hidden.author ? 'Show' : 'Hide'} the Author column`, onSelect: () => toggleColumn('author') },
+      { label: `${layout.hidden.date ? 'Show' : 'Hide'} the Date column`, onSelect: () => toggleColumn('date') },
+      { label: `${layout.hidden.sha ? 'Show' : 'Hide'} the SHA column`, onSelect: () => toggleColumn('sha') },
+      'separator',
+      { label: 'Fit the graph column to its lanes', disabled: layout.columns.graph === null, onSelect: () => setColumnWidth('graph', null) },
+      { label: 'Reset columns', onSelect: resetColumns },
+    ]);
+  const resizer = (column: ColumnId, label: string, edge: 'start' | 'end', width: number) => (
+    <Splitter
+      kind="col-resizer"
+      className={edge}
+      label={`Resize the ${label} column`}
+      value={width}
+      min={LIMITS[column][0]}
+      max={LIMITS[column][1]}
+      direction={edge === 'end' ? 1 : -1}
+      onChange={(value) => setColumnWidth(column, value)}
+      onReset={() => setColumnWidth(column, column === 'graph' ? null : DEFAULT_LAYOUT.columns[column])}
+    />
+  );
+  const scrollGraph = (delta: number) => setGraphScroll((current) => Math.max(0, Math.min(maxGraphScroll, Math.min(current, maxGraphScroll) + delta)));
   const headIsFirst = pages.row(0)?.hash === data.branch.oid;
   const staged = data.changes.filter((change) => change.staged).length;
   const unstaged = data.changes.filter((change) => change.unstaged).length;
@@ -219,7 +253,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
         <div key="wip" role="row" aria-selected={selectedHash === null} className={`commit-row wip${selectedHash === null ? ' selected' : ''}`} style={position} onClick={() => onSelect(null)}>
           <div className="cell refs" />
           <div className="cell graph" style={{ width: graphWidth }}>
-            <svg className="graph-cell" width={graphWidth} height={ROW_HEIGHT} aria-hidden="true" style={{ strokeWidth: style.lineWidth }}>
+            <svg className="graph-cell" width={svgWidth} height={ROW_HEIGHT} aria-hidden="true" style={{ strokeWidth: style.lineWidth }}>
               {headIsFirst && <path d={`M${laneX(style, column)} ${ROW_HEIGHT / 2}V${ROW_HEIGHT}`} className="edge wip-edge" />}
               <circle cx={laneX(style, column)} cy={ROW_HEIGHT / 2} r={Math.max(style.nodeRadius - 1, 4)} className="node wip-node" />
             </svg>
@@ -263,7 +297,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
           <GraphCell
             style={style}
             layout={row.graph}
-            width={graphWidth}
+            width={svgWidth}
             merge={row.parents.length > 1}
             stash={Boolean(row.stash)}
             wipAbove={wip && index === offset && row.hash === data.branch.oid}
@@ -286,25 +320,96 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
 
   const empty = pages.complete && pages.loaded === 0 && !wip;
   return (
-    <section className={`commits graph-style-${style.id}${style.laneRefs ? ' lane-refs' : ''}${style.streak ? ' streak-rows' : ''}`} aria-label="Commit history" style={{ '--row-height': `${ROW_HEIGHT}px` } as CSSProperties}>
+    <section
+      className={`commits graph-style-${style.id}${style.laneRefs ? ' lane-refs' : ''}${style.streak ? ' streak-rows' : ''}${layout.hidden.author ? ' hide-author' : ''}${layout.hidden.date ? ' hide-date' : ''}${layout.hidden.sha ? ' hide-sha' : ''}`}
+      aria-label="Commit history"
+      style={
+        {
+          '--row-height': `${ROW_HEIGHT}px`,
+          '--col-refs': `${layout.columns.refs}px`,
+          '--col-author': `${layout.columns.author}px`,
+          '--col-date': `${layout.columns.date}px`,
+          '--col-sha': `${layout.columns.sha}px`,
+          '--graph-scroll': graphScroll,
+        } as CSSProperties
+      }
+    >
       {pages.error && <div className="diff-message error">{pages.error}</div>}
       {empty && <div className="empty-note">No commits yet</div>}
-      <div className="commit-scroll" ref={scrollRef} role="grid" aria-rowcount={total} tabIndex={0} onKeyDown={onKeyDown} hidden={empty}>
+      <div
+        className="commit-scroll"
+        ref={scrollRef}
+        role="grid"
+        aria-rowcount={total}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        hidden={empty}
+        onWheel={(event) => {
+          // Sideways over the graph column: shift+wheel, or a horizontal wheel/touchpad.
+          if (!maxGraphScroll || !(event.target as Element).closest('.cell.graph')) return;
+          const delta = event.shiftKey ? event.deltaY || event.deltaX : Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : 0;
+          if (delta) scrollGraph(delta);
+        }}
+      >
         {/* Inside the scroll area (sticky), so its columns line up with the rows beside the scrollbar. */}
-        <div className="commit-header" role="row">
-          <div className="cell refs">Branch / Tag</div>
+        <div className="commit-header" role="row" onContextMenu={headerMenu}>
+          <div className="cell refs">
+            Branch / Tag
+            {resizer('refs', 'Branch / Tag', 'end', layout.columns.refs)}
+          </div>
           <div className="cell graph" style={{ width: graphWidth }}>
             Graph
+            {resizer('graph', 'Graph', 'end', graphWidth)}
           </div>
           <div className="cell message">Commit message</div>
-          <div className="cell author">Author</div>
-          <div className="cell date">Date</div>
-          <div className="cell sha">SHA</div>
+          <div className="cell author">
+            {resizer('author', 'Author', 'start', layout.columns.author)}
+            Author
+          </div>
+          <div className="cell date">
+            {resizer('date', 'Date', 'start', layout.columns.date)}
+            Date
+          </div>
+          <div className="cell sha">
+            {resizer('sha', 'SHA', 'start', layout.columns.sha)}
+            SHA
+          </div>
         </div>
         <div className="commit-rows" style={{ height: total * ROW_HEIGHT }}>
           {rows}
         </div>
       </div>
+      {maxGraphScroll > 0 && !empty && (
+        <GraphScrollbar left={layout.columns.refs} width={graphWidth} content={lanesWidth} scroll={graphScroll} onScroll={(value) => setGraphScroll(Math.max(0, Math.min(maxGraphScroll, value)))} />
+      )}
+      {menu}
     </section>
+  );
+}
+
+/** The bar under the graph column when its lanes are wider than it: drag the thumb to scroll sideways. */
+function GraphScrollbar({ left, width, content, scroll, onScroll }: { left: number; width: number; content: number; scroll: number; onScroll(value: number): void }) {
+  const ratio = width / content;
+  return (
+    <div className="graph-scrollbar" style={{ left, width }} role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the graph sideways" aria-valuenow={Math.round(scroll)} aria-valuemin={0} aria-valuemax={content - width}>
+      <div
+        className="graph-scrollbar-thumb"
+        style={{ left: scroll * ratio, width: Math.max(16, width * ratio) }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          const start = event.clientX;
+          const from = scroll;
+          const target = event.currentTarget;
+          target.setPointerCapture(event.pointerId);
+          const move = (e: globalThis.PointerEvent) => onScroll(from + (e.clientX - start) / ratio);
+          const up = () => {
+            target.removeEventListener('pointermove', move);
+            target.removeEventListener('pointerup', up);
+          };
+          target.addEventListener('pointermove', move);
+          target.addEventListener('pointerup', up);
+        }}
+      />
+    </div>
   );
 }
