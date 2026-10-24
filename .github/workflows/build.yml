@@ -1,6 +1,7 @@
-# Beta builds on GitHub's hosted runners: checks on Linux, then packages for Linux, Windows and macOS (x64 and
-# arm64). Native modules (nodegit, node-pty, nsfw) cannot be cross-compiled, so every OS/CPU builds on its own
-# runner. Packages are not signed yet (T-004): macOS asks to open the app with right-click → Open, Windows
+# Beta builds on GitHub's hosted runners: checks on Linux, then packages for Linux x64, Windows x64 and macOS on
+# Apple silicon (owner's choice, 2026-10-24). Native modules (nodegit, node-pty, nsfw) are compiled for the CPU
+# of the machine that builds them, so every OS/CPU needs its own runner: arm64 Linux/Windows or Intel macOS would
+# be further matrix entries (ubuntu-22.04-arm, windows-11-arm, macos-15-intel). Packages are not signed yet (T-004): macOS asks to open the app with right-click → Open, Windows
 # SmartScreen shows "More info → Run anyway".
 #
 # Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.1.0-beta.1): then the packages are
@@ -10,10 +11,6 @@ name: Build
 on:
   workflow_dispatch:
     inputs:
-      arm64:
-        description: Also build Linux and Windows for arm64 (macOS is always built for both Apple silicon and Intel)
-        type: boolean
-        default: true
       e2e:
         description: Run the end-to-end tests too (about 15 minutes more)
         type: boolean
@@ -73,37 +70,18 @@ jobs:
       - if: ${{ inputs.e2e || startsWith(github.ref, 'refs/tags/') }}
         run: npm run test:e2e
 
-  # Which packages to build: arm64 ones can be left out of a manual run.
-  plan:
-    runs-on: ubuntu-latest
-    outputs:
-      targets: ${{ steps.plan.outputs.targets }}
-    steps:
-      - id: plan
-        env:
-          ARM64: ${{ github.event_name != 'workflow_dispatch' || inputs.arm64 }}
-        run: |
-          targets='[
-            {"name":"linux-x64","runner":"ubuntu-22.04","os":"linux","arch":"x64"},
-            {"name":"windows-x64","runner":"windows-2022","os":"win","arch":"x64"},
-            {"name":"macos-arm64","runner":"macos-15","os":"mac","arch":"arm64"},
-            {"name":"macos-x64","runner":"macos-15-intel","os":"mac","arch":"x64"}'
-          if [ "$ARM64" = "true" ]; then
-            targets="$targets"',
-            {"name":"linux-arm64","runner":"ubuntu-22.04-arm","os":"linux","arch":"arm64"},
-            {"name":"windows-arm64","runner":"windows-11-arm","os":"win","arch":"arm64"}'
-          fi
-          echo "targets=$(echo "$targets]" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
-
   package:
     name: Package ${{ matrix.name }}
-    needs: [check, plan]
+    needs: check
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.plan.outputs.targets) }}
+        include:
+          - { name: linux-x64, runner: ubuntu-22.04, os: linux, arch: x64 }
+          - { name: windows-x64, runner: windows-2022, os: win, arch: x64 }
+          - { name: macos-arm64, runner: macos-15, os: mac, arch: arm64 }
     env:
       # Unsigned beta builds: electron-builder must not look for signing identities.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
