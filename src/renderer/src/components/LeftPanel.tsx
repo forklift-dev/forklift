@@ -169,6 +169,11 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
                   'separator',
                   ...filterItems(`refs/heads/${branch.name}`),
                   'separator',
+                  branch.upstream
+                    ? { label: `Change upstream (now ${branch.upstream})…`, onSelect: () => actions.setUpstream(branch.name) }
+                    : { label: 'Set upstream…', disabled: data.remoteBranches.length === 0, onSelect: () => actions.setUpstream(branch.name) },
+                  ...(branch.upstream ? [{ label: `Stop tracking ${branch.upstream}`, onSelect: () => actions.unsetUpstream(branch.name) }] : []),
+                  'separator',
                   { label: 'Rename…', onSelect: () => actions.renameBranch(branch.name) },
                   { label: 'Delete…', danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
                   'separator',

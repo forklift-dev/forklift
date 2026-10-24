@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CheckoutTarget } from '../../../shared/branches';
 import type { RepoData } from '../../../shared/state';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useConfirm } from './ConfirmDialog';
 import { useFormDialog } from './FormDialog';
+import { UpstreamPicker } from './UpstreamPicker';
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -36,6 +37,9 @@ export interface RefActions {
   createBranch(sha: string, from: string): void;
   createTag(sha: string, from: string): void;
   renameBranch(name: string): void;
+  /** Chooses the remote branch `name` tracks (or none). */
+  setUpstream(name: string): void;
+  unsetUpstream(name: string): void;
   deleteBranch(name: string): void;
   deleteTag(name: string): void;
   /** Opens the stash dialog (message, untracked files, only staged). */
@@ -63,6 +67,7 @@ export interface RefActions {
 export function useRefActions(repo: string, data: RepoData, run: RunAction): RefActions {
   const { form, dialog: formDialog } = useFormDialog();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const [upstreamFor, setUpstreamFor] = useState<string | null>(null);
   const validate = (kind: 'branch' | 'tag') => async (values: Record<string, string | boolean>) =>
     invoke('ref:validateName', repo, kind, String(values['name'] ?? '')).catch(errorText);
 
@@ -137,6 +142,9 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
         validate: async (values) => (values['name'] === name ? 'Enter a different name' : validate('branch')(values)),
         submit: (values) => attempt(() => invoke('branch:rename', repo, name, String(values['name']))),
       }),
+
+    setUpstream: (name) => setUpstreamFor(name),
+    unsetUpstream: (name) => void run(() => invoke('branch:setUpstream', repo, name, null)),
 
     deleteBranch: (name) =>
       void (async () => {
@@ -361,6 +369,17 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       <>
         {formDialog}
         {confirmDialog}
+        {upstreamFor && (
+          <UpstreamPicker
+            data={data}
+            branch={upstreamFor}
+            onPick={(upstream) => {
+              setUpstreamFor(null);
+              void run(() => invoke('branch:setUpstream', repo, upstreamFor, upstream));
+            }}
+            onClose={() => setUpstreamFor(null)}
+          />
+        )}
       </>
     ),
   };

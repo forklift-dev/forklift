@@ -13,6 +13,21 @@ async function contextMenu(page, expression) {
   await page.waitFor(`!!document.querySelector('.context-menu')`);
 }
 
+/** The branch's upstream once it equals `expected` (null: none), waiting for the app's command to finish. */
+async function upstreamBecomes(git, branch, expected) {
+  let upstream;
+  for (let i = 0; i < 50; i++) {
+    try {
+      upstream = git('rev-parse', '--abbrev-ref', `${branch}@{upstream}`);
+    } catch {
+      upstream = null;
+    }
+    if (upstream === expected) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
 async function doubleClick(page, expression) {
   await page.evaluate(`(${expression}).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
 }
@@ -116,4 +131,21 @@ export default async function ({ check }) {
   await doubleClick(page, item('origin/review'));
   check('remote branch checked out as a tracking branch', (await page.waitFor(`${currentBranch} === 'review' && ${currentBranch}`)) === 'review');
   check('…tracking origin/review', git('rev-parse', '--abbrev-ref', 'review@{upstream}') === 'origin/review');
+
+  // Upstream by hand: main tracks nothing; set it from the menu, then stop tracking.
+  git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'main'));
+  await page.invoke('repo:refresh', root);
+  await contextMenu(page, item('main'));
+  await page.click(menuItem('Set upstream…'));
+  await page.waitFor(`!!document.querySelector('.palette')`);
+  check('the picker lists remote branches, the same name first', (await page.evaluate(`document.querySelector('.palette-item')?.textContent`))?.includes('origin/main'));
+  await page.fill(`document.querySelector('.palette-input')`, 'review');
+  await page.waitFor(`document.querySelector('.palette-item')?.textContent.includes('origin/review')`);
+  await page.press('Enter');
+  check('upstream set from the menu', await page.waitFor(`!document.querySelector('.palette')`) && (await upstreamBecomes(git, 'main', 'origin/review')));
+  await page.waitFor(`${item('main')}?.title === 'main → origin/review'`);
+  await contextMenu(page, item('main'));
+  check('the menu shows the current upstream', await page.evaluate(`!!${menuItem('Change upstream (now origin/review)…')}`));
+  await page.click(menuItem('Stop tracking origin/review'));
+  check('Stop tracking removes the upstream', await upstreamBecomes(git, 'main', null));
 }

@@ -116,6 +116,23 @@ describe('BranchService.checkout with automatic stash', () => {
     sh('switch', '-q', 'main');
     await expect(service.checkout(root, { kind: 'remote', name: 'origin/review/x', remote: 'origin' })).rejects.toThrow('already exists');
   });
+
+  it('sets, changes and removes a branch’s upstream', async () => {
+    sh('config', 'remote.origin.url', root);
+    sh('config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*');
+    sh('update-ref', 'refs/remotes/origin/feature', sh('rev-parse', 'feature'));
+    sh('update-ref', 'refs/remotes/origin/main', sh('rev-parse', 'main'));
+    // A local branch named like the remote one must not be taken for it.
+    sh('branch', 'origin/main', 'feature');
+    await service.setUpstream(root, 'feature', 'origin/feature');
+    expect(sh('rev-parse', '--abbrev-ref', 'feature@{upstream}')).toBe('origin/feature');
+    await service.setUpstream(root, 'main', 'origin/main');
+    expect(sh('rev-parse', '--symbolic-full-name', 'main@{upstream}')).toBe('refs/remotes/origin/main');
+    await service.setUpstream(root, 'feature', null);
+    expect(() => sh('rev-parse', '--abbrev-ref', 'feature@{upstream}')).toThrow();
+    await expect(service.setUpstream(root, 'feature', 'origin/nothing')).rejects.toThrow('origin/nothing does not exist');
+    await expect(service.setUpstream(root, 'nothing', 'origin/main')).rejects.toThrow('nothing does not exist');
+  });
 });
 
 describe('BranchService: names, rename, delete, tags', () => {

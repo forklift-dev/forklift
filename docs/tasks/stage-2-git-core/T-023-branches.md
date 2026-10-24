@@ -51,6 +51,12 @@ updated: 2026-10-23
 - 2026-10-23: проверено: юнит-тесты на реальном git (чистая копия, перенос без конфликта со staged и untracked,
   конфликт при возврате, коллизия untracked, неудачный switch, ветка на HEAD, detached, удалённая ветка, имена,
   rename/delete, теги) и сквозной набор `branches` (20 проверок).
+- 2026-10-24: владелец не нашёл, где выбрать upstream. Было: upstream ставился только сам — при первом push ветки
+  без него (`remote/то-же-имя`) и при checkout удалённой ветки. Добавлено: в меню локальной ветки «Set upstream…»
+  (или «Change upstream (now …)…») — палитра удалённых веток с поиском, ветка с тем же именем первой, — и «Stop
+  tracking …»; команда палитры «Set the upstream of the current branch…». В git — `branch --set-upstream-to=
+  refs/remotes/<…>` (полное имя: локальная ветка `origin/x` не перепутается) и `--unset-upstream`
+  (`branch:setUpstream`). Юнит-тест и сквозная проверка в наборе `branches`.
 
 ## Промт
 

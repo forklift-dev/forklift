@@ -70,6 +70,17 @@ export class BranchService {
     });
   }
 
+  /** The remote branch `name` tracks (pull and push go there, ahead/behind count against it); null stops tracking. */
+  setUpstream(root: string, name: string, upstream: string | null): Promise<void> {
+    return this.queue.run(root, async () => {
+      await this.resolve(root, `refs/heads/${name}`);
+      if (upstream === null) return this.exec(root, ['branch', '--unset-upstream', name]);
+      await this.resolve(root, `refs/remotes/${upstream}`);
+      // The full ref name: a local branch called "origin/x" cannot be mistaken for it.
+      await this.exec(root, ['branch', `--set-upstream-to=refs/remotes/${upstream}`, name]);
+    });
+  }
+
   rename(root: string, from: string, to: string): Promise<void> {
     return this.queue.run(root, async () => {
       await this.resolve(root, `refs/heads/${from}`);

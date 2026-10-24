@@ -52,6 +52,8 @@ export interface Commands {
   /** Switches branch or commit; uncommitted changes are stashed and brought back (problems become a notice). */
   'branch:checkout': { args: [repo: string, target: CheckoutTarget]; result: void };
   'branch:rename': { args: [repo: string, from: string, to: string]; result: void };
+  /** The remote-tracking branch (`origin/main`) a local branch follows; null stops following one. */
+  'branch:setUpstream': { args: [repo: string, branch: string, upstream: string | null]; result: void };
   /** Without `force`, an unmerged branch is refused ("not fully merged"). */
   'branch:delete': { args: [repo: string, name: string, force: boolean]; result: void };
   /** `message` null: a lightweight tag; otherwise an annotated one. */
@@ -268,6 +270,7 @@ const commandChannelSet = {
   'branch:create': true,
   'branch:checkout': true,
   'branch:rename': true,
+  'branch:setUpstream': true,
   'branch:delete': true,
   'tag:create': true,
   'tag:delete': true,

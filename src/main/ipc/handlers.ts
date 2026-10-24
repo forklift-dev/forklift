@@ -628,6 +628,13 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       report(await thenRefresh(root, () => recorder.checkout(root, parsed, () => branches.checkout(root, parsed))));
     },
 
+    async 'branch:setUpstream'(_ctx, repo, branch, upstream) {
+      const root = tab(repo);
+      const name = parseName(branch, 'branch');
+      const target = upstream === null ? null : parseName(upstream, 'upstream');
+      await thenRefresh(root, () => branches.setUpstream(root, name, target));
+    },
+
     async 'branch:rename'(_ctx, repo, from, to) {
       const root = tab(repo);
       const [a, b] = [parseName(from, 'branch'), parseName(to, 'branch')];

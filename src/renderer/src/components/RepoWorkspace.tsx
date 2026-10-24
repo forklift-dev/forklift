@@ -216,6 +216,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     'view.toggleLeftPanel': { run: () => togglePanel('left') },
     'view.toggleRightPanel': { run: () => togglePanel('right') },
     'branch.switch': { run: () => setSwitchingBranch(true) },
+    'branch.setUpstream': { run: () => data.branch.head && refActions.setUpstream(data.branch.head), enabled: () => Boolean(data.branch.head) },
     'repo.stageAll': { run: () => void run(() => invoke('index:stage', repo, unstagedPaths)), enabled: () => unstagedPaths.length > 0 },
     'repo.unstageAll': { run: () => void run(() => invoke('index:unstage', repo, stagedPaths)), enabled: () => stagedPaths.length > 0 },
     'repo.discardAll': { run: () => void discardFiles(data.changes.map((c) => c.path)), enabled: () => data.changes.length > 0 && data.operation === null },
