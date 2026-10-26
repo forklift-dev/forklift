@@ -56,6 +56,7 @@ import { GitflowService } from './git/gitflow';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
+import { resolveLanguage, setLanguage } from '../shared/i18n';
 
 // Started by git or ssh to ask for credentials (see AskpassServer): no window, no single-instance lock.
 const askpassMode = process.argv.includes(ASKPASS_FLAG);
@@ -97,6 +98,9 @@ async function start() {
   // Before the window exists, so its first state snapshot already has the user's settings and themes.
   await Promise.all([settings.load(), themes.start().catch((error: unknown) => console.error('[themes] could not read user themes:', error))]);
   app.on('will-quit', () => themes.stop());
+  // Messages made here (errors, dialogs) in the window's language; the window follows the same setting.
+  const applyLanguage = () => setLanguage(resolveLanguage(settings.values['ui.language'], [app.getLocale()]));
+  applyLanguage();
   // Every git run, and every window command that changes something, for Help → Operation log.
   let logTimer: NodeJS.Timeout | null = null;
   const log = new OperationLog(() => {
@@ -247,6 +251,7 @@ async function start() {
       ),
     );
   void detectGit();
+  store.subscribe(applyLanguage);
   let gitExecutable = settings.values['git.executable'];
   store.subscribe(() => {
     if (settings.values['git.executable'] === gitExecutable) return;

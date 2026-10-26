@@ -99,6 +99,19 @@ export const SETTING_FIELDS = {
     label: 'Folder for new repositories',
     description: 'Where Clone and Init suggest creating repositories.',
   },
+  'ui.language': {
+    section: 'ui',
+    type: 'enum',
+    default: 'system',
+    // Language names are shown in their own language (not translated).
+    options: [
+      { value: 'system', label: 'System' },
+      { value: 'en', label: 'English' },
+      { value: 'ru', label: 'Русский' },
+    ],
+    label: 'Language',
+    description: 'Language of the interface. "System" follows the language of your system. Messages from git itself stay in English.',
+  },
   'ui.theme': {
     section: 'ui',
     type: 'string',

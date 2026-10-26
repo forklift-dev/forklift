@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react';
+import { t } from '../../../shared/i18n';
 import type { RemoteActivity, RepoData } from '../../../shared/state';
 
 interface ToolbarProps {
@@ -26,7 +27,9 @@ interface ToolbarProps {
   onSearch(): void;
 }
 
-const VERB = { fetch: 'Fetching', pull: 'Pulling', push: 'Pushing', submodules: 'Updating submodules' } as const;
+// A function, not a table: messages are translated when shown (the language can change while running).
+const verb = (kind: RemoteActivity['kind']) =>
+  ({ fetch: t('Fetching'), pull: t('Pulling'), push: t('Pushing'), submodules: t('Updating submodules') })[kind];
 
 /** A menu anchored under the element that was clicked, rather than at the pointer. */
 const below = (event: MouseEvent): MouseEvent => {
@@ -62,7 +65,7 @@ export function Toolbar(props: ToolbarProps) {
     <header className="toolbar">
       <div className="toolbar-repo">
         <button type="button" className="crumb" onClick={(event) => props.onRepoMenu(below(event))} aria-haspopup="menu" title={repo?.root}>
-          <span className="crumb-label">repository</span>
+          <span className="crumb-label">{t('repository')}</span>
           <span className="crumb-value">
             <strong>{repo?.name ?? 'Forklift'}</strong>
             <span className="codicon codicon-chevron-down" aria-hidden="true" />
@@ -71,13 +74,13 @@ export function Toolbar(props: ToolbarProps) {
         {branch && (
           <>
             <span className="crumb-separator codicon codicon-chevron-right" aria-hidden="true" />
-            <button type="button" className="crumb" onClick={props.onSwitchBranch} title="Switch branch">
-              <span className="crumb-label">branch</span>
+            <button type="button" className="crumb" onClick={props.onSwitchBranch} title={t('Switch branch')}>
+              <span className="crumb-label">{t('branch')}</span>
               <span className="crumb-value">
                 <span className="branch">
-                  {branch.head ?? `detached at ${branch.oid?.slice(0, 7) ?? '?'}`}
+                  {branch.head ?? t('detached at {sha}', { sha: branch.oid?.slice(0, 7) ?? '?' })}
                   {branch.upstream && (branch.ahead > 0 || branch.behind > 0) && (
-                    <span className="ahead-behind" title={`${branch.ahead} ahead, ${branch.behind} behind ${branch.upstream}`}>
+                    <span className="ahead-behind" title={t('{ahead} ahead, {behind} behind {upstream}', { ahead: branch.ahead, behind: branch.behind, upstream: branch.upstream })}>
                       {branch.ahead > 0 && ` ↑${branch.ahead}`}
                       {branch.behind > 0 && ` ↓${branch.behind}`}
                     </span>
@@ -88,53 +91,53 @@ export function Toolbar(props: ToolbarProps) {
             </button>
           </>
         )}
-        {busy && <span className="spinner toolbar-busy" aria-label="Loading" />}
+        {busy && <span className="spinner toolbar-busy" aria-label={t('Loading')} />}
       </div>
 
       <div className="toolbar-actions">
-        <ToolButton label="Undo" icon="discard" onClick={props.onUndo} disabled={busy || noRepo || !undo?.undo} title={undo?.undo ? `Undo ${undo.undo} (Ctrl+Z)` : 'Nothing to undo'} />
-        <ToolButton label="Redo" icon="redo" onClick={props.onRedo} disabled={busy || noRepo || !undo?.redo} title={undo?.redo ? `Redo ${undo.redo} (Ctrl+Shift+Z)` : 'Nothing to redo'} />
+        <ToolButton label={t('Undo')} icon="discard" onClick={props.onUndo} disabled={busy || noRepo || !undo?.undo} title={undo?.undo ? t('Undo {action} (Ctrl+Z)', { action: undo.undo }) : t('Nothing to undo')} />
+        <ToolButton label={t('Redo')} icon="redo" onClick={props.onRedo} disabled={busy || noRepo || !undo?.redo} title={undo?.redo ? t('Redo {action} (Ctrl+Shift+Z)', { action: undo.redo }) : t('Nothing to redo')} />
         <span className="tool-split">
           <ToolButton
-            label="Pull"
+            label={t('Pull')}
             icon="repo-pull"
             onClick={props.onPull}
             disabled={noRepo || !branch?.head || Boolean(remote)}
             running={remote?.kind === 'pull' || remote?.kind === 'fetch'}
-            title={repo?.pullRebase ? 'Pull (rebase)' : 'Pull (merge)'}
+            title={repo?.pullRebase ? t('Pull (rebase)') : t('Pull (merge)')}
           />
-          <button type="button" className="tool-split-arrow" onClick={(event) => props.onPullMenu(below(event))} disabled={noRepo || Boolean(remote)} aria-label="More pull options" title="Fetch, pull with merge or rebase">
+          <button type="button" className="tool-split-arrow" onClick={(event) => props.onPullMenu(below(event))} disabled={noRepo || Boolean(remote)} aria-label={t('More pull options')} title={t('Fetch, pull with merge or rebase')}>
             <span className="codicon codicon-triangle-down" aria-hidden="true" />
           </button>
         </span>
         <ToolButton
-          label="Push"
+          label={t('Push')}
           icon="repo-push"
           onClick={props.onPush}
           disabled={noRepo || !branch?.head || Boolean(remote)}
           running={remote?.kind === 'push'}
-          title="Push the current branch (a push cannot be undone)"
+          title={t('Push the current branch (a push cannot be undone)')}
         />
-        <ToolButton label="Branch" icon="git-branch-create" onClick={props.onCreateBranch} disabled={busy || noRepo || !branch?.oid} title="Create a branch at HEAD (Ctrl+B)" />
-        <ToolButton label="Stash" icon="git-stash" onClick={props.onStash} disabled={busy || noRepo || repo.changes.length === 0} title="Stash all changes, untracked files included" />
-        <ToolButton label="Pop" icon="git-stash-pop" onClick={props.onPop} disabled={busy || noRepo || repo.stashes.length === 0} title={repo?.stashes[0] ? `Pop ${repo.stashes[0].message}` : 'No stashes'} />
+        <ToolButton label={t('Branch')} icon="git-branch-create" onClick={props.onCreateBranch} disabled={busy || noRepo || !branch?.oid} title={t('Create a branch at HEAD (Ctrl+B)')} />
+        <ToolButton label={t('Stash')} icon="git-stash" onClick={props.onStash} disabled={busy || noRepo || repo.changes.length === 0} title={t('Stash all changes, untracked files included')} />
+        <ToolButton label={t('Pop')} icon="git-stash-pop" onClick={props.onPop} disabled={busy || noRepo || repo.stashes.length === 0} title={repo?.stashes[0] ? t('Pop {stash}', { stash: repo.stashes[0].message }) : t('No stashes')} />
         <span className="tool-separator" aria-hidden="true" />
-        <ToolButton label="Terminal" icon="terminal" onClick={props.onOpenTerminal} disabled={noRepo} title="Show or hide the terminal (Ctrl+`)" />
+        <ToolButton label={t('Terminal')} icon="terminal" onClick={props.onOpenTerminal} disabled={noRepo} title={t('Show or hide the terminal (Ctrl+`)')} />
       </div>
 
       <div className="toolbar-end">
         {remote && (
           <span className="remote-activity" role="status">
-            {VERB[remote.kind]}
+            {verb(remote.kind)}
             {remote.phase && ` · ${remote.phase}`}
             {remote.percent !== null && ` ${remote.percent}%`}
             <button type="button" className="link-button" onClick={props.onCancelRemote}>
-              Cancel
+              {t('Cancel')}
             </button>
           </span>
         )}
-        <ToolButton label="Actions" icon="zap" onClick={props.onActions} title="All commands (Ctrl+Shift+P)" />
-        <ToolButton label="Search" icon="search" onClick={props.onSearch} disabled={noRepo} title="Go to a file, branch, tag or commit (Ctrl+P)" />
+        <ToolButton label={t('Actions')} icon="zap" onClick={props.onActions} title={t('All commands (Ctrl+Shift+P)')} />
+        <ToolButton label={t('Search')} icon="search" onClick={props.onSearch} disabled={noRepo} title={t('Go to a file, branch, tag or commit (Ctrl+P)')} />
       </div>
       {remote && (
         <div className="toolbar-progress" aria-hidden="true">

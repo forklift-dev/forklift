@@ -19,6 +19,7 @@ import { TerminalPanel } from './components/TerminalPanel';
 import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
+import { useLanguage } from './i18n';
 
 /** Runs a command and reports failures in the banner; resolves to whether it succeeded. */
 export type RunAction = (action: () => Promise<unknown>) => Promise<boolean>;
@@ -35,6 +36,8 @@ function tabFor(tabs: TabsState, key: { step?: number; number?: number }): strin
 }
 
 export function App() {
+  // The whole app renders again in a new language (nothing below is memoized).
+  useLanguage();
   const tabs = useAppState((s) => s.tabs);
   const repo = useAppState((s) => s.repo);
   const notices = useAppState((s) => s.app.notices);

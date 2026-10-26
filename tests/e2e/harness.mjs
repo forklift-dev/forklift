@@ -100,7 +100,7 @@ async function electronBinary() {
  * never touch a copy the developer has running. `env` entries override, `undefined` removes.
  * `baseEnv: 'minimal'` starts from DISPLAY only (a desktop-menu launch); default inherits process.env.
  */
-export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, args = [], windowSize = '1400,900', home = tempDir('forklift-home-') } = {}) {
+export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, args = [], windowSize = '1400,900', lang = 'en-US', home = tempDir('forklift-home-') } = {}) {
   if (inspect && binary) throw new Error('the main-process inspector is fused off in packaged builds');
   const display = { DISPLAY: process.env.DISPLAY, XAUTHORITY: process.env.XAUTHORITY };
   const merged = {
@@ -120,6 +120,8 @@ export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false
     ...(cdpPort ? [`--remote-debugging-port=${cdpPort}`] : []),
     ...(inspectPort ? [`--inspect=${inspectPort}`] : []),
     '--ozone-platform=x11',
+    // Suites find elements by their English labels, whatever the language of this machine.
+    `--lang=${lang}`,
     `--window-size=${windowSize}`,
     // Chromium refuses to start as root with its sandbox on; CI containers (GitVerse's cloud runner) run as
     // root. Tests only: the app itself never turns the sandbox off.
