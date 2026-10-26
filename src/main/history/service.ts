@@ -4,6 +4,7 @@ import { fuzzyFilter } from '../../shared/fuzzy';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
 import type { GitCli } from '../git/cli';
 import { historyVersion, readStashes } from '../git/service';
+import type { HistorySnapshot, HistoryStore } from './store';
 
 export const MAX_PAGE = 1000;
 const MAX_MATCHES = 2000;
@@ -15,6 +16,8 @@ const BLOCK = 256;
 const MAX_BLOCKS = 256;
 /** A commit's details, one line each, separated by US (subjects are single lines). */
 const DETAILS_FORMAT = '--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s';
+/** Histories at least this long are saved for the next run (shorter ones are read again in no time). */
+const SAVE_FROM_ROWS = 20_000;
 
 /** git's summary: the first paragraph of the message on one line. */
 export function summary(message: string): string {
@@ -51,9 +54,9 @@ function parseDetails(line: string): CommitDetails | null {
  * again from the nearest saved state before it.
  */
 class HistoryCache {
-  private readonly hashes: string[] = [];
+  private hashes: string[] = [];
   /** Parent hashes joined by spaces ('' for a root commit). */
-  private readonly parentLists: string[] = [];
+  private parentLists: string[] = [];
   /** Stash rows by row index, drawn above the commit they were made on (their details are known up front). */
   private readonly stashAt = new Map<number, StashRow>();
   /** Details of blocks of BLOCK rows, read when shown. */
@@ -63,7 +66,7 @@ class HistoryCache {
   private subjectList: Promise<Map<string, string>> | null = null;
   /** Row index by commit sha. */
   readonly index = new Map<string, number>();
-  private readonly checkpoints: GraphLayoutState[] = [];
+  private checkpoints: GraphLayoutState[] = [];
   private readonly layout = new GraphLayout();
   complete = false;
   private failure: unknown = null;
@@ -83,7 +86,35 @@ class HistoryCache {
     private readonly readSubjects: (signal: AbortSignal) => Promise<Map<string, string>>,
     /** Stashes by the commit they were made on; each is placed right above it. */
     private readonly stashesByBase: Map<string, StashRow[]> = new Map(),
+    /** Told once the whole history has been read. */
+    private readonly onComplete?: (cache: HistoryCache) => void,
   ) {}
+
+  /** A history saved by an earlier run, complete without reading. */
+  static restore(snapshot: HistorySnapshot, details: HistoryCache['details'], readSubjects: HistoryCache['readSubjects']): HistoryCache {
+    const cache = new HistoryCache(snapshot.version, snapshot.filterKey, snapshot.revisions, async () => {}, details, readSubjects);
+    // Taken over as they are (spreading millions of rows into push would overflow the call stack).
+    cache.hashes = snapshot.hashes;
+    cache.parentLists = snapshot.parentLists;
+    for (const [row, stash] of snapshot.stashes) cache.stashAt.set(row, stash);
+    cache.checkpoints = snapshot.checkpoints;
+    snapshot.hashes.forEach((hash, row) => cache.index.set(hash, row));
+    cache.complete = true;
+    return cache;
+  }
+
+  /** What restore needs (the history must be complete). */
+  snapshot(): HistorySnapshot {
+    return {
+      version: this.version,
+      filterKey: this.filterKey,
+      revisions: this.revisions,
+      hashes: this.hashes,
+      parentLists: this.parentLists,
+      stashes: [...this.stashAt],
+      checkpoints: this.checkpoints,
+    };
+  }
 
   get length(): number {
     return this.hashes.length;
@@ -215,6 +246,7 @@ class HistoryCache {
     if (error && !this.abort.signal.aborted) this.failure = error;
     this.complete = true;
     this.wake();
+    if (!error) this.onComplete?.(this);
   }
 
   private wake(): void {
@@ -234,7 +266,11 @@ class HistoryCache {
 export class HistoryService {
   private readonly caches = new Map<string, Promise<HistoryCache>>();
 
-  constructor(private readonly git: GitCli) {}
+  constructor(
+    private readonly git: GitCli,
+    /** Saves large histories between runs; without it every run reads them again. */
+    private readonly store?: Pick<HistoryStore, 'load' | 'save'>,
+  ) {}
 
   /**
    * Rows `start…start+count` of the repository's history. `version` is what the window last saw in
@@ -402,6 +438,12 @@ export class HistoryService {
       });
       return subjects;
     };
-    return new HistoryCache(version, filterKey, revisions, read, details, readSubjects, stashesByBase);
+    const saved = await this.store?.load(root, version, filterKey).catch(() => null);
+    if (saved) return HistoryCache.restore(saved, details, readSubjects);
+    const save = (cache: HistoryCache) => {
+      if (!this.store || cache.length < SAVE_FROM_ROWS) return;
+      this.store.save(root, cache.snapshot()).catch((error: unknown) => console.error('[history] could not save the history:', error));
+    };
+    return new HistoryCache(version, filterKey, revisions, read, details, readSubjects, stashesByBase, save);
   }
 }

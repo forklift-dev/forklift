@@ -23,6 +23,7 @@ import { ASKPASS_FLAG, CREDENTIAL_ARG } from './askpass/protocol';
 import { AskpassServer, type PromptAnswer } from './askpass/server';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
+import { HistoryStore } from './history/store';
 import { StagingService } from './git/staging';
 import { createCommandHandlers } from './ipc/handlers';
 import { registerCommands } from './ipc/registry';
@@ -207,7 +208,7 @@ async function start() {
     writeSigners();
   });
   const scanner = new RepoScanner();
-  const history = new HistoryService(gitCli);
+  const history = new HistoryService(gitCli, new HistoryStore(join(app.getPath('userData'), 'history')));
   registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
