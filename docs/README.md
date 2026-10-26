@@ -40,6 +40,9 @@
 | [T-004](tasks/stage-0-foundation/T-004-signing-notarization.md) | Подпись и нотаризация дистрибутивов | draft |
 | [T-005](tasks/stage-0-foundation/T-005-e2e-harness.md) | Сквозные проверки в репозитории | review |
 | [T-069](tasks/stage-0-foundation/T-069-github-beta-builds.md) | Бета-сборки на GitHub Actions (Linux, Windows, macOS) | review |
+| [T-081](tasks/stage-0-foundation/T-081-packaging.md) | Пакеты: deb/rpm, Flatpak, AUR, Homebrew, winget | draft |
+| [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) | draft |
+| [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI | draft |
 
 ### Этап 1 — Процессы и внешние программы
 
@@ -50,6 +53,7 @@
 | [T-012](tasks/stage-1-processes/T-012-git-cli.md) | Адаптер git CLI поверх ProcessRunner | review |
 | [T-013](tasks/stage-1-processes/T-013-editor-terminal.md) | Открытие во внешнем редакторе и терминале | review |
 | [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | review |
+| [T-076](tasks/stage-1-processes/T-076-difftool-mergetool-mode.md) | Forklift как git difftool и mergetool | draft |
 
 ### Этап 2 — Основная работа внутри приложения
 
@@ -67,6 +71,8 @@
 | [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | review |
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | review |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
+| [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | todo |
+| [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | draft |
 
 ### Этап 3 — История и операции над коммитами
 
@@ -79,6 +85,9 @@
 | [T-034](tasks/stage-3-history/T-034-interactive-rebase.md) | Интерактивный rebase | review |
 | [T-035](tasks/stage-3-history/T-035-stash.md) | Stash | review |
 | [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | review |
+| [T-073](tasks/stage-3-history/T-073-bisect.md) | Bisect | todo |
+| [T-078](tasks/stage-3-history/T-078-compare-commits.md) | Сравнение двух коммитов и веток | draft |
+| [T-080](tasks/stage-3-history/T-080-history-memory-and-graph.md) | История: память и отрисовка графа на сотнях дорожек | draft |
 
 ### Этап 4 — Репозитории
 
@@ -92,6 +101,7 @@
 | [T-045](tasks/stage-4-repositories/T-045-lfs.md) | Git LFS | review |
 | [T-046](tasks/stage-4-repositories/T-046-gitflow.md) | Gitflow | review |
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | review |
+| [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | draft |
 
 ### Этап 5 — Настройки и удобство
 
@@ -107,6 +117,11 @@
 | [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | review |
 | [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | review |
 | [T-059](tasks/stage-5-settings/T-059-resizable-layout.md) | Изменяемая ширина колонок графа и боковых панелей | review |
+| [T-070](tasks/stage-5-settings/T-070-more-themes.md) | Больше тем интерфейса и стилей графа | todo |
+| [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | todo |
+| [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | todo |
+| [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
+| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | draft |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)
 
