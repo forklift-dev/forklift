@@ -1,3 +1,5 @@
+import { THEME_PALETTES, type ThemePalette } from './themePalettes';
+
 // Color themes: the tokens every theme defines (CSS variables of the same name), the built-in themes,
 // user themes (JSONC files extending a built-in one) and the contrast rules the built-in themes meet.
 
@@ -463,6 +465,7 @@ export const BUILTIN_THEMES: readonly Theme[] = [
   builtin('light-high-contrast', 'Light High Contrast', 'light', true, lightHighContrast),
   builtin('polar', 'Polar', 'dark', false, polar),
   builtin('sand', 'Sand', 'light', false, sand),
+  ...THEME_PALETTES.map((palette) => builtin(palette.id, palette.name, palette.scheme, false, paletteTheme(palette))),
 ];
 
 /** Setting values meaning "follow the system's light/dark" (app) and "same as the app" (editor). */
@@ -576,7 +579,10 @@ function luminance([r, g, b]: Rgba): number {
 /** Contrast ratio of `fg` on `bg` (a translucent `bg` is painted over `base`). */
 export function contrastRatio(fg: string, bg: string, base = '#ffffff'): number {
   const background = over(bg, base);
-  const hex = `#${background.slice(0, 3).map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
+  const hex = `#${background
+    .slice(0, 3)
+    .map((c) => Math.round(c).toString(16).padStart(2, '0'))
+    .join('')}`;
   const [l1, l2] = [luminance(over(fg, hex)), luminance(background)].sort((a, b) => b - a) as [number, number];
   return (l1 + 0.05) / (l2 + 0.05);
 }
@@ -610,7 +616,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { fg: 'fg', bg: 'diff-removed-bg', base: 'bg' },
   ...CODE_TEXT.map((fg) => ({ fg, bg: 'code-bg' as const })),
   { fg: 'code-fg', bg: 'code-selection' },
-  ...(['diff-added-bg', 'diff-removed-bg', 'diff-changed-bg', 'conflict-ours', 'conflict-theirs', 'conflict-base', 'conflict-marker'] as const).map((bg) => ({ fg: 'code-fg' as const, bg, base: 'code-bg' as const })),
+  ...(['diff-added-bg', 'diff-removed-bg', 'diff-changed-bg', 'conflict-ours', 'conflict-theirs', 'conflict-base', 'conflict-marker'] as const).map((bg) => ({
+    fg: 'code-fg' as const,
+    bg,
+    base: 'code-bg' as const,
+  })),
   ...THEME_TOKEN_GROUPS.graph.map((fg) => ({ fg, bg: 'bg' as const, graphic: true })),
   { fg: 'focus', bg: 'bg', graphic: true },
 ];
@@ -622,4 +632,214 @@ export function contrastProblems(theme: Theme): Array<ContrastPair & { ratio: nu
     const ratio = contrastRatio(theme.tokens[pair.fg], theme.tokens[pair.bg], pair.base ? theme.tokens[pair.base] : theme.tokens.bg);
     return ratio < minimum ? [{ ...pair, ratio: Math.round(ratio * 100) / 100, minimum }] : [];
   });
+}
+
+// --- Themes from palettes and accent colors --------------------------------------------------------------
+
+type Hsl = [h: number, s: number, l: number];
+
+function toHsl(color: string): Hsl {
+  const [r, g, b] = parseColor(color).map((c, i) => (i < 3 ? c / 255 : c)) as Rgba;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l * 100];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s * 100, l * 100];
+}
+
+function fromHsl([h, s, l]: Hsl): string {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const channel = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const value = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(value * 255)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+
+/** `a` and `b` mixed, `weight` of `a` (opaque colors). */
+function mix(a: string, b: string, weight: number): string {
+  const [ar, ag, ab] = parseColor(a);
+  const [br, bg, bb] = parseColor(b);
+  const channel = (x: number, y: number) =>
+    Math.round(x * weight + y * (1 - weight))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(ar, br)}${channel(ag, bg)}${channel(ab, bb)}`;
+}
+
+/** A translucent color as it looks over `base`. */
+function flatten(color: string, base: string): string {
+  return `#${over(color, base)
+    .slice(0, 3)
+    .map((c) => Math.round(c).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * `color`, made lighter (toward white) or darker until it reads at `minimum` on every one of `backgrounds`; the
+ * hue and saturation stay, so a palette keeps its character.
+ */
+function readable(color: string, backgrounds: readonly string[], minimum: number, toward: 'lighter' | 'darker'): string {
+  const [h, s, l] = toHsl(color);
+  for (let step = 0; step <= 100; step++) {
+    const lightness = toward === 'lighter' ? Math.min(100, l + step) : Math.max(0, l - step);
+    const candidate = fromHsl([h, s, lightness]);
+    if (backgrounds.every((background) => contrastRatio(candidate, background) >= minimum)) return candidate;
+  }
+  return toward === 'lighter' ? '#ffffff' : '#000000';
+}
+
+/**
+ * Lane colors: a ten-step wheel (AngKorGit's), lighter on dark themes, darker on light ones. A function: the
+ * built-in themes are made from it before the module's constants below them exist.
+ */
+function laneHues(): readonly Hsl[] {
+  return [
+    [32, 93, 54],
+    [199, 89, 48],
+    [142, 71, 45],
+    [262, 83, 66],
+    [0, 84, 60],
+    [174, 62, 47],
+    [43, 96, 56],
+    [292, 84, 61],
+    [217, 91, 60],
+    [24, 94, 50],
+  ];
+}
+
+/** Every token of a theme from its palette; text colors are nudged until they meet the contrast rules. */
+function paletteTheme(palette: ThemePalette): ThemeTokens {
+  const dark = palette.scheme === 'dark';
+  const toward = dark ? 'lighter' : 'darker';
+  const tints = dark ? darkTints : lightTints;
+  const bg = palette.background;
+  const panel = palette.surface;
+  const raised = palette.raised;
+  const input = dark ? mix(palette.background, '#000000', 0.8) : '#ffffff';
+  const hover = mix(palette.foreground, panel, 0.08);
+  const toolbarHover = mix(palette.foreground, panel, 0.12);
+  const surfaces = [bg, panel, raised, input, panel];
+  const accentBase = palette[palette.accent];
+  const selection = mix(accentBase, bg, 0.24);
+  const warningBase = dark ? '#d29922' : '#9a6700';
+  const refBg = mix(accentBase, panel, 0.2);
+  const tagBg = mix(warningBase, panel, 0.2);
+  const busy = [...surfaces, selection, hover, toolbarHover, refBg, tagBg, flatten(tints['diff-added-bg'], bg), flatten(tints['diff-removed-bg'], bg)];
+  const fg = readable(palette.foreground, busy, 4.5, toward);
+  const text = (color: string) => readable(color, surfaces, 4.5, toward);
+  const accent = readable(accentBase, surfaces, 4.5, toward);
+  const primaryFg = luminance(parseColor(accentBase)) > 0.3 ? '#000000' : '#ffffff';
+  const primaryBg = readable(accentBase, [primaryFg], 4.5, primaryFg === '#ffffff' ? 'darker' : 'lighter');
+  const dangerBg = mix(dark ? '#f85149' : '#cf222e', bg, 0.16);
+  const codeBg = bg;
+  const codeSelection = mix(accentBase, codeBg, 0.3);
+  const codeBackgrounds = [
+    codeBg,
+    codeSelection,
+    ...(['diff-added-bg', 'diff-removed-bg', 'diff-changed-bg', 'conflict-ours', 'conflict-theirs', 'conflict-base', 'conflict-marker'] as const).map((tint) => flatten(tints[tint], codeBg)),
+  ];
+  const code = (color: string) => readable(color, [codeBg], 4.5, toward);
+  const success = text(dark ? '#3fb950' : '#1a7f37');
+  const warning = text(warningBase);
+  const dangerFg = readable(dark ? '#f85149' : '#cf222e', [...surfaces, dangerBg], 4.5, toward);
+  const lane = (i: number) => {
+    const [h, s, l] = laneHues()[i]!;
+    return readable(fromHsl([h, s, dark ? Math.max(l, 58) : Math.min(l, 42)]), [bg], 3, toward);
+  };
+  const borderStrong = mix(palette.foreground, palette.border, 0.35);
+  return {
+    ...tints,
+    bg,
+    'bg-panel': panel,
+    'bg-raised': raised,
+    'bg-input': input,
+    'bg-hover': hover,
+    border: palette.border,
+    'border-strong': borderStrong,
+    selection,
+    fg,
+    'fg-muted': readable(palette.muted, busy.slice(0, surfaces.length + 3), 4.5, toward),
+    'fg-dimmed': text(palette.faint),
+    'fg-bright': dark ? '#ffffff' : '#000000',
+    'fg-inverse': bg,
+    accent,
+    focus: readable(accentBase, [bg], 3, toward),
+    'primary-bg': primaryBg,
+    'primary-fg': primaryFg,
+    success,
+    warning,
+    'danger-fg': dangerFg,
+    'danger-bg': dangerBg,
+    'danger-solid': readable(dark ? '#da3633' : '#cf222e', ['#ffffff'], 4.5, 'darker'),
+    'danger-solid-fg': '#ffffff',
+    'ref-bg': refBg,
+    'tag-bg': tagBg,
+    ...(Object.fromEntries(laneHues().map((_, i) => [`graph-${i}`, lane(i)])) as Record<`graph-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`, string>),
+    'stat-added': success,
+    'stat-removed': dangerFg,
+    'stat-modified': warning,
+    'toolbar-bg': panel,
+    'toolbar-hover': toolbarHover,
+    'button-bg': raised,
+    'button-border': palette.border,
+    'input-border': mix(palette.foreground, palette.border, 0.15),
+    scrollbar: `${borderStrong}80`,
+    'scrollbar-hover': `${palette.muted}b3`,
+    'code-bg': codeBg,
+    'code-fg': readable(palette.foreground, codeBackgrounds, 4.5, toward),
+    'code-line-number': code(palette.faint),
+    'code-selection': codeSelection,
+    'code-comment': code(palette.faint),
+    'code-keyword': code(palette.keyword),
+    'code-string': code(palette.string),
+    'code-number': code(palette.number),
+    'code-type': code(palette.type),
+    'code-tag': code(palette.variable),
+    blame: accent,
+  };
+}
+
+/** Accent colors to choose from in Preferences (`ui.accent`); 'theme' keeps the theme's own. */
+export const ACCENTS = {
+  blue: '#3b82f6',
+  green: '#10b981',
+  purple: '#8b5cf6',
+  pink: '#ec4899',
+  red: '#ef4444',
+  orange: '#f97316',
+  gold: '#d97706',
+  teal: '#14b8a6',
+} as const;
+export type AccentId = keyof typeof ACCENTS;
+
+/**
+ * The theme with another accent: buttons, links, focus rings and blame take it (nudged until readable on the
+ * theme's surfaces); lanes, selection and diff colors keep their meaning.
+ */
+export function withAccent(theme: Theme, accentId: string): Theme {
+  if (!Object.hasOwn(ACCENTS, accentId)) return theme;
+  const base = ACCENTS[accentId as AccentId];
+  const tokens = theme.tokens;
+  const toward = theme.scheme === 'dark' ? 'lighter' : 'darker';
+  const minimum = theme.highContrast ? 7 : 4.5;
+  const accent = readable(base, [tokens.bg, tokens['bg-panel'], tokens['bg-raised'], tokens['bg-input'], tokens['toolbar-bg']], minimum, toward);
+  const primaryFg = luminance(parseColor(base)) > 0.3 ? '#000000' : '#ffffff';
+  return {
+    ...theme,
+    tokens: {
+      ...tokens,
+      accent,
+      focus: readable(base, [tokens.bg], 3, toward),
+      'primary-bg': readable(base, [primaryFg], minimum, primaryFg === '#ffffff' ? 'darker' : 'lighter'),
+      'primary-fg': primaryFg,
+      blame: accent,
+    },
+  };
 }

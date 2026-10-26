@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_THEMES, contrastProblems, contrastRatio, parseJsonc, parseUserTheme, resolveTheme, THEME_TOKENS } from './themes';
+import { ACCENTS, BUILTIN_THEMES, contrastProblems, contrastRatio, parseJsonc, parseUserTheme, resolveTheme, THEME_TOKENS, withAccent } from './themes';
 
 describe('built-in themes', () => {
   it('define every token with a valid color', () => {
@@ -13,9 +13,27 @@ describe('built-in themes', () => {
     expect(contrastProblems(theme)).toEqual([]);
   });
 
-  it('has at least six, with unique ids', () => {
+  it('has twenty, dark and light, with unique ids', () => {
     expect(new Set(BUILTIN_THEMES.map((theme) => theme.id)).size).toBe(BUILTIN_THEMES.length);
-    expect(BUILTIN_THEMES.length).toBeGreaterThanOrEqual(6);
+    expect(BUILTIN_THEMES.length).toBe(20);
+    expect(BUILTIN_THEMES.filter((theme) => theme.scheme === 'light').length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('accent colors', () => {
+  it('keep every built-in theme readable', () => {
+    for (const theme of BUILTIN_THEMES) {
+      for (const accent of Object.keys(ACCENTS)) expect(contrastProblems(withAccent(theme, accent)), `${theme.id} + ${accent}`).toEqual([]);
+    }
+  });
+
+  it('change only the accent tokens, and "theme" or an unknown one changes nothing', () => {
+    const theme = BUILTIN_THEMES[0]!;
+    const changed = Object.entries(withAccent(theme, 'pink').tokens).filter(([token, color]) => theme.tokens[token as keyof typeof theme.tokens] !== color).map(([token]) => token);
+    expect(changed.sort()).toEqual(['accent', 'blame', 'focus', 'primary-bg', 'primary-fg'].filter((token) => changed.includes(token)).sort());
+    expect(changed).toContain('accent');
+    expect(withAccent(theme, 'theme')).toBe(theme);
+    expect(withAccent(theme, 'nonsense')).toBe(theme);
   });
 });
 

@@ -170,7 +170,12 @@ const MAX_SCROLL_HEIGHT = 30_000_000;
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
 export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
-  const style = graphStyle(useAppState((s) => s.settings.values['ui.graphStyle']));
+  const baseStyle = graphStyle(useAppState((s) => s.settings.values['ui.graphStyle']));
+  // Reserve a second label line throughout the graph when refs share a commit. Keeping one row height
+  // for the virtual list preserves correct positions for unloaded history pages and leaves a clear gap
+  // before the next commit's labels.
+  const hasStackedRefs = Object.values(data.refs).some((labels) => labels.length > 1);
+  const style = hasStackedRefs ? { ...baseStyle, rowHeight: baseStyle.rowHeight + 12 } : baseStyle;
   const ROW_HEIGHT = style.rowHeight;
   const pages = historyPages(repo, data.historyVersion, filter);
   useSyncExternalStore(pages.subscribe, pages.getSnapshot);

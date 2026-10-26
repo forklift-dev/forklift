@@ -229,3 +229,23 @@ export interface ReplicaAck {
 }
 
 export const REPLICA_READY_CHANNEL = 'replica:ready';
+
+/** A command the app is running, as the status bar lists it. */
+export interface RunningCommand {
+  id: number;
+  /** The command line, credentials masked. */
+  title: string;
+  /** Unix time in milliseconds. */
+  startedAt: number;
+}
+
+/** What the status bar shows besides the replicated state; read every few seconds while it is visible. */
+export interface AppStatus {
+  /** Memory of all the app's processes, in bytes. */
+  memory: number;
+  running: RunningCommand[];
+  /** When the repository last fetched (git wrote FETCH_HEAD), Unix ms; null if it never did. */
+  lastFetch: number | null;
+  /** Commits reachable from HEAD, branches, remotes and tags; null until it can be read. */
+  historySize: number | null;
+}

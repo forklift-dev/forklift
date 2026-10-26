@@ -43,6 +43,7 @@
 | [T-081](tasks/stage-0-foundation/T-081-packaging.md) | Пакеты: deb/rpm, Flatpak, AUR, Homebrew, winget — отложено | draft |
 | [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) — отложено | draft |
 | [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI — отложено | draft |
+| [T-085](tasks/stage-0-foundation/T-085-prebuilt-native-modules.md) | Готовые сборки nodegit и нативных модулей для CI (идея владельца) | draft |
 
 ### Этап 1 — Процессы и внешние программы
 
@@ -117,8 +118,8 @@
 | [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | review |
 | [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | review |
 | [T-059](tasks/stage-5-settings/T-059-resizable-layout.md) | Изменяемая ширина колонок графа и боковых панелей | review |
-| [T-070](tasks/stage-5-settings/T-070-more-themes.md) | Больше тем интерфейса и стилей графа | todo |
-| [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | todo |
+| [T-070](tasks/stage-5-settings/T-070-more-themes.md) | Больше тем интерфейса и стилей графа | review |
+| [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | review |
 | [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | review |
 | [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
 | [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | todo |

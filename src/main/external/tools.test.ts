@@ -18,6 +18,18 @@ function writeScript(dir: string, name: string, body: string, mode = 0o755) {
   writeFileSync(join(dir, name), body, { mode });
 }
 
+/** Waits until the launched helper has written data, not merely created its redirected output file. */
+async function recorded(file: string): Promise<string[]> {
+  for (let i = 0; i < 100; i++) {
+    if (existsSync(file)) {
+      const contents = readFileSync(file, 'utf8');
+      if (contents.length > 0) return contents.trimEnd().split('\n');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Timed out waiting for ${file}`);
+}
+
 describe('findExecutable', () => {
   it('returns the first executable match in PATH and skips non-executable files', async () => {
     writeScript(join(root, 'a'), 'tool', '', 0o644);
@@ -57,10 +69,6 @@ describe('resolveInsideRepo', () => {
 // Fake programs record their working directory and arguments, so we can see exactly what was launched.
 describe.skipIf(process.platform === 'win32')('ExternalTools', () => {
   const recorder = (out: string) => `#!/bin/sh\nprintf '%s\\n' "$PWD" "$@" > "${out}"\n`;
-  const recorded = async (file: string) => {
-    for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 20));
-    return readFileSync(file, 'utf8').trimEnd().split('\n');
-  };
   const tools = (env: Record<string, string>, opened: string[] = []) =>
     new ExternalTools({
       runner: directRunner({ PATH: join(root, 'bin'), ...env }),
@@ -106,10 +114,6 @@ describe.skipIf(process.platform === 'win32')('ExternalTools', () => {
 
 describe.skipIf(process.platform === 'win32')('ExternalTools with settings', () => {
   const recorder = (out: string) => `#!/bin/sh\nprintf '%s\\n' "$PWD" "$@" > "${out}"\n`;
-  const recorded = async (file: string) => {
-    for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 20));
-    return readFileSync(file, 'utf8').trimEnd().split('\n');
-  };
   const tools = (env: Record<string, string> = {}) =>
     new ExternalTools({ runner: directRunner({ PATH: join(root, 'bin'), ...env }), platform: 'linux', openPath: async () => '' });
 

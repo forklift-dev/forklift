@@ -213,7 +213,7 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli, new HistoryStore(join(app.getPath('userData'), 'history')));
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, processes: runner, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -261,6 +261,16 @@ async function start() {
 
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
   if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch, undo, terminals } });
+
+  // The interface scale: for the window as it loads, and again whenever the setting changes.
+  const zoomFactor = () => settings.values['ui.zoom'] / 100;
+  app.on('browser-window-created', (_event, window) => window.webContents.on('did-finish-load', () => window.webContents.setZoomFactor(zoomFactor())));
+  let zoom = settings.values['ui.zoom'];
+  store.subscribe(() => {
+    if (settings.values['ui.zoom'] === zoom) return;
+    zoom = settings.values['ui.zoom'];
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.setZoomFactor(zoomFactor());
+  });
 
   showMainWindow();
   app.on('activate', showMainWindow);

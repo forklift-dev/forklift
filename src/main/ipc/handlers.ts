@@ -1,5 +1,7 @@
-import { isAbsolute } from 'node:path';
-import { BrowserWindow, dialog, shell, type OpenDialogOptions, type WebContents } from 'electron';
+import { isAbsolute, join } from 'node:path';
+import { stat, writeFile } from 'node:fs/promises';
+import { Repository } from '@axosoft/nodegit';
+import { app, BrowserWindow, dialog, shell, type OpenDialogOptions, type WebContents } from 'electron';
 import type { CheckoutTarget } from '../../shared/branches';
 import type { DiffTarget } from '../../shared/diff';
 import type { HistoryFilter, HistorySearch } from '../../shared/history';
@@ -33,6 +35,7 @@ import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
 import type { ProfileService } from '../profiles/service';
 import type { OperationLog } from '../log/operationLog';
+import type { ProcessRunner } from '../process/runner';
 import type { AvatarService } from '../avatars/service';
 import type { SubmoduleService } from '../git/submodules';
 import type { WorktreeService } from '../git/worktrees';
@@ -42,7 +45,7 @@ import type { GitCli } from '../git/cli';
 import type { CredentialStore } from '../askpass/credentials';
 import type { HostingService } from '../hosting/service';
 import { PROVIDERS, type RepoHosting } from '../../shared/hosting';
-import { writeFile } from 'node:fs/promises';
+import { applicationMemory, runningGitCommands } from '../status';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
 import { hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { listHooks } from '../git/hooks';
@@ -90,6 +93,8 @@ export interface HandlerDeps {
   answerPrompt(id: number, answer: string | null, remember: boolean): void;
   credentials: Pick<CredentialStore, 'list' | 'remove'>;
   hosting: HostingService;
+  /** External processes running through the shared process host. */
+  processes: Pick<ProcessRunner, 'running' | 'cancel'>;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -235,7 +240,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -248,6 +253,38 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
   const optionalTab = (id: unknown): string | null => (id === null ? null : tab(id));
   const repoData = (id: string) => store.getState().repos.byId[id]?.data ?? null;
+  const historySizes = new Map<string, { version: string; value: Promise<number | null> }>();
+
+  const historySize = (root: string): Promise<number | null> => {
+    const data = repoData(root);
+    if (!data) return Promise.resolve(null);
+    const cached = historySizes.get(root);
+    if (cached?.version === data.historyVersion) return cached.value;
+    // `--all` covers every visible ref; HEAD also keeps a detached commit in the count.
+    const revisions = data.branch.oid ? ['--all', 'HEAD'] : ['--all'];
+    let value: Promise<number | null>;
+    value = gitCli
+      .exec(['rev-list', '--count', ...revisions], { cwd: root, readOnly: true })
+      .then(({ stdout }) => {
+        const count = Number(stdout.trim());
+        return Number.isSafeInteger(count) && count >= 0 ? count : null;
+      })
+      .catch(() => {
+        if (historySizes.get(root)?.value === value) historySizes.delete(root);
+        return null;
+      });
+    historySizes.set(root, { version: data.historyVersion, value });
+    return value;
+  };
+
+  const lastFetch = async (root: string): Promise<number | null> => {
+    try {
+      const repo = await Repository.open(root);
+      return (await stat(join(repo.path(), 'FETCH_HEAD'))).mtimeMs;
+    } catch {
+      return null;
+    }
+  };
 
   /** Runs an index/working-tree operation, then re-reads the repository whether or not it succeeded. */
   const thenRefresh = async <T>(root: string, operation: () => Promise<T>): Promise<T> => {
@@ -859,6 +896,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       store.dispatch(tabClosed(root));
       history.forget(root);
+      historySizes.delete(root);
       terminals.closeRepo(root);
       const active = store.getState().repos.view.activeId;
       const next = active ? store.getState().repos.byId[active] : null;
@@ -934,6 +972,20 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'app:dismissNotices'() {
       store.dispatch(noticesDismissed());
+    },
+
+    async 'app:status'(_ctx, repo) {
+      const root = optionalTab(repo);
+      // Snapshot running commands before historySize potentially starts its own short read.
+      const running = runningGitCommands(processes.running(), gitCli.executable);
+      const [lastFetchTime, commits] = root ? await Promise.all([lastFetch(root), historySize(root)]) : [null, null];
+      const memory = applicationMemory(app.getAppMetrics());
+      return { memory, running, lastFetch: lastFetchTime, historySize: commits };
+    },
+
+    async 'process:cancel'(_ctx, id) {
+      if (!Number.isInteger(id) || id < 1) throw new TypeError('id must be a positive integer');
+      processes.cancel(id);
     },
 
     async 'terminal:create'({ sender }, repo, cols, rows) {

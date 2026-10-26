@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { english, fill, formatDate, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
+import { english, fill, formatDate, LANGUAGES, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
 import { PARTS } from './strings';
 
 afterEach(() => setLanguage('en'));
@@ -91,5 +91,18 @@ describe('formatDate', () => {
     expect(formatDate(time, { month: 'long', timeZone: 'UTC' })).toBe('October');
     setLanguage('ru');
     expect(formatDate(time, { month: 'long', timeZone: 'UTC' })).toBe('октябрь');
+  });
+});
+
+describe('Community edition promise', () => {
+  it('has the promise and quote attribution in every interface language', () => {
+    for (const language of LANGUAGES) {
+      setLanguage(language);
+      expect(t('This edition will always be open and free, with no paid features.').trim(), language).not.toBe('');
+      expect(t('— attributed to Marcus Tullius (a modern aphorism with no established source)').trim(), language).not.toBe('');
+    }
+    setLanguage('ru');
+    expect(t('This edition will always be open and free, with no paid features.')).toBe('Версия всегда будет открытой и бесплатной, без платного функционала.');
+    expect(t('— attributed to Marcus Tullius (a modern aphorism with no established source)')).toContain('приписывается Марку Туллию');
   });
 });

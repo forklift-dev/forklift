@@ -5,13 +5,14 @@ const MAX_ENTRIES = 3000;
 const MAX_OUTPUT = 8 * 1024;
 
 /** The app's own credential helper (`-c credential.helper=!…forklift-askpass…`) is left out of command lines. */
-const withoutHelper = (args: readonly string[]) =>
+export const withoutHelper = (args: readonly string[]) =>
   args.filter((arg, i) => !(arg === '-c' && /^credential\.helper=.*forklift-askpass/.test(args[i + 1] ?? '')) && !(args[i - 1] === '-c' && /^credential\.helper=.*forklift-askpass/.test(arg)));
 
 const tail = (text: string) => (text.length > MAX_OUTPUT ? `…${text.slice(-MAX_OUTPUT)}` : text);
 
 /** Window commands whose runs are not worth logging: frequent reads that change nothing. */
 export const QUIET_COMMANDS = new Set([
+  'app:status',
   'history:rows',
   'history:locate',
   'history:search',
