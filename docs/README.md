@@ -53,7 +53,7 @@
 | [T-012](tasks/stage-1-processes/T-012-git-cli.md) | Адаптер git CLI поверх ProcessRunner | review |
 | [T-013](tasks/stage-1-processes/T-013-editor-terminal.md) | Открытие во внешнем редакторе и терминале | review |
 | [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | review |
-| [T-076](tasks/stage-1-processes/T-076-difftool-mergetool-mode.md) | Forklift как git difftool и mergetool | draft |
+| [T-076](tasks/stage-1-processes/T-076-difftool-mergetool-mode.md) | Forklift как git difftool и mergetool | todo |
 
 ### Этап 2 — Основная работа внутри приложения
 
@@ -72,7 +72,7 @@
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | review |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
 | [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | todo |
-| [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | draft |
+| [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | todo |
 
 ### Этап 3 — История и операции над коммитами
 
@@ -86,8 +86,8 @@
 | [T-035](tasks/stage-3-history/T-035-stash.md) | Stash | review |
 | [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | review |
 | [T-073](tasks/stage-3-history/T-073-bisect.md) | Bisect | todo |
-| [T-078](tasks/stage-3-history/T-078-compare-commits.md) | Сравнение двух коммитов и веток | draft |
-| [T-080](tasks/stage-3-history/T-080-history-memory-and-graph.md) | История: память и отрисовка графа на сотнях дорожек | draft |
+| [T-078](tasks/stage-3-history/T-078-compare-commits.md) | Сравнение двух коммитов и веток | todo |
+| [T-080](tasks/stage-3-history/T-080-history-memory-and-graph.md) | История: память и отрисовка графа на сотнях дорожек | todo |
 
 ### Этап 4 — Репозитории
 
