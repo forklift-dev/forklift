@@ -35,6 +35,7 @@ function setup(repos: string[]) {
       branch: { head: 'main', oid: null, upstream: null, ahead: 0, behind: 0 },
       refs: {},
       historyVersion: 'v',
+      commitGraph: false,
       branches: [],
       remoteBranches: [],
       tags: [],

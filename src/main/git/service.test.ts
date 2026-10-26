@@ -126,6 +126,18 @@ describe('GitService', () => {
     expect((await service.read(root)).changes.map((change) => change.path)).toEqual(['a.txt']);
   });
 
+  it('tells whether git has a commit-graph (one file or a chain)', async () => {
+    writeFileSync(join(root, 'a.txt'), 'a\n');
+    sh(root, 'add', '.');
+    sh(root, 'commit', '-m', 'First commit');
+    expect((await service.read(root)).commitGraph).toBe(false);
+    sh(root, 'commit-graph', 'write', '--reachable');
+    expect((await service.read(root)).commitGraph).toBe(true);
+    rmSync(join(root, '.git/objects/info/commit-graph'));
+    sh(root, 'commit-graph', 'write', '--reachable', '--split');
+    expect((await service.read(root)).commitGraph).toBe(true);
+  });
+
   it('reports merge conflicts as unstaged changes', async () => {
     writeFileSync(join(root, 'c.txt'), 'base\n');
     sh(root, 'add', '.');

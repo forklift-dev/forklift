@@ -107,6 +107,8 @@ export interface RepoData {
    * replicated; windows fetch it page by page with `history:rows` and reload on a new version.
    */
   historyVersion: string;
+  /** git's commit-graph file exists: large histories open several times faster with it. */
+  commitGraph: boolean;
   changes: FileChange[];
   loadedAt: number;
 }

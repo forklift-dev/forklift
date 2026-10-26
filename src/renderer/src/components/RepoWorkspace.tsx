@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { historyPages } from '../history';
 import { LIMITS, resetPanelWidth, setPanelWidth, togglePanel, useLayout } from '../layout';
 import { Splitter } from './Splitter';
 import { NO_FILTER, type HistoryFilter } from '../../../shared/history';
@@ -278,6 +279,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       <Splitter label="Resize the left panel" className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
+      <CommitGraphHint data={data} filter={filter} run={run} />
       {lfsMissing && !lfsWarningHidden && (
         <div className="error-banner notices lfs-missing" role="alert">
           This repository uses Git LFS, but git-lfs is not installed: LFS files show as pointers, and new ones would be committed as normal files. Install it from https://git-lfs.com and run “git lfs install” once.
@@ -500,6 +502,67 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         />
       )}
     </main>
+  );
+}
+
+/** The first page of history slower than this, without a commit-graph: suggest writing one. */
+const SLOW_HISTORY_MS = 2000;
+const HINT_KEY = (root: string) => `forklift.commitGraphHint:${root}`;
+
+/**
+ * A large repository without git's commit-graph opens its history several times slower (linux: 11 s instead of
+ * 2.6 s). Writing one is what `git gc` and `git maintenance` do anyway, but it is the user's repository: ask.
+ */
+function CommitGraphHint({ data, filter, run }: { data: RepoData; filter: HistoryFilter; run: RunAction }) {
+  const pages = historyPages(data.root, data.historyVersion, filter);
+  useSyncExternalStore(pages.subscribe, pages.getSnapshot);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(HINT_KEY(data.root)) === 'off';
+    } catch {
+      return false;
+    }
+  });
+  const [writing, setWriting] = useState(false);
+  let threshold = SLOW_HISTORY_MS;
+  try {
+    // Tests make every history "slow".
+    threshold = Number(localStorage.getItem('forklift.commitGraphHintMs') ?? SLOW_HISTORY_MS);
+  } catch {
+    // storage unavailable: the default
+  }
+  if (data.commitGraph || dismissed || pages.firstPageMs === null || pages.firstPageMs < threshold) return null;
+  const seconds = Math.round(pages.firstPageMs / 100) / 10;
+  return (
+    <div className="notices commit-graph-hint" role="status">
+      <span>
+        The history took {seconds} s to open. git’s commit-graph makes it several times faster for large repositories (it is what <code>git maintenance</code> writes).
+      </span>
+      <button
+        type="button"
+        disabled={writing}
+        onClick={() => {
+          setWriting(true);
+          void run(() => invoke('repo:writeCommitGraph', data.root)).finally(() => setWriting(false));
+        }}
+      >
+        {writing ? 'Writing…' : 'Write the commit-graph'}
+      </button>
+      <button
+        type="button"
+        disabled={writing}
+        onClick={() => {
+          setDismissed(true);
+          try {
+            localStorage.setItem(HINT_KEY(data.root), 'off');
+          } catch {
+            // not kept: asked again next time
+          }
+        }}
+      >
+        Not for this repository
+      </button>
+    </div>
   );
 }
 

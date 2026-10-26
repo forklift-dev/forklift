@@ -147,6 +147,8 @@ export interface Commands {
   'repo:open': { args: [path: string]; result: string };
   'repo:activate': { args: [repo: string]; result: void };
   'repo:refresh': { args: [repo: string]; result: void };
+  /** `git commit-graph write --reachable` (as git maintenance does): large histories open several times faster. */
+  'repo:writeCommitGraph': { args: [repo: string]; result: void };
   'repo:close': { args: [repo: string]; result: void };
   /** Moves a tab to `index` in the tab bar. */
   'repo:move': { args: [repo: string, index: number]; result: void };
@@ -323,6 +325,7 @@ const commandChannelSet = {
   'repo:open': true,
   'repo:activate': true,
   'repo:refresh': true,
+  'repo:writeCommitGraph': true,
   'repo:close': true,
   'repo:move': true,
   'repo:openTerminal': true,

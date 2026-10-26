@@ -3522,3 +3522,16 @@ select {
 .markdown .md-mention {
   font-weight: 600;
 }
+
+/* Suggests writing git's commit-graph after a slow history load */
+.commit-graph-hint {
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.commit-graph-hint span {
+  flex: 1;
+}

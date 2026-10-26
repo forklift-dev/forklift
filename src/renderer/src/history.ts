@@ -17,6 +17,9 @@ export class HistoryPages {
   private snapshot = 0;
   /** The page the list last asked around. */
   private focus = 0;
+  private readonly created = performance.now();
+  /** How long the first page took (null until it came): a slow one suggests git's commit-graph. */
+  firstPageMs: number | null = null;
   loaded = 0;
   complete = false;
   /** Widest graph row seen, in lanes; the graph column does not jump while scrolling. */
@@ -73,7 +76,10 @@ export class HistoryPages {
           this.complete = result.complete;
           for (const row of result.rows) this.maxWidth = Math.max(this.maxWidth, row.graph.width);
           // The first own page replaces the previous version's rows everywhere.
-          if (page === 0) this.fallback = null;
+          if (page === 0) {
+            this.fallback = null;
+            this.firstPageMs ??= performance.now() - this.created;
+          }
           this.emit();
         },
         (error: unknown) => {

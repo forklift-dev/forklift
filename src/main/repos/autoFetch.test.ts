@@ -24,6 +24,7 @@ const data = (root: string): RepoData =>
     pullRebase: false,
     refs: {},
     historyVersion: 'v',
+    commitGraph: false,
     changes: [],
     loadedAt: 1,
   }) as RepoData;

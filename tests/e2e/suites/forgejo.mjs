@@ -127,8 +127,13 @@ export default async function ({ check }) {
   // #3 in a commit message opens that issue.
   await page.press('Escape');
   await page.waitFor(`!${view}`);
-  await page.click(`[...document.querySelectorAll('.commit-row[data-hash]')].find(r => /Fixes #3/.test(r.textContent))`);
-  await page.waitFor(`!!document.querySelector('.commit-details .issue-ref')`);
+  // Commits made in the same second: rows may still swap while a newer history version replaces the old one,
+  // so the commit is picked by sha and the click repeated until its details are the ones shown.
+  const fixes = sh(root, 'log', '--all', '--format=%H %s').split('\n').find((line) => line.includes('Fixes #3'))?.slice(0, 40);
+  for (let i = 0; i < 5; i++) {
+    await page.click(`document.querySelector('.commit-row[data-hash="${fixes}"]')`);
+    if (await page.waitFor(`document.querySelector('.commit-details .hash')?.title === ${JSON.stringify(fixes)} && !!document.querySelector('.commit-details .issue-ref')`, 3000)) break;
+  }
   await page.click(`document.querySelector('.commit-details .issue-ref')`);
   check('#3 in a commit message shows issue #3', await page.waitFor(`/Crash on start/.test(${viewText})`));
 

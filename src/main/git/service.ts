@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
@@ -81,6 +81,7 @@ export function createGitService(): GitService {
         pullRebase,
         refs: Object.fromEntries(refs.labels),
         historyVersion: version,
+        commitGraph: await hasCommitGraph(repo),
         changes,
         loadedAt: Date.now(),
       };
@@ -262,6 +263,13 @@ async function readTracking(repo: Repository, branch: Reference): Promise<Pick<L
   // Typed as number in @types/nodegit, but the binding resolves to { ahead, behind }.
   const counts = (await Graph.aheadBehind(repo, branch.target(), upstream.target())) as unknown as { ahead: number; behind: number };
   return { upstream: upstream.shorthand(), ahead: counts.ahead, behind: counts.behind };
+}
+
+/** A single commit-graph file or a chain of them (git maintenance writes chains). */
+async function hasCommitGraph(repo: Repository): Promise<boolean> {
+  const info = join(repo.commondir(), 'objects', 'info');
+  const exists = (path: string) => access(path).then(() => true, () => false);
+  return (await exists(join(info, 'commit-graph'))) || (await exists(join(info, 'commit-graphs', 'commit-graph-chain')));
 }
 
 async function readChanges(repo: Repository): Promise<FileChange[]> {

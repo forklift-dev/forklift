@@ -841,6 +841,12 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (!state.data && !state.loading && !state.error) await store.dispatch(loadRepo(root));
     },
 
+    async 'repo:writeCommitGraph'(_ctx, repo) {
+      const root = tab(repo);
+      // Only git's own optional file under objects/info: no ref, index or working tree is touched.
+      await thenRefresh(root, () => gitCli.exec(['commit-graph', 'write', '--reachable', '--no-progress'], { cwd: root }));
+    },
+
     async 'repo:refresh'(_ctx, repo) {
       await store.dispatch(loadRepo(tab(repo))).unwrap();
     },

@@ -1,6 +1,7 @@
 // Commit graph: lanes for a merged branch, WIP row, selection with mouse and keys, virtualized
 // scrolling through a long generated history that is fetched page by page.
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRepo, launchApp, projectDir, tempDir } from '../harness.mjs';
 
@@ -63,4 +64,11 @@ export default async function ({ check }) {
   const height = await page.evaluate(`document.querySelector('.commit-rows').style.height`);
   const rowHeight = await page.evaluate(`Math.round(document.querySelector('.commit-row[data-hash]').getBoundingClientRect().height)`);
   check('list height matches the whole history once walked', height === `${3000 * rowHeight}px`, `${height} (rows of ${rowHeight} px)`);
+
+  // No commit-graph and a slow history (every history counts as slow here): the hint writes one.
+  await page.evaluate(`localStorage.setItem('forklift.commitGraphHintMs', '0')`);
+  await page.invoke('repo:refresh', big);
+  check('a repository without a commit-graph gets the hint', await page.waitFor(`/commit-graph/.test(document.querySelector('.commit-graph-hint')?.textContent ?? '')`, 10000));
+  await page.click(`[...document.querySelectorAll('.commit-graph-hint button')].find(b => b.textContent === 'Write the commit-graph')`);
+  check('the commit-graph is written and the hint goes away', await page.waitFor(`!document.querySelector('.commit-graph-hint')`, 30000) && existsSync(join(big, '.git/objects/info/commit-graph')));
 }
