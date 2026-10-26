@@ -13,6 +13,7 @@ import { diff } from './diff';
 import { app } from './app';
 import { hosting } from './hosting';
 import { main } from './main';
+import { status } from './status';
 
 export const PARTS = {
   common,
@@ -26,6 +27,7 @@ export const PARTS = {
   app,
   hosting,
   main,
+  status,
 } as const;
 
 export const RU = {
@@ -40,6 +42,7 @@ export const RU = {
   ...app.ru,
   ...hosting.ru,
   ...main.ru,
+  ...status.ru,
 };
 export const EN: Readonly<Record<string, string | PluralForms>> = {
   ...common.en,
@@ -53,4 +56,5 @@ export const EN: Readonly<Record<string, string | PluralForms>> = {
   ...app.en,
   ...hosting.en,
   ...main.en,
+  ...status.en,
 };

@@ -11,7 +11,7 @@ const SAMPLE: Array<{ layout: GraphRowLayout; merge?: boolean }> = [
   { layout: { column: 0, color: 0, width: 2, edges: [{ kind: EdgeKind.In, from: 0, to: 0, color: 0 }, { kind: EdgeKind.In, from: 1, to: 0, color: 1 }] } },
 ];
 
-function Preview({ style }: { style: GraphStyle }) {
+export function GraphStylePreview({ style }: { style: GraphStyle }) {
   const width = style.laneWidth * 3;
   return (
     <span className="graph-style-preview">
@@ -50,7 +50,7 @@ export function GraphStylePicker({ id, value, save }: ControlProps) {
     <div id={id} className="theme-picker graph-style-picker" role="radiogroup" aria-label={t('Commit graph')}>
       {GRAPH_STYLES.map((style) => (
         <button key={style.id} type="button" role="radio" aria-checked={value === style.id} className={`theme-option${value === style.id ? ' selected' : ''}`} data-graph-style={style.id} onClick={() => void save(style.id)}>
-          <Preview style={style} />
+          <GraphStylePreview style={style} />
           <span className="theme-option-label">{translate(style.name)}</span>
         </button>
       ))}

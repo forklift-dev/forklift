@@ -1,37 +1,33 @@
 # App icon
 
-Three layers, each a 1024×1024 PNG with a transparent background, composed by `scripts/build-icon.py`
-(Pillow) into `build/icon.png`, `build/icon.ico`, `build/icons/<size>x<size>.png` (electron-builder) and
-`build/window.png` (the Linux window).
+The icon is composed by `scripts/build-icon.py` (Pillow) into `build/icon.png`, `build/icon.ico`,
+`build/icons/<size>x<size>.png` (electron-builder) and `build/window.png` (the Linux window).
 
-Two variants (`compose.json` → `variants`): **large** (128 px and up) — the forklift and its load on the tile;
-**small** (64 px and below, and the window icon) — its own square picture `layers/small.png` (the forks raised
-high, the git badge on top, fewer details) that fills the square: the side view of the large icon is 1.4 times
-wider than high and looked too small on a taskbar. The `.ico` takes each size from the right variant.
+Two variants (`compose.json` → `variants`) use the owner's `layers/forklift_alt.png`: **large** (128 px and
+up) places it on the blue-slate tile; **small** (64 px and below, and the window icon) uses the same artwork
+without the tile, enlarged and symmetrically cropped at the sides so the wide silhouette remains readable and
+fills the taskbar height. The `.ico` takes each size from the right variant. The alternative artwork is a
+256×256 PNG; the older source layers are 1024×1024.
 
 | Layer | File | What |
 |---|---|---|
 | background | `layers/background.png` | Plain rounded-square tile, blue-slate gradient (drawn with Pillow, no details: they made the icon unreadable when small); outside it transparent; `clip` keeps the other layers inside it |
-| forklift | `layers/forklift.png` | The forklift, strict side view facing right, forks empty |
-| load | `layers/git.png` | The git badge that sits on the forks |
-| small | `layers/small.png` | The whole small-size icon in one picture (Codex, from the two layers above as a style reference) |
+| logo | `layers/forklift_alt.png` | The current complete logo: a forklift in 3/4 view holding a glowing Git badge |
 
 Each variant places its layers, first at the bottom: `scale` (around the layer's top-left corner), `x`, `y`;
 `solidify` makes the nearly opaque inside of generated pictures fully opaque and drops faint halos; `shadow`
 adds a soft contact shadow under the layer; `clip` cuts everything to that layer's shape.
 
-## Alternatives
+## Previous artwork
 
-- `layers/forklift_alt.png` — the owner's alternative (256×256, a forklift in 3/4 view holding a glowing git
-  badge, no tile), kept to try later; not used by `compose.json`. A larger original (1254×1254) exists
-  outside the repository.
+- `layers/forklift.png` and `layers/git.png` — the previous large icon, split into forklift and load layers.
+- `layers/small.png` — the previous compact icon.
 
 ## Changing a layer
 
 1. Replace the file (same size, transparent background).
-2. Adjust its entries in both variants of `compose.json`. For a new forklift, measure where its forks are and
-   put the load on them: in the current one the fork tops are at y = 460, x ≈ 715–915 of the layer; the load's
-   lowest point lands at (`load.y` + 870 × `load.scale`), which should equal (`forklift.y` + 460 × `forklift.scale`).
+2. Adjust its entries in both variants of `compose.json`. The 256×256 source is scaled up independently for
+   the tiled large icon and the transparent small/window icon.
 3. `python3 scripts/build-icon.py`, then look at `build/icon.png` and the small sizes in `build/icons/`.
 
 ## How the layers were made

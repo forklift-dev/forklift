@@ -17,6 +17,7 @@ import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
+import type { AppStatus } from './state';
 
 /** Repository commands name their tab explicitly (`repo` = the tab id, i.e. the repository root). */
 export interface Commands {
@@ -177,6 +178,10 @@ export interface Commands {
   /** Changes settings (validated in main); `repo` targets that open repository's overrides. */
   /** Clears the notices shown above the window content. */
   'app:dismissNotices': { args: []; result: void };
+  /** Memory, running commands and the repository's last fetch, for the status bar. */
+  'app:status': { args: [repo: string | null]; result: AppStatus };
+  /** Stops a running command (from the status bar). */
+  'process:cancel': { args: [id: number]; result: void };
   'settings:update': { args: [patch: SettingsPatch]; result: void };
   'settings:dismissProblems': { args: []; result: void };
   /** Shows a file picker for a program; resolves to its path or null when cancelled. */
@@ -339,6 +344,8 @@ const commandChannelSet = {
   'file:blame': true,
   'file:externalMerge': true,
   'app:dismissNotices': true,
+  'app:status': true,
+  'process:cancel': true,
   'terminal:create': true,
   'terminal:resize': true,
   'terminal:kill': true,

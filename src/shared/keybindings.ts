@@ -66,6 +66,7 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'history.goToHead', title: 'Go to HEAD', category: 'History' },
   { id: 'history.showAll', title: 'Show all branches in the graph', category: 'History' },
   { id: 'theme.choose', title: 'Choose a theme…', category: 'View' },
+  { id: 'view.toggleStatusBar', title: 'Show or hide the status bar', category: 'View' },
   { id: 'view.toggleLeftPanel', title: 'Show or hide the left panel (branches)', category: 'View', keys: ['Mod+J'] },
   { id: 'view.toggleRightPanel', title: 'Show or hide the right panel (changes, details)', category: 'View', keys: ['Mod+K'] },
   { id: 'view.zoomIn', title: 'Zoom in', category: 'View', keys: ['Mod+Equal'] },

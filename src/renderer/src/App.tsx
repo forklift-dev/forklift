@@ -18,6 +18,7 @@ import { TabBar } from './components/TabBar';
 import { TerminalPanel } from './components/TerminalPanel';
 import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
+import { StatusBar } from './components/StatusBar';
 import { getState, useAppState } from './state';
 import { useLanguage } from './i18n';
 import { t, translate } from '../../shared/i18n';
@@ -94,6 +95,7 @@ export function App() {
   const [creating, setCreating] = useState<NewRepoKind | null>(null);
   const userThemes = useAppState((s) => s.app.userThemes.themes);
   const library = useAppState((s) => s.library);
+  const statusBarVisible = useAppState((s) => s.settings.values['ui.statusBar']);
 
   const reportError = (error: unknown) => setActionError({ message: error instanceof Error ? error.message : String(error), logId: logIdOf(error) });
   const showLog = (id: number | null) => {
@@ -181,6 +183,7 @@ export function App() {
     'view.zoomIn': { run: () => zoomBy(ZOOM_STEP) },
     'view.zoomOut': { run: () => zoomBy(-ZOOM_STEP) },
     'view.zoomReset': { run: () => zoomBy(null) },
+    'view.toggleStatusBar': { run: () => void run(() => invoke('settings:update', { values: { 'ui.statusBar': !getState().settings.values['ui.statusBar'] } })) },
     'theme.choose': { run: () => openPreferences('ui') },
     'profile.switch': { run: () => setSwitchingProfile(true) },
     'app.log': { run: () => showLog(null) },
@@ -375,6 +378,25 @@ export function App() {
             );
           })}
       </div>
+      {statusBarVisible && (
+        <StatusBar
+          repo={data}
+          remote={repo.remote ?? null}
+          onBranch={() => {
+            setScreen('repo');
+            requestAnimationFrame(() => runCommand('branch.switch'));
+          }}
+          onChanges={() => {
+            setScreen('repo');
+            requestAnimationFrame(() => runCommand('repo.focusCommit'));
+          }}
+          onFetch={() => remoteActions.fetch()}
+          onLog={() => showLog(null)}
+          onPreferences={openPreferences}
+          onGraphStyle={(style) => void run(() => invoke('settings:update', { values: { 'ui.graphStyle': style } }))}
+          onWriteCommitGraph={() => activeId && void run(() => invoke('repo:writeCommitGraph', activeId))}
+        />
+      )}
     </div>
   );
 }

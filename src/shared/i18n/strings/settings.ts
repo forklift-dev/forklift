@@ -51,6 +51,8 @@ export const settings = {
     Teal: 'Бирюзовый',
     'Interface scale (%)': 'Масштаб интерфейса (%)',
     'Ctrl+= and Ctrl+- change it, Ctrl+0 resets it.': 'Ctrl+= и Ctrl+- меняют его, Ctrl+0 сбрасывает.',
+    'Show status bar': 'Показывать строку состояния',
+    'Repository and system information at the bottom of the window.': 'Сведения о репозитории и системе внизу окна.',
     'Commit graph': 'Граф коммитов',
     'How the branches and commits are drawn.': 'Как отображаются ветки и коммиты.',
     'Load avatars from Gravatar': 'Загружать аватары из Gravatar',

@@ -148,6 +148,13 @@ export const SETTING_FIELDS = {
     label: 'Interface scale (%)',
     description: 'Ctrl+= and Ctrl+- change it, Ctrl+0 resets it.',
   },
+  'ui.statusBar': {
+    section: 'ui',
+    type: 'boolean',
+    default: true,
+    label: 'Show status bar',
+    description: 'Repository and system information at the bottom of the window.',
+  },
   'ui.editorTheme': {
     section: 'ui',
     type: 'string',

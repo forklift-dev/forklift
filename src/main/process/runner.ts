@@ -17,6 +17,20 @@ interface PendingCall {
   /** Process tree to kill if the host dies; unset for detached launches, which must survive. */
   pid?: number;
   ownedByHost: boolean;
+  command: string;
+  args: readonly string[];
+  cwd?: string;
+  startedAt: number;
+}
+
+/** A command that is running now (for the status bar: what the app is doing, with a way to stop it). */
+export interface RunningProcess {
+  id: number;
+  command: string;
+  args: readonly string[];
+  cwd?: string;
+  /** Unix time in milliseconds. */
+  startedAt: number;
 }
 
 /**
@@ -92,6 +106,18 @@ export class ProcessRunner implements Runner {
     return event.result;
   }
 
+  /** Commands that run now (detached launches are not tracked once started). */
+  running(): RunningProcess[] {
+    return [...this.pending]
+      .filter(([, call]) => call.ownedByHost)
+      .map(([id, call]) => ({ id, command: call.command, args: call.args, cwd: call.cwd, startedAt: call.startedAt }));
+  }
+
+  /** Stops a running command as its caller's abort would; its caller sees it fail. */
+  cancel(id: number): void {
+    if (this.pending.get(id)?.ownedByHost) this.host?.postMessage({ type: 'cancel', id } satisfies HostRequest);
+  }
+
   /** Cancels running commands and stops the host. Detached launches keep running. */
   dispose(): void {
     if (!this.host) return;
@@ -137,6 +163,10 @@ export class ProcessRunner implements Runner {
         },
         onOutput,
         ownedByHost: request.type === 'run' || request.wait,
+        command: request.command,
+        args: request.args,
+        cwd: request.cwd,
+        startedAt: Date.now(),
       });
       signal?.addEventListener('abort', onAbort, { once: true });
       host.postMessage(request);
