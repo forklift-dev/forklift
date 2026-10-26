@@ -70,8 +70,8 @@ describe('HistoryService', () => {
     const history = new HistoryService(new GitCli(directRunner()));
     const { historyVersion } = await git.read(root);
     const { rows: whole } = await history.page(root, historyVersion, 0, 5000);
-    // Pages that start before, at and after a saved state (every 1024 rows), and one across two of them.
-    for (const [start, count] of [[1000, 30], [1024, 1], [2047, 2], [3000, 1000], [4990, 50]] as const) {
+    // Pages that start before, at and after a saved state (every 256 rows), and ones across several of them.
+    for (const [start, count] of [[250, 30], [256, 1], [511, 2], [1000, 30], [3000, 1000], [4990, 50]] as const) {
       const { rows } = await history.page(root, historyVersion, start, count);
       expect(rows.map((row) => [row.hash, row.graph])).toEqual(whole.slice(start, start + count).map((row) => [row.hash, row.graph]));
     }

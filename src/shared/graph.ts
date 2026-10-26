@@ -65,6 +65,7 @@ export class GraphLayout {
   }
 
   next(sha: string, parents: readonly string[]): GraphRowLayout {
+    this.index = null;
     const edges: GraphEdge[] = [];
     const hits: number[] = [];
     this.lanes.forEach((lane, index) => lane?.sha === sha && hits.push(index));
@@ -111,8 +112,105 @@ export class GraphLayout {
     return { column, color, edges, width };
   }
 
+  /**
+   * Moves past a row exactly as `next` would, without building its edges: for reading far ahead (a history
+   * of millions of commits can keep hundreds of lanes open, and `next` lists every one of them per row).
+   * Lanes are looked up through an index (sha → lanes, free columns), built on first use.
+   */
+  advance(sha: string, parents: readonly string[]): void {
+    const lanes = this.lanes;
+    const index = (this.index ??= this.buildIndex());
+    let column = -1;
+    let color = 0;
+    const hits = index.waiting.get(sha);
+    if (hits) {
+      column = hits[0]!;
+      color = lanes[column]!.color;
+      for (const hit of hits) {
+        lanes[hit] = null;
+        heapPush(index.free, hit);
+      }
+      index.waiting.delete(sha);
+    } else {
+      column = this.peekFree(index);
+      color = this.nextColor++;
+    }
+    for (let order = 0; order < parents.length; order++) {
+      const parent = parents[order]!;
+      const waiting = index.waiting.get(parent)?.[0] ?? -1;
+      if (waiting >= 0 && (order > 0 || waiting < column)) continue;
+      const target = order === 0 && !lanes[column] ? column : this.peekFree(index);
+      lanes[target] = { sha: parent, color: order === 0 ? color : this.nextColor++ };
+      const list = index.waiting.get(parent);
+      if (!list) index.waiting.set(parent, [target]);
+      else list.splice(sortedIndex(list, target), 0, target);
+    }
+    while (lanes.length && lanes.at(-1) === null) lanes.pop();
+  }
+
+  /** advance's lookups; `next` changes lanes without them, so it drops the index. */
+  private index: { waiting: Map<string, number[]>; free: number[] } | null = null;
+
+  private buildIndex() {
+    const waiting = new Map<string, number[]>();
+    const free: number[] = [];
+    this.lanes.forEach((lane, i) => {
+      if (!lane) return heapPush(free, i);
+      const list = waiting.get(lane.sha);
+      if (list) list.push(i);
+      else waiting.set(lane.sha, [i]);
+    });
+    return { waiting, free };
+  }
+
+  /** The leftmost free column (as freeColumn), skipping heap entries taken or trimmed since. */
+  private peekFree(index: { free: number[] }): number {
+    const heap = index.free;
+    while (heap.length && (heap[0]! >= this.lanes.length || this.lanes[heap[0]!] !== null)) heapPop(heap);
+    return heap.length ? heap[0]! : this.lanes.length;
+  }
+
   private freeColumn(): number {
     const free = this.lanes.indexOf(null);
     return free < 0 ? this.lanes.length : free;
   }
+}
+
+function sortedIndex(list: number[], value: number): number {
+  let low = 0;
+  let high = list.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (list[mid]! < value) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+/** A binary min-heap of column numbers in a plain array. */
+function heapPush(heap: number[], value: number): void {
+  heap.push(value);
+  let i = heap.length - 1;
+  while (i > 0) {
+    const parent = (i - 1) >> 1;
+    if (heap[parent]! <= value) break;
+    heap[i] = heap[parent]!;
+    i = parent;
+  }
+  heap[i] = value;
+}
+
+function heapPop(heap: number[]): void {
+  const last = heap.pop()!;
+  if (!heap.length) return;
+  let i = 0;
+  for (;;) {
+    const left = 2 * i + 1;
+    if (left >= heap.length) break;
+    const child = left + 1 < heap.length && heap[left + 1]! < heap[left]! ? left + 1 : left;
+    if (heap[child]! >= last) break;
+    heap[i] = heap[child]!;
+    i = child;
+  }
+  heap[i] = last;
 }

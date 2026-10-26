@@ -8,7 +8,7 @@ import { historyVersion, readStashes } from '../git/service';
 export const MAX_PAGE = 1000;
 const MAX_MATCHES = 2000;
 /** Rows between saved layout states: a page is laid out again from the nearest one before it. */
-const CHECKPOINT = 1024;
+const CHECKPOINT = 256;
 /** Fields of a commit in the `git log` stream: one line each, separated by US (subjects are single lines). */
 const LOG_FORMAT = '--format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s';
 
@@ -30,7 +30,7 @@ interface StashRow {
 /**
  * One repository's history at one version, read from a `git log --date-order` stream as far as asked (git
  * then keeps reading in the background). Commits are kept column by column (no object per row) and the graph
- * is not stored at all: every CHECKPOINT rows the layout's state is saved, and a page is laid out again from
+ * is not stored at all: every CHECKPOINT rows the layout's state is saved (reading moves it on without drawing), and a page is laid out again from
  * the nearest saved state before it — a history of millions of commits fits in a few hundred MB.
  */
 class HistoryCache {
@@ -151,7 +151,7 @@ class HistoryCache {
   private append(hash: string, parents: string, name: string, email: string, time: number, subject: string): void {
     const row = this.length;
     if (row % CHECKPOINT === 0) this.checkpoints.push(this.layout.state());
-    this.layout.next(hash, parents ? parents.split(' ') : []);
+    this.layout.advance(hash, parents ? parents.split(' ') : []);
     const key = `${name}\0${email}`;
     let author = this.authorIndex.get(key);
     if (author === undefined) {

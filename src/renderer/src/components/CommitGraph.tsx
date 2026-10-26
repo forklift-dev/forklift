@@ -114,6 +114,9 @@ interface CommitGraphProps {
   reveal?: { index: number; nonce: number } | null;
 }
 
+/** Tallest scroll range used; Chromium caps element heights at about 33.5 million pixels (≈ 1.1 million rows). */
+const MAX_SCROLL_HEIGHT = 30_000_000;
+
 /**
  * The history list with its graph, virtualized: only rows in view are rendered and history pages are
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
@@ -141,8 +144,20 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
   const wip = data.changes.length > 0;
   const offset = wip ? 1 : 0;
   const total = offset + pages.rowCount;
-  const first = Math.max(0, Math.floor(viewport.top / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(total - 1, Math.ceil((viewport.top + viewport.height) / ROW_HEIGHT) + OVERSCAN);
+  // Rows are placed in "virtual" pixels (index × row height); past what an element may be tall, the scroll
+  // range is squeezed and scroll positions map onto virtual ones proportionally.
+  const virtualHeight = total * ROW_HEIGHT;
+  const domHeight = Math.min(virtualHeight, MAX_SCROLL_HEIGHT);
+  const scale = domHeight > viewport.height && virtualHeight > domHeight ? (virtualHeight - viewport.height) / (domHeight - viewport.height) : 1;
+  // Effects below read the current scale without depending on it (they scroll once per cause).
+  const scaleRef = useRef(scale);
+  useLayoutEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+  const toDom = (top: number) => top / scaleRef.current;
+  const virtualTop = viewport.top * scale;
+  const first = Math.max(0, Math.floor(virtualTop / ROW_HEIGHT) - OVERSCAN);
+  const last = Math.min(total - 1, Math.ceil((virtualTop + viewport.height) / ROW_HEIGHT) + OVERSCAN);
 
   useEffect(() => {
     pages.request(first - offset, Math.max(0, last - offset));
@@ -199,7 +214,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     if (!reveal) return;
     pendingReveal.current = reveal;
     const element = scrollRef.current;
-    if (element) element.scrollTop = Math.max(0, (reveal.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+    if (element) element.scrollTop = Math.max(0, (reveal.index + offset) * ROW_HEIGHT - element.clientHeight / 3) / scaleRef.current;
   }, [reveal, offset, ROW_HEIGHT]);
   useEffect(() => {
     const target = pendingReveal.current;
@@ -209,13 +224,13 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     if (!row) {
       // Not loaded yet (and the list may not be that long yet): fetch its page; scroll again once it grows.
       pages.request(target.index, target.index);
-      if (element && (target.index + offset) * ROW_HEIGHT < element.scrollHeight) {
-        element.scrollTop = Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+      if (element && (target.index + offset) * ROW_HEIGHT < virtualHeight) {
+        element.scrollTop = toDom(Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3));
       }
       return;
     }
     pendingReveal.current = null;
-    if (element) element.scrollTop = Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3);
+    if (element) element.scrollTop = toDom(Math.max(0, (target.index + offset) * ROW_HEIGHT - element.clientHeight / 3));
     if (row.hash !== selectedHash) onSelect(row.hash);
   });
 
@@ -227,8 +242,9 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     const element = scrollRef.current;
     if (!element) return;
     const top = selectedIndex * ROW_HEIGHT;
-    if (top < element.scrollTop || top + 2 * ROW_HEIGHT > element.scrollTop + element.clientHeight) {
-      element.scrollTop = Math.max(0, top - element.clientHeight / 3);
+    const shown = element.scrollTop * scaleRef.current;
+    if (top < shown || top + 2 * ROW_HEIGHT > shown + element.clientHeight) {
+      element.scrollTop = Math.max(0, top - element.clientHeight / 3) / scaleRef.current;
     }
   }, [selectedHash, selectedIndex, offset, ROW_HEIGHT]);
 
@@ -240,13 +256,14 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
     // Rows start below the sticky header (one row high), so row `next` spans content y (next+1)…(next+2) rows.
     const element = scrollRef.current!;
     const top = next * ROW_HEIGHT;
-    if (top < element.scrollTop) element.scrollTop = top;
-    else if (top + 2 * ROW_HEIGHT > element.scrollTop + element.clientHeight) element.scrollTop = top + 2 * ROW_HEIGHT - element.clientHeight;
+    const shown = element.scrollTop * scale;
+    if (top < shown) element.scrollTop = toDom(top);
+    else if (top + 2 * ROW_HEIGHT > shown + element.clientHeight) element.scrollTop = toDom(top + 2 * ROW_HEIGHT - element.clientHeight);
   };
 
   const rows = [];
   for (let index = first; index <= last; index++) {
-    const position = { transform: `translateY(${index * ROW_HEIGHT}px)` };
+    const position = { transform: `translateY(${index * ROW_HEIGHT - virtualTop + viewport.top}px)` };
     if (index < offset) {
       const column = headIsFirst ? (pages.row(0)?.graph.column ?? 0) : 0;
       rows.push(
@@ -375,7 +392,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
             SHA
           </div>
         </div>
-        <div className="commit-rows" style={{ height: total * ROW_HEIGHT }}>
+        <div className="commit-rows" style={{ height: domHeight }}>
           {rows}
         </div>
       </div>

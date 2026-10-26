@@ -120,3 +120,38 @@ describe('GraphLayout', () => {
     }
   });
 });
+
+describe('GraphLayout.advance', () => {
+  it('leaves the lanes exactly as next does, so layout can continue from either', () => {
+    // A branchy random history: tips, forks, merges, octopus merges, roots.
+    let seed = 7;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const rows: string[][] = [];
+    const open: string[] = ['c0'];
+    for (let i = 0; i < 3000 && open.length; i++) {
+      const sha = open.splice(Math.floor(random() * Math.min(open.length, 3)), 1)[0]!;
+      const parents: string[] = [];
+      const count = i > 2950 ? 0 : random() < 0.15 ? 2 + Math.floor(random() * 2) : 1;
+      for (let p = 0; p < count; p++) {
+        const parent = random() < 0.3 && open.length ? open[Math.floor(random() * open.length)]! : `c${i}-${p}`;
+        if (!parents.includes(parent)) parents.push(parent);
+        if (!open.includes(parent)) open.push(parent);
+      }
+      if (random() < 0.05) open.push(`tip${i}`);
+      rows.push([sha, ...parents]);
+    }
+    const drawn = new GraphLayout();
+    const read = new GraphLayout();
+    rows.forEach(([sha, ...parents], i) => {
+      drawn.next(sha!, parents);
+      read.advance(sha!, parents);
+      if (i % 50 === 0) expect(read.state()).toEqual(drawn.state());
+    });
+    expect(read.state()).toEqual(drawn.state());
+    // Continuing from the state read ahead draws the same rows.
+    const tail = rows.slice(-100);
+    const fromDrawn = GraphLayout.from(drawn.state());
+    const fromRead = GraphLayout.from(read.state());
+    for (const [sha, ...parents] of tail) expect(fromRead.next(sha!, parents)).toEqual(fromDrawn.next(sha!, parents));
+  });
+});
