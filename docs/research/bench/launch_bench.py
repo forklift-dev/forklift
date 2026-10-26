@@ -99,6 +99,32 @@ def main():
         else:
             quiet_since = None
     pids = tree(sid)
+    # Optional: wheel down over the graph BENCH_SCROLL notches, then time until the tree is quiet again.
+    notches = int(os.environ.get('BENCH_SCROLL', '0'))
+    if notches and settle is not None:
+        wid = visible_window(pids)
+        subprocess.run(['xdotool', 'windowactivate', '--sync', wid], capture_output=True)
+        subprocess.run(['xdotool', 'mousemove', '--window', wid, '700', '500'], capture_output=True)
+        cpu_before = cpu_seconds(pids)
+        scroll_start = time.monotonic()
+        subprocess.run(['xdotool', 'click', '--repeat', str(notches), '--delay', '10', '5'], capture_output=True)
+        last_cpu, last_t, quiet_since, scroll_settle = cpu_seconds(pids), time.monotonic(), None, None
+        while time.monotonic() - scroll_start < 180:
+            time.sleep(0.25)
+            now = time.monotonic()
+            cpu = cpu_seconds(tree(sid))
+            load = (cpu - last_cpu) / (now - last_t)
+            last_cpu, last_t = cpu, now
+            if load < 0.03:
+                quiet_since = quiet_since or now
+                if now - quiet_since >= 2:
+                    scroll_settle = quiet_since - scroll_start
+                    break
+            else:
+                quiet_since = None
+        result['scroll_settle_s'] = round(scroll_settle, 2) if scroll_settle else 'timeout'
+        result['scroll_cpu_s'] = round(cpu_seconds(tree(sid)) - cpu_before, 2)
+        pids = tree(sid)
     result.update({'name': name, 'window_s': round(window, 2) if window else None, 'settle_s': round(settle, 2) if settle else None,
                    'cpu_s': round(cpu_seconds(pids), 2), 'pss_mib': round(pss_mib(pids)), 'processes': len(pids)})
     subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'x11grab', '-video_size', '1600x1000', '-i', os.environ['DISPLAY'], '-frames:v', '1', f'{out_dir}/{name}.png'], capture_output=True)

@@ -119,9 +119,9 @@ async function wideRepo() {
 }
 
 try {
-  // git measured in the first run
-  // linux measured separately (it does not finish)
-  await wideRepo();
+  // await historyRepo('git', `${B}/git`, 'Initial revision of "git", the information manager from hell');
+  await historyRepo('linux', `${B}/linux-hist`, 'Linux-2.6.12-rc2');
+  // await wideRepo();
 } catch (error) {
   results.error = String(error?.stack ?? error);
 } finally {
