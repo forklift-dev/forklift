@@ -15,7 +15,8 @@
     "test:e2e": "node tests/e2e/run.mjs",
     "postinstall": "node scripts/rebuild-native.mjs",
     "rebuild:native": "node scripts/rebuild-native.mjs --force",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "build:mac": "bash scripts/build-macos.sh"
   },
   "dependencies": {
     "@axosoft/nodegit": "0.28.0-alpha.38",

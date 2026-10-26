@@ -54,6 +54,21 @@ powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -SkipSetup # 
 
 Options: `-Arch arm64`, `-Clean` (rebuild native modules and OpenSSL), `-Test` (typecheck, lint, unit tests).
 
+**macOS packages in one command** (bootstraps Node 22 if the machine has none, rebuilds the native
+modules, signs the app ad-hoc and packages it; artifacts in `dist/`):
+
+```bash
+bash scripts/build-macos.sh            # works on a clean Mac: bootstraps Node itself
+npm run build:mac                      # same, when Node/npm are already installed
+bash scripts/build-macos.sh --check    # also typecheck and lint
+```
+
+Xcode Command Line Tools are the only prerequisite; the script opens their installer if they are
+missing. Downloads and caches stay in `~/.forklift-build` (`FORKLIFT_BUILD_HOME` overrides the
+location), Electron headers in `~/.electron-gyp`; the repository itself only gets `node_modules/`,
+`out/` and `dist/`. Builds are ad-hoc signed, not notarized (T-004): they launch on the machine that
+built them, elsewhere macOS asks to open the app with right-click → Open.
+
 ## Scripts
 
 | Command | Purpose |
@@ -64,3 +79,4 @@ Options: `-Arch arm64`, `-Clean` (rebuild native modules and OpenSSL), `-Test` (
 | `npm run typecheck` / `npm run lint` | TypeScript / oxlint |
 | `npm run rebuild:native` | Force rebuild native modules (after changing Electron version) |
 | `npm run dist` | Package for the current OS into `dist/` |
+| `npm run build:mac` | macOS: bootstrap Node, rebuild native modules, sign ad-hoc, package dmg + zip |
