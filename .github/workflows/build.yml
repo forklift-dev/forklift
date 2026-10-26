@@ -45,8 +45,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential python3 perl libkrb5-dev git git-lfs xvfb xauth \
+            build-essential clang-15 python3 perl libkrb5-dev git git-lfs xvfb xauth \
             libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 libsecret-1-0 libnotify4
+          # Electron 45's V8 headers use an attribute combination that GCC 12 and older cannot parse.
+          echo "CC=clang-15" >> "$GITHUB_ENV"
+          echo "CXX=clang++-15" >> "$GITHUB_ENV"
           git lfs install
 
       # OpenSSL for nodegit, built once per runner image and lock file (see scripts/rebuild-native.mjs).
@@ -102,7 +105,10 @@ jobs:
         if: ${{ matrix.os == 'linux' }}
         run: |
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential perl libkrb5-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential clang-15 perl libkrb5-dev
+          # Electron 45's V8 headers use an attribute combination that GCC 12 and older cannot parse.
+          echo "CC=clang-15" >> "$GITHUB_ENV"
+          echo "CXX=clang++-15" >> "$GITHUB_ENV"
 
       # nodegit's build asks for Visual Studio's Spectre-mitigated libraries; the runner image may lack them.
       - name: Toolchain (Windows)
