@@ -6,8 +6,8 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launchApp, projectDir, tempDir } from '../harness.mjs';
 
-const STYLES = { kraken: 30, classic: 28, compact: 22, metro: 30 };
-const THEMES = ['forklift-dark', 'forklift-light', 'dark-high-contrast', 'light-high-contrast', 'polar', 'sand'];
+const STYLES = { kraken: 30, classic: 28, compact: 22, metro: 30, thin: 26, rails: 28, ribbon: 28 };
+const THEMES = ['forklift-dark', 'forklift-light', 'dark-high-contrast', 'light-high-contrast', 'polar', 'sand', 'nocturne', 'cream'];
 const commits = `document.querySelector('.commits')`;
 
 export default async function ({ check }) {
@@ -28,7 +28,15 @@ export default async function ({ check }) {
     const rowHeight = await page.evaluate(`document.querySelector('.commit-row[data-hash]').getBoundingClientRect().height`);
     check(`${style}: rows are ${height} px`, Math.round(rowHeight) === height, rowHeight);
   }
+  await page.invoke('settings:update', { values: { 'ui.graphStyle': 'metro' } });
+  await page.waitFor(`${commits}.classList.contains('graph-style-metro')`);
   check('Metro: stations and 45° turns', await page.evaluate(`!!document.querySelector('.graph-cell .node.station') && [...document.querySelectorAll('.graph-cell .edge')].some(p => /L/.test(p.getAttribute('d')))`));
+  await page.invoke('settings:update', { values: { 'ui.graphStyle': 'rails' } });
+  await page.waitFor(`${commits}.classList.contains('graph-style-rails')`);
+  check('Rails: right-angle turns, no curves', await page.evaluate(`(() => { const turns = [...document.querySelectorAll('.graph-cell .edge')].map(p => p.getAttribute('d')).filter(d => /H/.test(d)); return turns.length > 0 && turns.every(d => !/[QCL]/.test(d)); })()`));
+  await page.invoke('settings:update', { values: { 'ui.graphStyle': 'ribbon' } });
+  await page.waitFor(`${commits}.classList.contains('graph-style-ribbon')`);
+  check('Ribbon: dots with a streak along the row and lane-colored labels', await page.evaluate(`!!document.querySelector('.graph-cell .streak') && !document.querySelector('.graph-cell .avatar-node') && ${commits}.classList.contains('lane-refs')`));
   check('Compact: plain dots, no avatars', await page.invoke('settings:update', { values: { 'ui.graphStyle': 'compact' } }).then(() => page.waitFor(`${commits}.classList.contains('graph-style-compact') && !document.querySelector('.graph-cell .avatar-node')`)));
 
   // Selection and going to a commit far down work with another row height.
@@ -59,4 +67,34 @@ export default async function ({ check }) {
     }
   }
   check('screenshots of every style in every theme', true);
+
+  // Every style scrolls a long history smoothly: 200 jumps of 900 px through 10 000 commits.
+  const big = join(tempDir('forklift-graph-styles-big-'), 'big');
+  execFileSync(process.execPath, [join(projectDir, 'scripts/make-history-repo.mjs'), big, '10000', '7']);
+  await page.invoke('settings:update', { values: { 'ui.theme': 'forklift-dark' } });
+  await page.invoke('repo:open', big);
+  await page.waitFor(`document.querySelectorAll('.commit-row[data-hash]').length > 10 && document.querySelector('.toolbar .crumb-value strong')?.textContent === 'big'`, 20000);
+  const timings = {};
+  for (const style of Object.keys(STYLES)) {
+    await page.invoke('settings:update', { values: { 'ui.graphStyle': style } });
+    await page.waitFor(`${commits}.classList.contains('graph-style-${style}')`);
+    timings[style] = await page.evaluate(`(async () => {
+      const scroll = document.querySelector('.commit-scroll');
+      const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      scroll.scrollTop = 0;
+      await frame();
+      const times = [];
+      for (let i = 0; i < 200; i++) {
+        const start = performance.now();
+        scroll.scrollTop = (i * 900) % (scroll.scrollHeight - scroll.clientHeight);
+        await frame();
+        await frame();
+        times.push(performance.now() - start);
+      }
+      times.sort((a, b) => a - b);
+      return { median: Math.round(times[100]), p95: Math.round(times[190]) };
+    })()`);
+  }
+  // Two frames are ~33 ms at 60 Hz; software rendering under xvfb leaves some room.
+  check('every style redraws a 900 px jump within a few frames (median ≤ 50 ms)', Object.values(timings).every((t) => t.median <= 50), JSON.stringify(timings));
 }

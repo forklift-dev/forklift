@@ -262,6 +262,16 @@ async function start() {
   // Handle for poking services from the main-process inspector (`--inspect`) in dev builds.
   if (!app.isPackaged) Object.assign(globalThis, { forkliftDebug: { store, runner, gitCli, tools, diffTools, staging, settings, toolActions, repoSession, history, watch, branches, stashes, autoFetch, undo, terminals } });
 
+  // The interface scale: for the window as it loads, and again whenever the setting changes.
+  const zoomFactor = () => settings.values['ui.zoom'] / 100;
+  app.on('browser-window-created', (_event, window) => window.webContents.on('did-finish-load', () => window.webContents.setZoomFactor(zoomFactor())));
+  let zoom = settings.values['ui.zoom'];
+  store.subscribe(() => {
+    if (settings.values['ui.zoom'] === zoom) return;
+    zoom = settings.values['ui.zoom'];
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.setZoomFactor(zoomFactor());
+  });
+
   showMainWindow();
   app.on('activate', showMainWindow);
 }

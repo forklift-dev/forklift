@@ -18,7 +18,7 @@ import { TabBar } from './components/TabBar';
 import { TerminalPanel } from './components/TerminalPanel';
 import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
-import { useAppState } from './state';
+import { getState, useAppState } from './state';
 import { useLanguage } from './i18n';
 import { t, translate } from '../../shared/i18n';
 
@@ -26,6 +26,11 @@ import { t, translate } from '../../shared/i18n';
 export type RunAction = (action: () => Promise<unknown>) => Promise<boolean>;
 
 type Screen = 'repo' | 'repositories' | 'preferences' | 'log';
+
+/** Percent per Zoom in / Zoom out. */
+const ZOOM_STEP = 10;
+/** The scale last asked for while main is still saving it. */
+let pendingZoom: number | null = null;
 
 /** Tab to switch to for Ctrl+Tab (+1), Ctrl+Shift+Tab (-1) or Ctrl+N (index N-1; Ctrl+9 is the last tab). */
 function tabFor(tabs: TabsState, key: { step?: number; number?: number }): string | null {
@@ -159,10 +164,23 @@ export function App() {
       { title: t('Use the {theme} theme', { theme: translate(theme.name) }), category: 'View', run: () => void run(() => invoke('settings:update', { values: { 'ui.theme': theme.id } })) },
     ]),
   );
+  // From the value asked for last (the replica catches up only after main saved it): quick presses each take a step.
+  const zoomBy = (step: number | null) => {
+    const current = pendingZoom ?? getState().settings.values['ui.zoom'];
+    const value = step === null ? 100 : Math.min(200, Math.max(50, current + step));
+    if (value === current) return;
+    pendingZoom = value;
+    void run(() => invoke('settings:update', { values: { 'ui.zoom': value } })).finally(() => {
+      if (pendingZoom === value) pendingZoom = null;
+    });
+  };
   useCommandHandlers({
     'palette.commands': { run: () => setPalette('') },
     'app.preferences': { run: () => openPreferences() },
     'app.keybindings': { run: () => openPreferences('keys') },
+    'view.zoomIn': { run: () => zoomBy(ZOOM_STEP) },
+    'view.zoomOut': { run: () => zoomBy(-ZOOM_STEP) },
+    'view.zoomReset': { run: () => zoomBy(null) },
     'theme.choose': { run: () => openPreferences('ui') },
     'profile.switch': { run: () => setSwitchingProfile(true) },
     'app.log': { run: () => showLog(null) },

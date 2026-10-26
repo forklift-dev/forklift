@@ -10,8 +10,8 @@ export interface GraphStyle {
   nodeRadius: number;
   mergeRadius: number;
   lineWidth: number;
-  /** bezier: smooth S-curves; rounded: straight runs with rounded corners (GitKraken); angled: 45° (metro map). */
-  curve: 'bezier' | 'rounded' | 'angled';
+  /** bezier: smooth S-curves; rounded: straight runs with rounded corners (GitKraken); angled: 45° (metro map); square: right angles (rails). */
+  curve: 'bezier' | 'rounded' | 'angled' | 'square';
   /** dot: a filled circle; avatar: the author's avatar in a ring of the lane color; station: a ring with a hollow middle. */
   nodes: 'dot' | 'avatar' | 'station';
   /** A faint band of the lane color from the node to the end of the graph column, and a bar before the message. */
@@ -25,6 +25,9 @@ export const GRAPH_STYLES: readonly GraphStyle[] = [
   { id: 'classic', name: 'Classic', rowHeight: 28, laneWidth: 14, nodeRadius: 5, mergeRadius: 3.5, lineWidth: 2, curve: 'bezier', nodes: 'dot', streak: false, laneRefs: false },
   { id: 'compact', name: 'Compact', rowHeight: 22, laneWidth: 10, nodeRadius: 3.5, mergeRadius: 2.5, lineWidth: 1.5, curve: 'bezier', nodes: 'dot', streak: false, laneRefs: false },
   { id: 'metro', name: 'Metro', rowHeight: 30, laneWidth: 20, nodeRadius: 6, mergeRadius: 6, lineWidth: 4, curve: 'angled', nodes: 'station', streak: false, laneRefs: true },
+  { id: 'thin', name: 'Thin', rowHeight: 26, laneWidth: 12, nodeRadius: 3, mergeRadius: 3, lineWidth: 1.25, curve: 'bezier', nodes: 'dot', streak: false, laneRefs: false },
+  { id: 'rails', name: 'Rails', rowHeight: 28, laneWidth: 16, nodeRadius: 4.5, mergeRadius: 4.5, lineWidth: 3, curve: 'square', nodes: 'station', streak: false, laneRefs: false },
+  { id: 'ribbon', name: 'Ribbon', rowHeight: 28, laneWidth: 16, nodeRadius: 5, mergeRadius: 3.5, lineWidth: 2, curve: 'rounded', nodes: 'dot', streak: true, laneRefs: true },
 ];
 
 export const graphStyle = (id: string): GraphStyle => GRAPH_STYLES.find((style) => style.id === id) ?? GRAPH_STYLES[0]!;
@@ -48,6 +51,10 @@ export function edgePath(style: GraphStyle, edge: GraphEdge): string {
     return edge.kind === EdgeKind.In
       ? `M${from} 0C${from} ${mid * 0.6} ${to} ${mid * 0.4} ${to} ${mid}`
       : `M${from} ${mid}C${from} ${mid * 1.6} ${to} ${mid * 1.4} ${to} ${h}`;
+  }
+  if (style.curve === 'square') {
+    // Along the node's row, turning at a right angle into the other lane.
+    return edge.kind === EdgeKind.In ? `M${from} 0V${mid}H${to}` : `M${from} ${mid}H${to}V${h}`;
   }
   if (style.curve === 'rounded') {
     // Along the node's row, then a rounded corner into the other lane (as GitKraken draws branches and merges).

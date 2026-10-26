@@ -25,6 +25,8 @@ files:
 extraResources:
   - from: build/window.png
     to: icon.png
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
 
 asar: true
 asarUnpack:

@@ -7,7 +7,11 @@ import { createRepo, launchApp, projectDir, tempDir } from '../harness.mjs';
 
 export const meta = { platforms: ['linux', 'darwin'] };
 
-const BUILTIN = ['forklift-dark', 'forklift-light', 'dark-high-contrast', 'light-high-contrast', 'polar', 'sand'];
+const BUILTIN = [
+  'forklift-dark', 'forklift-light', 'dark-high-contrast', 'light-high-contrast', 'polar', 'sand',
+  // Made from palettes of popular editor themes (src/shared/themePalettes.ts).
+  'dusk', 'dawn', 'studio-dark', 'studio-light', 'harbor-dark', 'harbor-light', 'graphite', 'neon-night', 'cocoa', 'cream', 'nocturne', 'fjord', 'amber-dark', 'amber-light',
+];
 const cssVar = (name, scope = 'document.documentElement') => `getComputedStyle(${scope}).getPropertyValue('--${name}').trim()`;
 const option = (setting, id) => `document.querySelector('.setting-row[data-setting="${setting}"] [data-theme-id="${id}"]')`;
 
@@ -95,4 +99,27 @@ export default async function ({ check }) {
   await page.invoke('settings:update', { values: { 'ui.theme': 'sand' } });
   const after = await page.waitFor(`${terminalBg} !== ${JSON.stringify(before)} && ${terminalBg}`, 5000);
   check('the terminal repaints with the theme', after === 'rgb(250, 246, 238)', `${before} → ${after}`);
+
+  // An accent color recolors buttons, links and focus, not the lanes; "From the theme" brings the theme's back.
+  const themeAccent = await page.evaluate(cssVar('accent'));
+  const lane = await page.evaluate(cssVar('graph-0'));
+  await page.invoke('settings:update', { values: { 'ui.accent': 'pink' } });
+  const pink = await page.waitFor(`${cssVar('accent')} !== ${JSON.stringify(themeAccent)} && ${cssVar('accent')}`);
+  check('an accent color recolors the accent, and lanes stay', Boolean(pink) && (await page.evaluate(cssVar('graph-0'))) === lane, `${themeAccent} → ${pink}`);
+  await page.invoke('settings:update', { values: { 'ui.accent': 'theme' } });
+  check('"From the theme" restores the theme’s accent', await page.waitFor(`${cssVar('accent')} === ${JSON.stringify(themeAccent)}`));
+
+  // The interface scale: the setting and Ctrl+= / Ctrl+- / Ctrl+0.
+  const width = `document.documentElement.clientWidth`;
+  const normal = await page.evaluate(width);
+  await page.invoke('settings:update', { values: { 'ui.zoom': 125 } });
+  check('the scale setting zooms the window', await page.waitFor(`Math.abs(${width} - ${Math.round(normal / 1.25)}) <= 2`), `${normal} → ${await page.evaluate(width)}`);
+  await page.evaluate(`document.querySelector('.commit-scroll').focus()`);
+  await page.press('=', { code: 'Equal', keyCode: 187, modifiers: 2 });
+  check('Ctrl+= zooms in by 10 %', await page.waitFor(`Math.abs(${width} - ${Math.round(normal / 1.35)}) <= 2`), await page.evaluate(width));
+  await page.press('-', { code: 'Minus', keyCode: 189, modifiers: 2 });
+  await page.press('-', { code: 'Minus', keyCode: 189, modifiers: 2 });
+  check('Ctrl+- zooms out', await page.waitFor(`Math.abs(${width} - ${Math.round(normal / 1.15)}) <= 2`), await page.evaluate(width));
+  await page.press('0', { code: 'Digit0', keyCode: 48, modifiers: 2 });
+  check('Ctrl+0 resets the scale', await page.waitFor(`Math.abs(${width} - ${normal}) <= 2`), await page.evaluate(width));
 }

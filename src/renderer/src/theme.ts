@@ -1,5 +1,5 @@
 import type { ITheme } from '@xterm/xterm';
-import { APP_THEME, resolveTheme, THEME_TOKENS, type Theme } from '../../shared/themes';
+import { APP_THEME, resolveTheme, THEME_TOKENS, withAccent, type Theme } from '../../shared/themes';
 import { monaco } from './monaco/setup';
 import { getState, subscribe } from './state';
 
@@ -97,14 +97,25 @@ export function terminalTheme(): ITheme {
   return { ...ansi, background: t['code-bg'], foreground: t['code-fg'], cursor: t.accent, cursorAccent: t['code-bg'], selectionBackground: t['code-selection'] };
 }
 
+/** Themes with the chosen accent, kept so the same choice gives the same object (apply compares them). */
+const accented = new WeakMap<Theme, Map<string, Theme>>();
+function withChosenAccent(theme: Theme, accent: string): Theme {
+  let byAccent = accented.get(theme);
+  if (!byAccent) accented.set(theme, (byAccent = new Map()));
+  let result = byAccent.get(accent);
+  if (!result) byAccent.set(accent, (result = withAccent(theme, accent)));
+  return result;
+}
+
 let applied: [Theme, Theme] | null = null;
 function apply(): void {
   const state = getState();
   const values = state.settings.values;
   const user = state.app.userThemes.themes;
-  const app = resolveTheme(values['ui.theme'], darkQuery.matches, user);
+  const accent = values['ui.accent'];
+  const app = withChosenAccent(resolveTheme(values['ui.theme'], darkQuery.matches, user), accent);
   const editorId = values['ui.editorTheme'];
-  const editor = editorId === APP_THEME ? app : resolveTheme(editorId, darkQuery.matches, user);
+  const editor = editorId === APP_THEME ? app : withChosenAccent(resolveTheme(editorId, darkQuery.matches, user), accent);
   // Themes are stable objects (built-in constants, or user themes until their files are read again).
   if (applied && applied[0] === app && applied[1] === editor) return;
   applied = [app, editor];
