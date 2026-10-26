@@ -40,6 +40,17 @@ for (const sourceDir of ['src', 'include']) {
 }
 if (patchedFiles > 0) console.log(`Patched v8::External::Value() calls in ${patchedFiles} nodegit sources`);
 
+// nsfw 2.3.1 pins -std=c++11 in binding.gyp while its "node-addon-api": "*" dependency resolves to
+// v8, whose headers need C++17 (std::void_t, std::decay_t): clang fails on every platform. Build it
+// at the standard Electron's common.gypi already selects instead. Idempotent.
+const nsfwBinding = join(dirname(require.resolve('nsfw/package.json')), 'binding.gyp');
+const nsfwSource = readFileSync(nsfwBinding, 'utf8');
+const nsfwPatched = nsfwSource.replaceAll('-std=c++11', '-std=gnu++20');
+if (nsfwPatched !== nsfwSource) {
+  writeFileSync(nsfwBinding, nsfwPatched);
+  console.log('Patched nsfw binding.gyp to C++20');
+}
+
 // OpenSSL is built from source on Linux and downloaded prebuilt on macOS/Windows by nodegit's
 // own script. We run it once up front instead of letting the gyp graph do it, because:
 // - parallel compile jobs do not wait for that gyp action ("openssl/des.h: No such file");
