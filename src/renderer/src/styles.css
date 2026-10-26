@@ -734,7 +734,17 @@ body.resizing * {
 .cell.refs {
   width: var(--col-refs, 170px);
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 2px 4px;
+}
+
+.commit-row .cell.refs .ref {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  line-height: 12px;
 }
 
 .cell.graph {
@@ -949,7 +959,7 @@ body.resizing * {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  padding: 1px 6px;
+  padding: 0 5px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--lane) 32%, var(--bg));
   color: var(--fg-bright);
