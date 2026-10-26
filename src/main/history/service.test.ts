@@ -85,6 +85,14 @@ describe('HistoryService', () => {
     expect(rows.map((row) => `${row.hash} ${row.authorName} <${row.authorEmail}> ${row.authorTime} ${row.parents.join(' ')}`.trim())).toEqual(expected.map((line) => line.trim()));
   });
 
+  it('reads details only for the rows shown, also far down and across blocks', async () => {
+    const history = new HistoryService(new GitCli(directRunner()));
+    const { historyVersion } = await git.read(root);
+    const { rows } = await history.page(root, historyVersion, 3000, 600);
+    const expected = sh('log', '--all', '--date-order', '--skip=3000', '-600', '--format=%H %an %at %s').split('\n');
+    expect(rows.map((row) => `${row.hash} ${row.authorName} ${row.authorTime} ${row.subject}`)).toEqual(expected);
+  });
+
   it('rebuilds when the version changes and reports the version it was built for', async () => {
     const history = new HistoryService(new GitCli(directRunner()));
     const before = await git.read(root);
