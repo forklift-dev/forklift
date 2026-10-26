@@ -2,6 +2,7 @@ import { access, rm } from 'node:fs/promises';
 import { isAbsolute, join, normalize, relative, sep } from 'node:path';
 import type { SubmoduleInfo } from '../../shared/submodules';
 import { normalizeRepoRelative } from '../repoPaths';
+import { t } from '../../shared/i18n';
 import type { GitCli } from './cli';
 import type { RemoteRun, RemoteService } from './remote';
 import { RepoQueue } from './repoQueue';
@@ -67,10 +68,10 @@ export class SubmoduleService {
 
   /** `git submodule add`: clones `url` into `path` and records it (staged, to be committed). */
   async add(root: string, url: unknown, path: unknown, run: RemoteRun): Promise<void> {
-    if (typeof url !== 'string' || !url.trim() || url.trim().startsWith('-') || /[\0\r\n]/.test(url) || url.length > 4096) throw new SubmoduleError('Enter the repository URL');
+    if (typeof url !== 'string' || !url.trim() || url.trim().startsWith('-') || /[\0\r\n]/.test(url) || url.length > 4096) throw new SubmoduleError(t('Enter the repository URL'));
     const target = this.relativePath(path);
     return this.queue.run(root, async () => {
-      if (await exists(join(root, target))) throw new SubmoduleError(`${target} already exists`);
+      if (await exists(join(root, target))) throw new SubmoduleError(t('{path} already exists', { path: target }));
       await this.remotes.networkCommand(root, ['submodule', 'add', '--progress', '--', url.trim(), target], run);
     });
   }
@@ -103,7 +104,7 @@ export class SubmoduleService {
     const target = this.relativePath(path);
     return this.queue.run(root, async () => {
       const found = (await this.list(root)).find((submodule) => submodule.path === target);
-      if (!found) throw new SubmoduleError(`${target} is not a submodule`);
+      if (!found) throw new SubmoduleError(t('{path} is not a submodule', { path: target }));
       await this.git.exec(['submodule', 'deinit', '-f', '--', target], { cwd: root });
       // git rm edits .gitmodules and refuses while it has unstaged edits.
       await this.git.exec(['add', '--', '.gitmodules'], { cwd: root });
@@ -118,13 +119,13 @@ export class SubmoduleService {
   }
 
   private relativePath(path: unknown): string {
-    if (typeof path !== 'string' || !path.trim()) throw new SubmoduleError('Enter the folder for the submodule');
+    if (typeof path !== 'string' || !path.trim()) throw new SubmoduleError(t('Enter the folder for the submodule'));
     try {
       const relativePath = normalizeRepoRelative(path.trim().replace(/\\/g, '/').replace(/\/+$/, ''));
       if (relativePath === '.git' || relativePath.startsWith('.git/')) throw new Error('inside .git');
       return relativePath;
     } catch {
-      throw new SubmoduleError(`"${path}" is not a folder inside the repository`);
+      throw new SubmoduleError(t('"{path}" is not a folder inside the repository', { path: String(path) }));
     }
   }
 }

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatDate, t } from '../../../shared/i18n';
 import type { LogEntry } from '../../../shared/log';
 import { invoke } from '../api';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
 
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const TIME: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
 const baseName = (path: string | null) => (path ? (path.split(/[\\/]/).filter(Boolean).pop() ?? path) : '');
 
 interface Group {
@@ -14,17 +15,17 @@ interface Group {
 
 function Details({ entry }: { entry: LogEntry }) {
   const parts = [
-    entry.error && ['Error', entry.error],
-    entry.stderr?.trim() && ['Output (stderr)', entry.stderr.trim()],
-    entry.stdout?.trim() && ['Output (stdout)', entry.stdout.trim()],
+    entry.error && [t('Error'), entry.error],
+    entry.stderr?.trim() && [t('Output (stderr)'), entry.stderr.trim()],
+    entry.stdout?.trim() && [t('Output (stdout)'), entry.stdout.trim()],
   ].filter(Boolean) as Array<[string, string]>;
   return (
     <div className="log-details">
       <p className="log-meta">
-        {new Date(entry.time).toLocaleString()}
+        {formatDate(entry.time, { dateStyle: 'medium', timeStyle: 'medium' })}
         {entry.repo && ` · ${entry.repo}`}
-        {entry.exitCode !== undefined && ` · exit code ${entry.exitCode ?? 'none (terminated)'}`}
-        {entry.readOnly && ' · read-only'}
+        {entry.exitCode !== undefined && ` · ${entry.exitCode === null ? t('exit code none (terminated)') : t('exit code {code}', { code: entry.exitCode })}`}
+        {entry.readOnly && ` · ${t('read-only')}`}
       </p>
       {parts.map(([title, text]) => (
         <div key={title}>
@@ -32,7 +33,7 @@ function Details({ entry }: { entry: LogEntry }) {
           <pre>{text}</pre>
         </div>
       ))}
-      {!parts.length && <p className="empty-note">No output</p>}
+      {!parts.length && <p className="empty-note">{t('No output')}</p>}
     </div>
   );
 }
@@ -42,10 +43,10 @@ function Row({ entry, open, onToggle, nested }: { entry: LogEntry; open: boolean
     <li className={`log-entry ${entry.kind} ${entry.status}${nested ? ' nested' : ''}`} data-log-id={entry.id}>
       <button type="button" className="log-row" aria-expanded={open} onClick={onToggle}>
         <span className={`codicon ${entry.status === 'error' ? 'codicon-error' : entry.status === 'running' ? 'codicon-loading codicon-modifier-spin' : entry.kind === 'git' ? 'codicon-terminal' : 'codicon-check'}`} aria-hidden="true" />
-        <span className="log-time">{timeFormat.format(entry.time)}</span>
+        <span className="log-time">{formatDate(entry.time, TIME)}</span>
         <span className="log-title">{entry.title}</span>
         <span className="log-repo">{entry.kind === 'operation' ? baseName(entry.repo) : ''}</span>
-        <span className="log-duration">{entry.durationMs === null ? '…' : `${entry.durationMs} ms`}</span>
+        <span className="log-duration">{entry.durationMs === null ? '…' : t('{ms} ms', { ms: entry.durationMs })}</span>
       </button>
       {open && <Details entry={entry} />}
     </li>
@@ -98,7 +99,7 @@ export function LogView({ focus, onClose }: { focus: number | null; onClose(): v
   return (
     <section
       className="log-view"
-      aria-label="Operation log"
+      aria-label={t('Operation log')}
       ref={rootRef}
       tabIndex={-1}
       onKeyDown={(event) => {
@@ -108,23 +109,23 @@ export function LogView({ focus, onClose }: { focus: number | null; onClose(): v
       }}
     >
       <header className="log-header">
-        <h1>Operation log</h1>
-        <input type="search" placeholder="Filter" aria-label="Filter the log" value={filter} onChange={(event) => setFilter(event.target.value)} />
+        <h1>{t('Operation log')}</h1>
+        <input type="search" placeholder={t('Filter')} aria-label={t('Filter the log')} value={filter} onChange={(event) => setFilter(event.target.value)} />
         <label className="checkbox-label">
-          <input type="checkbox" checked={errorsOnly} onChange={(event) => setErrorsOnly(event.target.checked)} /> Errors only
+          <input type="checkbox" checked={errorsOnly} onChange={(event) => setErrorsOnly(event.target.checked)} /> {t('Errors only')}
         </label>
         <label className="checkbox-label">
-          <input type="checkbox" checked={showReads} onChange={(event) => setShowReads(event.target.checked)} /> Read-only git commands
+          <input type="checkbox" checked={showReads} onChange={(event) => setShowReads(event.target.checked)} /> {t('Read-only git commands')}
         </label>
         <span className="log-spacer" />
         {status && <span className="hint">{status}</span>}
-        <button type="button" onClick={() => void invoke('log:export').then((path) => path && setStatus(`Saved to ${path}`))}>
-          Export…
+        <button type="button" onClick={() => void invoke('log:export').then((path) => path && setStatus(t('Saved to {path}', { path })))}>
+          {t('Export…')}
         </button>
         <button type="button" onClick={() => void invoke('log:clear')}>
-          Clear
+          {t('Clear')}
         </button>
-        <button type="button" aria-label="Close the log" title="Close (Esc)" onClick={onClose}>
+        <button type="button" aria-label={t('Close the log')} title={t('Close (Esc)')} onClick={onClose}>
           ✕
         </button>
       </header>
@@ -138,8 +139,8 @@ export function LogView({ focus, onClose }: { focus: number | null; onClose(): v
             </ul>
           </li>
         ))}
-        {!groups.length && <li className="empty-note">{entries.length ? 'Nothing matches' : 'Nothing logged yet'}</li>}
-        {dropped && <li className="empty-note">Older entries were dropped (the log keeps the last 3000).</li>}
+        {!groups.length && <li className="empty-note">{entries.length ? t('Nothing matches') : t('Nothing logged yet')}</li>}
+        {dropped && <li className="empty-note">{t('Older entries were dropped (the log keeps the last 3000).')}</li>}
       </ul>
     </section>
   );

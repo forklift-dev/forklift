@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import type { HistoryFilter, SearchField } from '../../../shared/history';
+import { t } from '../../../shared/i18n';
 
-const FIELDS: Array<{ value: SearchField; label: string }> = [
-  { value: 'message', label: 'Message' },
-  { value: 'author', label: 'Author' },
-  { value: 'sha', label: 'SHA' },
-  { value: 'file', label: 'File name' },
-  { value: 'content', label: 'Changed text' },
+const fields = (): Array<{ value: SearchField; label: string }> => [
+  { value: 'message', label: t('Message') },
+  { value: 'author', label: t('Author') },
+  { value: 'sha', label: t('SHA') },
+  { value: 'file', label: t('File name') },
+  { value: 'content', label: t('Changed text') },
 ];
 
 const shortRef = (ref: string) => ref.replace(/^refs\/(heads|remotes|tags)\//, '');
@@ -42,8 +43,8 @@ export function HistoryBar({ filter, onShowAll, onGoToHead, search, onSearch, re
     <div className="history-bar">
       {search.open ? (
         <div className="history-search" role="search">
-          <select aria-label="Search in" value={search.field} onChange={(event) => onSearch({ ...search, field: event.target.value as SearchField })}>
-            {FIELDS.map((field) => (
+          <select aria-label={t('Search in')} value={search.field} onChange={(event) => onSearch({ ...search, field: event.target.value as SearchField })}>
+            {fields().map((field) => (
               <option key={field.value} value={field.value}>
                 {field.label}
               </option>
@@ -52,8 +53,8 @@ export function HistoryBar({ filter, onShowAll, onGoToHead, search, onSearch, re
           <input
             ref={inputRef}
             type="search"
-            aria-label="Search commits"
-            placeholder="Search commits"
+            aria-label={t('Search commits')}
+            placeholder={t('Search commits')}
             value={search.text}
             onChange={(event) => onSearch({ ...search, text: event.target.value })}
             onKeyDown={(event) => {
@@ -70,33 +71,33 @@ export function HistoryBar({ filter, onShowAll, onGoToHead, search, onSearch, re
             }}
           />
           <span className="search-count" role="status">
-            {error ? <span className="setting-error">{error}</span> : !search.text.trim() ? '' : results === null ? 'Searching…' : results.count === 0 ? 'No matches' : `${current + 1} of ${results.count}${results.truncated ? '+' : ''}`}
+            {error ? <span className="setting-error">{error}</span> : !search.text.trim() ? '' : results === null ? t('Searching…') : results.count === 0 ? t('No matches') : t('{current} of {count}{truncated}', { current: current + 1, count: results.count, truncated: results.truncated ? '+' : '' })}
           </span>
-          <button type="button" className="icon-button" aria-label="Previous match" disabled={!results?.count} onClick={() => onStep(-1)}>
+          <button type="button" className="icon-button" aria-label={t('Previous match')} disabled={!results?.count} onClick={() => onStep(-1)}>
             <span className="codicon codicon-arrow-up" aria-hidden="true" />
           </button>
-          <button type="button" className="icon-button" aria-label="Next match" disabled={!results?.count} onClick={() => onStep(1)}>
+          <button type="button" className="icon-button" aria-label={t('Next match')} disabled={!results?.count} onClick={() => onStep(1)}>
             <span className="codicon codicon-arrow-down" aria-hidden="true" />
           </button>
-          <button type="button" className="icon-button" aria-label="Close search" onClick={() => onSearch({ ...search, open: false, text: '' })}>
+          <button type="button" className="icon-button" aria-label={t('Close search')} onClick={() => onSearch({ ...search, open: false, text: '' })}>
             <span className="codicon codicon-close" aria-hidden="true" />
           </button>
         </div>
       ) : (
-        <button type="button" className="icon-button" aria-label="Search commits" title="Search commits (Ctrl+F)" onClick={() => onSearch({ ...search, open: true })}>
+        <button type="button" className="icon-button" aria-label={t('Search commits')} title={t('Search commits (Ctrl+F)')} onClick={() => onSearch({ ...search, open: true })}>
           <span className="codicon codicon-search" aria-hidden="true" />
         </button>
       )}
       {filtered && (
         <span className="filter-status">
-          {filter.solo.length ? `Showing only ${filter.solo.map(shortRef).join(', ')}` : `${filter.hidden.length} branch${filter.hidden.length === 1 ? '' : 'es'} hidden`}
+          {filter.solo.length ? t('Showing only {refs}', { refs: filter.solo.map(shortRef).join(', ') }) : t('{count} branches hidden', { count: filter.hidden.length })}
           <button type="button" className="link-button" onClick={onShowAll}>
-            Show all branches
+            {t('Show all branches')}
           </button>
         </span>
       )}
-      <button type="button" className="go-head" onClick={onGoToHead} title="Show the checked-out commit">
-        Go to HEAD
+      <button type="button" className="go-head" onClick={onGoToHead} title={t('Show the checked-out commit')}>
+        {t('Go to HEAD')}
       </button>
     </div>
   );

@@ -1,4 +1,5 @@
 import { EdgeKind, type GraphRowLayout } from '../../../../shared/graph';
+import { t, translate } from '../../../../shared/i18n';
 import { edgePath, GRAPH_STYLES, laneX, type GraphStyle } from '../../graphStyles';
 import type { ControlProps } from './SettingRow';
 
@@ -46,11 +47,11 @@ function Preview({ style }: { style: GraphStyle }) {
 /** `ui.graphStyle` as cards with a small drawing of each style. */
 export function GraphStylePicker({ id, value, save }: ControlProps) {
   return (
-    <div id={id} className="theme-picker graph-style-picker" role="radiogroup" aria-label="Commit graph">
+    <div id={id} className="theme-picker graph-style-picker" role="radiogroup" aria-label={t('Commit graph')}>
       {GRAPH_STYLES.map((style) => (
         <button key={style.id} type="button" role="radio" aria-checked={value === style.id} className={`theme-option${value === style.id ? ' selected' : ''}`} data-graph-style={style.id} onClick={() => void save(style.id)}>
           <Preview style={style} />
-          <span className="theme-option-label">{style.name}</span>
+          <span className="theme-option-label">{translate(style.name)}</span>
         </button>
       ))}
     </div>

@@ -3,6 +3,7 @@ import type { CheckoutTarget } from '../../../shared/branches';
 import { fuzzyFilter } from '../../../shared/fuzzy';
 import type { RepoData } from '../../../shared/state';
 import { Palette, type PaletteItem } from './Palette';
+import { t } from '../../../shared/i18n';
 
 /** The branch ▾ of the toolbar: find a branch and check it out, or create one at HEAD. */
 export function BranchSwitcher({ data, onClose, onCheckout, onCreate }: { data: RepoData; onClose(): void; onCheckout(target: CheckoutTarget): void; onCreate(): void }) {
@@ -16,16 +17,16 @@ export function BranchSwitcher({ data, onClose, onCheckout, onCreate }: { data: 
   ];
   const items: PaletteItem[] = fuzzyFilter(query, branches, (branch) => branch.name, 200).map(({ item, positions }) => ({
     key: `${item.kind}:${item.name}`,
-    group: item.kind === 'branch' ? 'Local' : 'Remote',
+    group: item.kind === 'branch' ? t('Local') : t('Remote'),
     icon: item.current ? 'check' : item.kind === 'remote' ? 'cloud' : 'git-branch',
     label: item.name,
     positions,
-    detail: item.current ? 'checked out' : undefined,
+    detail: item.current ? t('checked out') : undefined,
     run: () => {
       if (item.current) return;
       onCheckout(item.kind === 'branch' ? { kind: 'branch', name: item.name } : { kind: 'remote', name: item.name, remote: item.remote });
     },
   }));
-  items.push({ key: 'create', icon: 'git-branch-create', label: 'Create a branch at HEAD…', run: onCreate });
-  return <Palette label="Branches" placeholder="Switch to branch" query={query} onQuery={setQuery} items={items} empty="No matching branches" onClose={onClose} />;
+  items.push({ key: 'create', icon: 'git-branch-create', label: t('Create a branch at HEAD…'), run: onCreate });
+  return <Palette label={t('Branches')} placeholder={t('Switch to branch')} query={query} onQuery={setQuery} items={items} empty={t('No matching branches')} onClose={onClose} />;
 }

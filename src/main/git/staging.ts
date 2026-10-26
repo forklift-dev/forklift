@@ -1,6 +1,7 @@
 import { lstat, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FileVersion } from '../../shared/diff';
+import { t } from '../../shared/i18n';
 import type { LineActionRequest } from '../../shared/staging';
 import { GitCliError, type GitCli } from './cli';
 import { applyLineChanges, dominantEol, splitLines } from './partial';
@@ -73,7 +74,7 @@ export class StagingService {
         if (!(error instanceof GitCliError) || error.exitCode === null) throw error;
         // Hook output is what the user needs here, not just git's last line.
         const output = `${error.stdout}\n${error.stderr}`.trim().split(/\r?\n/).slice(-COMMIT_OUTPUT_LINES).join('\n');
-        throw new StagingError(`Commit failed:\n${output || error.message}`);
+        throw new StagingError(t('Commit failed:\n{output}', { output: output || error.message }));
       }
       return (await this.git.exec(['rev-parse', 'HEAD'], { cwd: root, readOnly: true })).stdout.trim();
     });
@@ -83,15 +84,15 @@ export class StagingService {
     const { path, action } = request;
     const { original, modified } = await this.reader.fileDiff(root, { kind: 'worktree', path, staged: action === 'unstage' });
     if (original.hash !== request.originalHash || modified.hash !== request.modifiedHash) {
-      throw new StagingError(`${path} changed since it was shown; review the updated diff and try again`);
+      throw new StagingError(t('{path} changed since it was shown; review the updated diff and try again', { path }));
     }
     assertEditable(original, path);
     assertEditable(modified, path);
-    if (!modified.exists) throw new StagingError(`${path} was deleted; stage or discard the whole file instead`);
+    if (!modified.exists) throw new StagingError(t('{path} was deleted; stage or discard the whole file instead', { path }));
     // Symlinks and submodules are not text files: writing "lines" would replace them with regular files.
     const onDisk = await lstat(join(root, path)).catch(() => null);
     if (onDisk?.isSymbolicLink() || onDisk?.isDirectory()) {
-      throw new StagingError(`${path} is a symlink or submodule; stage or discard it as a whole`);
+      throw new StagingError(t('{path} is a symlink or submodule; stage or discard it as a whole', { path }));
     }
     await this.assertNoFilter(root, path);
 
@@ -120,7 +121,7 @@ export class StagingService {
 
     const text = applyLineChanges(originalText, modifiedText, request.changes, pick);
     const mode = await this.indexMode(root, path);
-    if (mode === '120000' || mode === '160000') throw new StagingError(`${path} is a symlink or submodule; stage it as a whole`);
+    if (mode === '120000' || mode === '160000') throw new StagingError(t('{path} is a symlink or submodule; stage it as a whole', { path }));
     // Working-tree text goes through the clean filters (autocrlf, eol, ident) exactly as `git add` would;
     // HEAD/index text is already clean.
     const filters = action === 'stage' ? [`--path=${path}`] : ['--no-filters'];
@@ -142,7 +143,7 @@ export class StagingService {
     const { stdout } = await this.git.exec(['check-attr', 'filter', '--', path], { cwd: root, readOnly: true });
     const value = stdout.trim().split(': ').pop();
     if (value && value !== 'unspecified' && value !== 'unset') {
-      throw new StagingError(`${path} uses the "${value}" filter; stage or discard the whole file instead`);
+      throw new StagingError(t('{path} uses the "{value}" filter; stage or discard the whole file instead', { path, value }));
     }
   }
 
@@ -164,7 +165,7 @@ export class StagingService {
 }
 
 function assertEditable(version: FileVersion, path: string): void {
-  if (version.binary) throw new StagingError(`${path} is binary; stage or discard the whole file instead`);
-  if (version.tooLarge) throw new StagingError(`${path} is too large for line staging; use the whole file`);
-  if (version.lossy) throw new StagingError(`${path} is not valid UTF-8; stage or discard the whole file instead`);
+  if (version.binary) throw new StagingError(t('{path} is binary; stage or discard the whole file instead', { path }));
+  if (version.tooLarge) throw new StagingError(t('{path} is too large for line staging; use the whole file', { path }));
+  if (version.lossy) throw new StagingError(t('{path} is not valid UTF-8; stage or discard the whole file instead', { path }));
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { fuzzyFilter } from '../../../shared/fuzzy';
 import type { RepoData } from '../../../shared/state';
 import { Palette, type PaletteItem } from './Palette';
+import { t } from '../../../shared/i18n';
 
 interface UpstreamPickerProps {
   data: RepoData;
@@ -24,18 +25,18 @@ export function UpstreamPicker({ data, branch, onPick, onClose }: UpstreamPicker
     icon: item.name === current ? 'check' : 'cloud',
     label: item.name,
     positions,
-    detail: item.name === current ? 'current upstream' : undefined,
+    detail: item.name === current ? t('current upstream') : undefined,
     run: () => item.name !== current && onPick(item.name),
   }));
-  if (current) items.push({ key: 'none', icon: 'debug-disconnect', label: `Stop tracking ${current}`, run: () => onPick(null) });
+  if (current) items.push({ key: 'none', icon: 'debug-disconnect', label: t('Stop tracking {upstream}', { upstream: current }), run: () => onPick(null) });
   return (
     <Palette
-      label={`Upstream of ${branch}`}
-      placeholder={`Remote branch for ${branch} to track`}
+      label={t('Upstream of {branch}', { branch })}
+      placeholder={t('Remote branch for {branch} to track', { branch })}
       query={query}
       onQuery={setQuery}
       items={items}
-      empty={remote.length ? 'No matching remote branches' : 'No remote branches: push the branch to a remote first (it is tracked from then on)'}
+      empty={remote.length ? t('No matching remote branches') : t('No remote branches: push the branch to a remote first (it is tracked from then on)')}
       onClose={onClose}
     />
   );

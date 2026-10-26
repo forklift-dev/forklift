@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { t } from '../../../shared/i18n';
 import type { LfsInfo } from '../../../shared/lfs';
 import { invoke } from '../api';
 
@@ -48,23 +49,23 @@ export function LfsDialog({ repo, info, onClose }: { repo: string; info: LfsInfo
         <h2 id={`${id}-title`}>Git LFS</h2>
         {info && !info.installed && (
           <p className="setting-error" role="alert">
-            git-lfs is not installed, so files cannot be tracked or downloaded. Install it from https://git-lfs.com, then run “git lfs install” once.
+            {t('git-lfs is not installed, so files cannot be tracked or downloaded. Install it from https://git-lfs.com, then run “git lfs install” once.')}
           </p>
         )}
-        {info?.installed && <p>git-lfs {info.installed}. Patterns go into .gitattributes; commit it. Files already committed move to LFS once added again.</p>}
+        {info?.installed && <p>{t('git-lfs {version}. Patterns go into .gitattributes; commit it. Files already committed move to LFS once added again.', { version: info.installed })}</p>}
         <ul className="lfs-patterns">
           {info?.patterns.map((item) => (
             <li key={item}>
               <code>{item}</code>
               <button type="button" className="link-button" disabled={busy} onClick={() => void act(() => invoke('lfs:untrack', repo, item))}>
-                Untrack
+                {t('Untrack')}
               </button>
             </li>
           ))}
-          {info && info.patterns.length === 0 && <li className="empty-note">Nothing is tracked with LFS</li>}
+          {info && info.patterns.length === 0 && <li className="empty-note">{t('Nothing is tracked with LFS')}</li>}
         </ul>
         <label className="form-field">
-          Track files matching
+          {t('Track files matching')}
           <input type="text" name="pattern" value={pattern} spellCheck={false} placeholder="*.psd" disabled={!info?.installed} onChange={(event) => setPattern(event.target.value)} />
         </label>
         {error && (
@@ -74,10 +75,10 @@ export function LfsDialog({ repo, info, onClose }: { repo: string; info: LfsInfo
         )}
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
-            Close
+            {t('Close')}
           </button>
           <button type="submit" className="primary" disabled={busy || !pattern.trim() || !info?.installed}>
-            Track
+            {t('Track')}
           </button>
         </div>
       </form>

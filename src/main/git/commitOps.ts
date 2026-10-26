@@ -1,5 +1,6 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
+import { t } from '../../shared/i18n';
 import { GitCliError, type GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
 
@@ -81,9 +82,9 @@ export class CommitOps {
   }
 
   private async assertRef(root: string, ref: string): Promise<void> {
-    if (ref.startsWith('-') || ref.length > 255) throw new CommitOpError(`"${ref}" is not a branch or commit`);
+    if (ref.startsWith('-') || ref.length > 255) throw new CommitOpError(t('"{ref}" is not a branch or commit', { ref }));
     const { exitCode } = await this.git.exec(['rev-parse', '--verify', '-q', `${ref}^{commit}`], { cwd: root, readOnly: true, allowedExitCodes: [1] });
-    if (exitCode !== 0) throw new CommitOpError(`${ref} does not exist`);
+    if (exitCode !== 0) throw new CommitOpError(t('{ref} does not exist', { ref }));
   }
 
   private async apply(root: string, command: 'cherry-pick' | 'revert', sha: string, stateFile: string): Promise<CommitOpResult> {

@@ -1,48 +1,50 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../../../shared/i18n';
 import type { LogEntry } from '../../../shared/log';
 import { invoke } from '../api';
 import { useAppState } from '../state';
 
-// What a finished operation is called in its notification.
-const DONE: Record<string, string> = {
-  'remote:fetch': 'Fetched',
-  'remote:pull': 'Pulled',
-  'remote:push': 'Pushed',
-  'commit:create': 'Committed',
-  'stash:push': 'Changes stashed',
-  'stash:apply': 'Stash applied',
-  'stash:pop': 'Stash popped',
-  'stash:drop': 'Stash deleted',
-  'branch:create': 'Branch created',
-  'branch:checkout': 'Checked out',
-  'branch:rename': 'Branch renamed',
-  'branch:delete': 'Branch deleted',
-  'branch:merge': 'Merged',
-  'branch:rebase': 'Rebased',
-  'tag:create': 'Tag created',
-  'tag:delete': 'Tag deleted',
-  'commit:cherryPick': 'Cherry-picked',
-  'commit:revert': 'Reverted',
-  'commit:reset': 'Reset',
-  'rebase:interactive': 'Rebased',
-  'undo:undo': 'Undone',
-  'undo:redo': 'Redone',
-  'repo:clone': 'Cloned',
-  'repo:init': 'Repository created',
-  'profile:apply': 'Profile applied',
-  'remote:add': 'Remote added',
-  'remote:remove': 'Remote removed',
-  'submodule:add': 'Submodule added',
-  'gitflow:init': 'Gitflow set up',
-  'gitflow:start': 'Started',
-  'gitflow:finish': 'Finished',
-  'lfs:track': 'Tracked with LFS',
-  'lfs:untrack': 'No longer tracked with LFS',
-  'lfs:download': 'LFS objects downloaded',
-  'submodule:update': 'Submodules updated',
-  'submodule:sync': 'Submodule URLs synced',
-  'submodule:remove': 'Submodule removed',
-};
+// What a finished operation is called in its notification (translated when shown: the language can change).
+const done = (title: string): string | undefined =>
+  ({
+    'remote:fetch': t('Fetched'),
+    'remote:pull': t('Pulled'),
+    'remote:push': t('Pushed'),
+    'commit:create': t('Committed'),
+    'stash:push': t('Changes stashed'),
+    'stash:apply': t('Stash applied'),
+    'stash:pop': t('Stash popped'),
+    'stash:drop': t('Stash deleted'),
+    'branch:create': t('Branch created'),
+    'branch:checkout': t('Checked out'),
+    'branch:rename': t('Branch renamed'),
+    'branch:delete': t('Branch deleted'),
+    'branch:merge': t('Merged'),
+    'branch:rebase': t('Rebased'),
+    'tag:create': t('Tag created'),
+    'tag:delete': t('Tag deleted'),
+    'commit:cherryPick': t('Cherry-picked'),
+    'commit:revert': t('Reverted'),
+    'commit:reset': t('done|Reset'),
+    'rebase:interactive': t('Rebased'),
+    'undo:undo': t('Undone'),
+    'undo:redo': t('Redone'),
+    'repo:clone': t('Cloned'),
+    'repo:init': t('Repository created'),
+    'profile:apply': t('Profile applied'),
+    'remote:add': t('Remote added'),
+    'remote:remove': t('Remote removed'),
+    'submodule:add': t('Submodule added'),
+    'gitflow:init': t('Gitflow set up'),
+    'gitflow:start': t('Started'),
+    'gitflow:finish': t('Finished'),
+    'lfs:track': t('Tracked with LFS'),
+    'lfs:untrack': t('No longer tracked with LFS'),
+    'lfs:download': t('LFS objects downloaded'),
+    'submodule:update': t('Submodules updated'),
+    'submodule:sync': t('Submodule URLs synced'),
+    'submodule:remove': t('Submodule removed'),
+  } as Record<string, string>)[title];
 
 interface Toast {
   id: number;
@@ -77,7 +79,8 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
       for (const entry of entries) {
         if (entry.kind !== 'operation' || entry.parent !== null || entry.status === 'running' || seen.current.has(entry.id)) continue;
         seen.current.add(entry.id);
-        if (!first && entry.status === 'ok' && DONE[entry.title]) fresh.push({ id: entry.id, text: DONE[entry.title]!, detail: baseName(entry.repo) });
+        const text = first || entry.status !== 'ok' ? undefined : done(entry.title);
+        if (text) fresh.push({ id: entry.id, text, detail: baseName(entry.repo) });
       }
       const running = entries.find((entry: LogEntry) => entry.kind === 'operation' && entry.status === 'running');
       cursor.current = running ? running.id - 1 : (entries.at(-1)?.id ?? cursor.current ?? 0);
@@ -97,13 +100,13 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
   const progress = [
     remote && {
       key: 'remote',
-      text: `${{ fetch: 'Fetching', pull: 'Pulling', push: 'Pushing', submodules: 'Updating submodules of' }[remote.kind]} ${repoName}`,
+      text: { fetch: t('Fetching {repo}', { repo: repoName }), pull: t('Pulling {repo}', { repo: repoName }), push: t('Pushing {repo}', { repo: repoName }), submodules: t('Updating submodules of {repo}', { repo: repoName }) }[remote.kind],
       // A pre-push hook runs before anything is sent: show what it prints.
-      phase: pushHooks ? `${pushHooks.hooks.join(', ')} hook${pushHooks.output.length ? `: ${pushHooks.output.at(-1)}` : '…'}` : remote.phase,
+      phase: pushHooks ? (pushHooks.output.length ? t('{hooks} hook: {output}', { hooks: pushHooks.hooks.join(', '), output: pushHooks.output.at(-1)! }) : t('{hooks} hook…', { hooks: pushHooks.hooks.join(', ') })) : remote.phase,
       percent: pushHooks ? null : remote.percent,
       cancel: () => repo && void invoke('remote:cancel', repo),
     },
-    clone && { key: 'clone', text: `Cloning ${baseName(clone.target)}`, phase: clone.phase, percent: clone.percent, cancel: () => void invoke('repo:cancelClone') },
+    clone && { key: 'clone', text: t('Cloning {name}', { name: baseName(clone.target) }), phase: clone.phase, percent: clone.percent, cancel: () => void invoke('repo:cancelClone') },
   ].filter(Boolean) as Array<{ key: string; text: string; phase: string | null; percent: number | null; cancel(): void }>;
 
   if (!toasts.length && !progress.length) return null;
@@ -118,7 +121,7 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
             {item.percent !== null && <span className="toast-detail"> {item.percent}%</span>}
           </span>
           <button type="button" className="link-button" onClick={item.cancel}>
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
       ))}
@@ -130,9 +133,9 @@ export function Toasts({ onShowLog }: { onShowLog(id: number): void }) {
             {toast.detail && <span className="toast-detail"> · {toast.detail}</span>}
           </span>
           <button type="button" className="link-button" onClick={() => onShowLog(toast.id)}>
-            Log
+            {t('Log')}
           </button>
-          <button type="button" className="icon-button" aria-label="Dismiss" onClick={() => setToasts((list) => list.filter((t) => t.id !== toast.id))}>
+          <button type="button" className="icon-button" aria-label={t('Dismiss')} onClick={() => setToasts((list) => list.filter((other) => other.id !== toast.id))}>
             <span className="codicon codicon-close" aria-hidden="true" />
           </button>
         </div>

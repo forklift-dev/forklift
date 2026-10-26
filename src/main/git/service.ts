@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type StatusFile } from '@axosoft/nodegit';
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
+import { t } from '../../shared/i18n';
 import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, RepoOperation, StashInfo, TagInfo } from '../../shared/state';
 import { readCommitDetails, readFileDiff, readStashDetails } from './diff';
 import { INDEX_ENTRY_SKIP_WORKTREE, INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
@@ -41,7 +42,7 @@ export function createGitService(): GitService {
       // openExt searches parent directories the same way `git rev-parse` does.
       const repo = await Repository.openExt(path, 0, '');
       const workdir = repo.workdir();
-      if (!workdir) throw new Error('Bare repositories are not supported');
+      if (!workdir) throw new Error(t('Bare repositories are not supported'));
       return workdir.replace(/[\\/]+$/, '');
     },
 

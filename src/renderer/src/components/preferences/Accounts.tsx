@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { PROVIDERS, type HostingAccount, type HostingProvider } from '../../../../shared/hosting';
+import { t } from '../../../../shared/i18n';
 import { invoke } from '../../api';
 import { useAppState } from '../../state';
 import { errorText, type ControlProps } from './SettingRow';
@@ -25,7 +26,7 @@ export function AccountsEditor({ value }: ControlProps<'integrations.accounts'>)
     try {
       const account = await invoke('hosting:add', form.provider, form.url, form.token);
       closeForm();
-      setStatus({ error: false, text: `Signed in as ${account.username} on ${new URL(account.url).host}` });
+      setStatus({ error: false, text: t('Signed in as {username} on {host}', { username: account.username, host: new URL(account.url).host }) });
     } catch (error) {
       setStatus({ error: true, text: errorText(error) });
     } finally {
@@ -52,11 +53,11 @@ export function AccountsEditor({ value }: ControlProps<'integrations.accounts'>)
                 )
               }
             >
-              Remove
+              {t('Remove')}
             </button>
           </li>
         ))}
-        {accounts.length === 0 && <li className="empty-note">No accounts yet</li>}
+        {accounts.length === 0 && <li className="empty-note">{t('No accounts yet')}</li>}
       </ul>
       {form ? (
         <form
@@ -67,7 +68,7 @@ export function AccountsEditor({ value }: ControlProps<'integrations.accounts'>)
           }}
         >
           <label>
-            Service
+            {t('Service')}
             <select
               name="provider"
               value={form.provider}
@@ -86,29 +87,29 @@ export function AccountsEditor({ value }: ControlProps<'integrations.accounts'>)
             </select>
           </label>
           <label>
-            Server address
+            {t('Server address')}
             <input name="url" value={form.url} placeholder="https://code.example.com" autoFocus onChange={(event) => setForm({ ...form, url: event.target.value })} />
           </label>
           <label>
-            Access token
+            {t('Access token')}
             <input name="token" type="password" autoComplete="off" value={form.token} onChange={(event) => setForm({ ...form, token: event.target.value })} />
           </label>
-          <p className="hint">Create one on the server: {PROVIDERS[form.provider].tokenHelp}.</p>
+          <p className="hint">{t('Create one on the server: {instructions}.', { instructions: PROVIDERS[form.provider].tokenHelp })}</p>
           <div className="form-actions">
             <button type="submit" disabled={busy || !form.url.trim() || !form.token.trim()}>
-              {busy ? 'Checking…' : 'Add account'}
+              {busy ? t('Checking…') : t('Add account')}
             </button>
             <button type="button" onClick={closeForm} disabled={busy}>
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
         </form>
       ) : (
         <button type="button" ref={addRef} disabled={!secretStorage} onClick={() => setForm({ provider: 'forgejo', url: '', token: '' })}>
-          Add an account…
+          {t('Add an account…')}
         </button>
       )}
-      {!secretStorage && <p className="setting-error">No system keychain is available to Forklift, so tokens cannot be kept safely.</p>}
+      {!secretStorage && <p className="setting-error">{t('No system keychain is available to Forklift, so tokens cannot be kept safely.')}</p>}
       {status && <p className={status.error ? 'setting-error' : 'setting-ok'}>{status.text}</p>}
     </div>
   );

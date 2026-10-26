@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { chosenLines, parseConflicts, type ConflictBlock, type ConflictChoice, type ConflictFile } from '../../../shared/conflicts';
 import type { FileVersion } from '../../../shared/diff';
+import { t } from '../../../shared/i18n';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { CODE_FONT, languageForPath, monaco } from '../monaco/setup';
@@ -16,17 +17,17 @@ interface ConflictViewProps {
   onClose(): void;
 }
 
-const CHOICES: Array<{ choice: ConflictChoice; label: string; title: string }> = [
-  { choice: 'ours', label: 'Take ours', title: 'Keep the current branch’s lines' },
-  { choice: 'theirs', label: 'Take theirs', title: 'Keep the incoming lines' },
-  { choice: 'both', label: 'Take both', title: 'Ours, then theirs' },
-];
+type VisibleChoice = 'ours' | 'theirs' | 'both';
+const CHOICES: VisibleChoice[] = ['ours', 'theirs', 'both'];
+const choiceLabel = (choice: VisibleChoice) => ({ ours: t('Take ours'), theirs: t('Take theirs'), both: t('Take both') })[choice];
+const choiceTitle = (choice: VisibleChoice) =>
+  ({ ours: t('Keep the current branch’s lines'), theirs: t('Keep the incoming lines'), both: t('Ours, then theirs') })[choice];
 
 function unusable(version: FileVersion): string | null {
   if (!version.exists) return null;
-  if (version.binary) return 'binary';
-  if (version.tooLarge) return 'too large to edit here';
-  if (version.lossy) return 'not valid UTF-8';
+  if (version.binary) return t('binary');
+  if (version.tooLarge) return t('too large to edit here');
+  if (version.lossy) return t('not valid UTF-8');
   return null;
 }
 
@@ -59,7 +60,7 @@ function SidePane({ title, version, path }: { title: string; version: FileVersio
       {version.exists && version.text !== null ? (
         <div className="conflict-editor" ref={ref} />
       ) : (
-        <div className="diff-message">{version.exists ? `This version is ${unusable(version)}` : 'Deleted on this side'}</div>
+        <div className="diff-message">{version.exists ? t('This version is {problem}', { problem: unusable(version) ?? '' }) : t('Deleted on this side')}</div>
       )}
     </div>
   );
@@ -81,6 +82,9 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
   // What the file on disk is expected to be at the next save: as loaded, then as last saved.
   const [savedHash, setSavedHash] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
+  const oursActionLabel = t('{action} (this conflict)', { action: choiceLabel('ours') });
+  const theirsActionLabel = t('{action} (this conflict)', { action: choiceLabel('theirs') });
+  const bothActionLabel = t('{action} (this conflict)', { action: choiceLabel('both') });
 
   const file: ConflictFile | undefined = data;
   const expectedHash = savedHash ?? file?.merged.hash ?? null;
@@ -144,10 +148,10 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
         setDirty(model.getAlternativeVersionId() !== initial);
       }),
       editor.onDidChangeCursorPosition(followCursor),
-      ...CHOICES.map(({ choice, label }, order) =>
+      ...CHOICES.map((choice, order) =>
         editor.addAction({
           id: `forklift.conflict.${choice}`,
-          label: `${label} (this conflict)`,
+          label: choice === 'ours' ? oursActionLabel : choice === 'theirs' ? theirsActionLabel : bothActionLabel,
           contextMenuGroupId: '0_forklift',
           contextMenuOrder: order,
           run: () => applyChoice(choice),
@@ -163,7 +167,7 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
       model.dispose();
       editorRef.current = null;
     };
-  }, [file, editable, path]);
+  }, [file, editable, path, oursActionLabel, theirsActionLabel, bothActionLabel]);
 
   /** Replaces the conflict around (or after) the cursor with the chosen lines, undoably. */
   function applyChoice(choice: ConflictChoice, index?: number) {
@@ -210,9 +214,9 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
     if (text === undefined) return;
     if (markResolved && blocks.length) {
       const ok = await confirm({
-        title: `${blocks.length} conflict${blocks.length === 1 ? ' is' : 's are'} not resolved`,
-        detail: 'The conflict markers will be committed as they are. Mark the file resolved anyway?',
-        confirmLabel: 'Mark resolved',
+        title: t('{count} conflicts are not resolved', { count: blocks.length }),
+        detail: t('The conflict markers will be committed as they are. Mark the file resolved anyway?'),
+        confirmLabel: t('Mark resolved'),
         danger: true,
       });
       if (!ok) return;
@@ -228,12 +232,21 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
   };
 
   const take = async (side: 'ours' | 'theirs') => {
-    if (dirty && !(await confirm({ title: 'Discard your edits?', detail: `The whole file is replaced by the ${side === 'ours' ? 'current branch’s' : 'incoming'} version.`, confirmLabel: 'Replace', danger: true }))) return;
+    if (
+      dirty &&
+      !(await confirm({
+        title: t('Discard your edits?'),
+        detail: side === 'ours' ? t('The whole file is replaced by the current branch’s version.') : t('The whole file is replaced by the incoming version.'),
+        confirmLabel: t('Replace'),
+        danger: true,
+      }))
+    )
+      return;
     if (await run(() => invoke('conflict:take', repo, path, side))) onClose();
   };
 
   const close = async () => {
-    if (dirty && !(await confirm({ title: 'Close without saving?', detail: 'Your edits to the result are lost.', confirmLabel: 'Close', danger: true }))) return;
+    if (dirty && !(await confirm({ title: t('Close without saving?'), detail: t('Your edits to the result are lost.'), confirmLabel: t('Close'), danger: true }))) return;
     onClose();
   };
 
@@ -251,68 +264,70 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
 
   const labels = blocks[0] ?? null;
   return (
-    <section className="conflict-view" aria-label={`Conflicts in ${path}`}>
+    <section className="conflict-view" aria-label={t('Conflicts in {path}', { path })}>
       <header className="diff-header">
         <div className="diff-title" title={path}>
           <strong>{path}</strong>
-          <span className="diff-subtitle">{editable ? (blocks.length ? `Conflict ${Math.min(current + 1, blocks.length)} of ${blocks.length}` : 'No conflicts left') : 'Conflict'}</span>
-          {dirty && <span className="dirty-mark" title="Not saved">●</span>}
+          <span className="diff-subtitle">
+            {editable ? (blocks.length ? t('Conflict {current} of {count}', { current: Math.min(current + 1, blocks.length), count: blocks.length }) : t('No conflicts left')) : t('Conflict')}
+          </span>
+          {dirty && <span className="dirty-mark" title={t('Not saved')}>●</span>}
         </div>
         <div className="diff-toolbar">
           {editable && (
             <>
-              <button type="button" onClick={() => goTo(Math.max(0, current - 1))} disabled={blocks.length === 0} title="Previous conflict">
+              <button type="button" onClick={() => goTo(Math.max(0, current - 1))} disabled={blocks.length === 0} title={t('Previous conflict')}>
                 ↑
               </button>
-              <button type="button" onClick={() => goTo(Math.min(blocks.length - 1, current + 1))} disabled={blocks.length === 0} title="Next conflict">
+              <button type="button" onClick={() => goTo(Math.min(blocks.length - 1, current + 1))} disabled={blocks.length === 0} title={t('Next conflict')}>
                 ↓
               </button>
-              {CHOICES.map(({ choice, label, title }) => (
-                <button key={choice} type="button" disabled={blocks.length === 0} title={title} onClick={() => applyChoice(choice, current)}>
-                  {label}
+              {CHOICES.map((choice) => (
+                <button key={choice} type="button" disabled={blocks.length === 0} title={choiceTitle(choice)} onClick={() => applyChoice(choice, current)}>
+                  {choiceLabel(choice)}
                 </button>
               ))}
             </>
           )}
-          <button type="button" onClick={() => void take('ours')} title="Resolve with the current branch’s whole file">
-            Use our file
+          <button type="button" onClick={() => void take('ours')} title={t('Resolve with the current branch’s whole file')}>
+            {t('Use our file')}
           </button>
-          <button type="button" onClick={() => void take('theirs')} title="Resolve with the incoming whole file">
-            Use their file
+          <button type="button" onClick={() => void take('theirs')} title={t('Resolve with the incoming whole file')}>
+            {t('Use their file')}
           </button>
-          <button type="button" onClick={() => void runInBackground(() => invoke('file:externalMerge', repo, path))} title="Resolve in the external merge tool">
-            External
+          <button type="button" onClick={() => void runInBackground(() => invoke('file:externalMerge', repo, path))} title={t('Resolve in the external merge tool')}>
+            {t('External')}
           </button>
           {editable && (
             <>
-              <button type="button" onClick={() => void save(false)} disabled={!dirty} title="Save (Ctrl+S)">
-                Save
+              <button type="button" onClick={() => void save(false)} disabled={!dirty} title={t('Save (Ctrl+S)')}>
+                {t('Save')}
               </button>
               <button type="button" className="primary" onClick={() => void save(true)}>
-                Save and mark resolved
+                {t('Save and mark resolved')}
               </button>
             </>
           )}
-          <button type="button" onClick={() => void close()} title="Close (Esc)" aria-label="Close conflict editor">
+          <button type="button" onClick={() => void close()} title={t('Close (Esc)')} aria-label={t('Close conflict editor')}>
             ✕
           </button>
         </div>
       </header>
       {error && <div className="diff-message error">{error}</div>}
-      {!file && !error && <div className="diff-message">Loading…</div>}
+      {!file && !error && <div className="diff-message">{t('Loading…')}</div>}
       {file && (
         <div className="conflict-body">
           <div className="conflict-sides">
-            <SidePane title={`Ours${labels ? ` — ${labels.oursLabel}` : ''}`} version={file.ours} path={path} />
-            <SidePane title={`Theirs${labels ? ` — ${labels.theirsLabel}` : ''}`} version={file.theirs} path={path} />
+            <SidePane title={labels ? t('Ours — {label}', { label: labels.oursLabel }) : t('Ours')} version={file.ours} path={path} />
+            <SidePane title={labels ? t('Theirs — {label}', { label: labels.theirsLabel }) : t('Theirs')} version={file.theirs} path={path} />
           </div>
           <div className="conflict-pane result">
-            <div className="conflict-pane-title">Result{editable ? ' — edit freely; colored blocks are conflicts' : ''}</div>
+            <div className="conflict-pane-title">{editable ? t('Result — edit freely; colored blocks are conflicts') : t('Result')}</div>
             {editable ? (
               <div className="conflict-editor" ref={resultRef} />
             ) : (
               <div className="diff-message">
-                {file.merged.exists ? `The file is ${problem}: choose a whole side or use the external tool.` : 'The file was deleted in the working tree: choose a side.'}
+                {file.merged.exists ? t('The file is {problem}: choose a whole side or use the external tool.', { problem: problem ?? '' }) : t('The file was deleted in the working tree: choose a side.')}
               </div>
             )}
           </div>

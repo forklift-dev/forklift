@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import type { FileDiff } from '../../../shared/diff';
+import { t } from '../../../shared/i18n';
 import { changeLines, hunkHeader, type LineAction, type LineChange } from '../../../shared/staging';
 import { anchorLine, selectedLines } from '../monaco/lineActions';
 import { languageForPath, monaco } from '../monaco/setup';
 
 const CONTEXT = 3;
-const ACTION_LABEL: Record<LineAction, string> = { stage: 'Stage hunk', unstage: 'Unstage hunk', discard: 'Discard hunk' };
+const actionLabel = (action: LineAction) => ({ stage: t('Stage hunk'), unstage: t('Unstage hunk'), discard: t('Discard hunk') })[action];
 
 export interface LineSelection {
   original: Set<number>;
@@ -33,9 +34,9 @@ export function HunkView({ data, changes, actions, onAction, selection, onSelect
     else next[side].add(line);
     onSelection(next);
   };
-  if (changes.length === 0) return <div className="diff-message">No changes</div>;
+  if (changes.length === 0) return <div className="diff-message">{t('No changes')}</div>;
   return (
-    <div className="hunk-view" role="list" aria-label="Changed fragments">
+    <div className="hunk-view" role="list" aria-label={t('Changed fragments')}>
       {changes.map((change) => {
         const changed = changeLines(change);
         const before = Math.max(1, (change.modifiedEndLineNumber === 0 ? change.modifiedStartLineNumber + 1 : change.modifiedStartLineNumber) - CONTEXT);
@@ -50,7 +51,7 @@ export function HunkView({ data, changes, actions, onAction, selection, onSelect
               <span className="hunk-actions">
                 {actions.map((action) => (
                   <button key={action} type="button" className={action === 'discard' ? 'danger-text' : undefined} onClick={() => onAction(action, change)}>
-                    {ACTION_LABEL[action]}
+                    {actionLabel(action)}
                   </button>
                 ))}
               </span>
@@ -147,7 +148,7 @@ export function FileView({ data, path, changes, fontFamily, fontSize, hunkAction
       } else {
         // A pure removal sits between two lines: mark the line after it.
         const line = Math.max(1, change.modifiedStartLineNumber + 1);
-        list.push({ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'file-view-removed-above', hoverMessage: { value: `${removed} line${removed === 1 ? '' : 's'} removed here` } } });
+        list.push({ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'file-view-removed-above', hoverMessage: { value: t('{count} lines removed here', { count: removed }) } } });
       }
       if (hunkAction) {
         const anchor = anchorLine(change);

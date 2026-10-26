@@ -25,7 +25,8 @@ beforeAll(() => {
   writeFileSync(join(root, 'wip.txt'), 'work in progress\n');
   sh('add', 'wip.txt');
   sh('stash', 'push', '-q', '-m', 'Half done');
-});
+  // 25 000 commits take a few seconds, more while the other suites run alongside.
+}, 60_000);
 afterAll(() => {
   rmSync(root, { recursive: true, force: true });
   rmSync(saved, { recursive: true, force: true });

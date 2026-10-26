@@ -1,6 +1,8 @@
 // Hosting services (Forgejo, GitVerse, GitHub, GitLab): accounts, and what the app shows of them.
 // Tokens never appear here: main keeps them encrypted (safeStorage) and uses them itself.
 
+import { t } from './i18n';
+
 export type HostingProvider = 'forgejo' | 'gitverse' | 'github' | 'gitlab';
 
 export interface ProviderInfo {
@@ -144,18 +146,21 @@ export function normalizeServerUrl(raw: string): string | null {
 
 /** Validates accounts from the settings file or a window (untrusted). */
 export function parseAccounts(value: unknown): HostingAccount[] {
-  if (!Array.isArray(value) || value.length > MAX_ACCOUNTS) throw new TypeError(`Accounts must be a list of up to ${MAX_ACCOUNTS}`);
+  if (!Array.isArray(value) || value.length > MAX_ACCOUNTS) throw new TypeError(t('Accounts must be a list of up to {count}', { count: MAX_ACCOUNTS }));
   const ids = new Set<string>();
   return value.map((raw, index) => {
-    if (typeof raw !== 'object' || raw === null) throw new TypeError(`Account ${index + 1} must be an object`);
+    if (typeof raw !== 'object' || raw === null) throw new TypeError(t('Account {account} must be an object', { account: index + 1 }));
     const { id, provider, url, username, name } = raw as Record<string, unknown>;
-    if (typeof id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(id) || ids.has(id)) throw new TypeError(`Account ${index + 1} needs a unique id`);
+    if (typeof id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(id) || ids.has(id)) throw new TypeError(t('Account {account} needs a unique id', { account: index + 1 }));
     ids.add(id);
-    if (typeof provider !== 'string' || !Object.hasOwn(PROVIDERS, provider)) throw new TypeError(`Account ${index + 1}: unknown service`);
+    if (typeof provider !== 'string' || !Object.hasOwn(PROVIDERS, provider)) throw new TypeError(t('Account {account}: unknown service', { account: index + 1 }));
     const normalized = typeof url === 'string' ? normalizeServerUrl(url) : null;
-    if (!normalized || normalized !== url) throw new TypeError(`Account ${index + 1}: "${String(url)}" is not a server address`);
+    if (!normalized || normalized !== url) throw new TypeError(t('Account {account}: "{address}" is not a server address', { account: index + 1, address: String(url) }));
     for (const [field, text] of Object.entries({ username, name })) {
-      if (typeof text !== 'string' || text.length > 200 || /[\0\r\n]/.test(text)) throw new TypeError(`Account ${index + 1}: ${field} must be one line`);
+      if (typeof text !== 'string' || text.length > 200 || /[\0\r\n]/.test(text)) {
+        const fieldName = field === 'username' ? t('account-field|username') : t('account-field|name');
+        throw new TypeError(t('Account {account}: {field} must be one line', { account: index + 1, field: fieldName }));
+      }
     }
     return { id, provider: provider as HostingProvider, url: normalized, username: username as string, name: name as string };
   });

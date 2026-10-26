@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { PROVIDERS, pullTerm, refLabel, type HostingComment, type HostingProvider, type IssueDetails, type PullDetails, type RepoHosting } from '../../../shared/hosting';
+import { formatDate, t } from '../../../shared/i18n';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useCommand } from '../useCommand';
@@ -7,8 +8,8 @@ import { Markdown } from './Markdown';
 
 export type HostingItem = { kind: 'pull' | 'issue'; number: number };
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const when = (iso: string) => (iso ? dateFormat.format(new Date(iso)) : '');
+const when = (iso: string) => (iso ? formatDate(new Date(iso).getTime()) : '');
+const stateName = (state: string) => ({ open: t('state|open'), closed: t('state|closed'), merged: t('state|merged') })[state] ?? state;
 
 /**
  * Text with `#123` (and on GitLab `!123`, a merge request) turned into links to that issue or pull request,
@@ -25,7 +26,7 @@ export function IssueRefs({ text, provider, onOpen }: { text: string; provider?:
     const [mark, number] = [parts[index + 1]!, Number(parts[index + 2])];
     const item: HostingItem = { kind: mark === '!' ? 'pull' : 'issue', number };
     nodes.push(
-      <button key={`${index}-ref`} type="button" className="link-button issue-ref" onClick={() => onOpen(item)} title={`Show ${mark}${number}`}>
+      <button key={`${index}-ref`} type="button" className="link-button issue-ref" onClick={() => onOpen(item)} title={t('Show {ref}', { ref: `${mark}${number}` })}>
         {mark}
         {number}
       </button>,
@@ -81,19 +82,19 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
         </div>
         <div className="diff-toolbar">
           {pullDetails && pullDetails.state === 'open' && (
-            <button type="button" onClick={() => void run(() => invoke('hosting:checkoutPull', repo, item.number))} title={pullDetails.headRepo ? `Fetch it as the local branch pr/${item.number}` : `Fetch and switch to ${pullDetails.head}`}>
-              Check out
+            <button type="button" onClick={() => void run(() => invoke('hosting:checkoutPull', repo, item.number))} title={pullDetails.headRepo ? t('Fetch it as the local branch pr/{number}', { number: item.number }) : t('Fetch and switch to {branch}', { branch: pullDetails.head })}>
+              {t('Check out')}
             </button>
           )}
           {details?.webUrl && (
-            <a className="button-link" href={details.webUrl} target="_blank" rel="noreferrer" title="Open on the server">
-              <span className="codicon codicon-link-external" aria-hidden="true" /> Open in browser
+            <a className="button-link" href={details.webUrl} target="_blank" rel="noreferrer" title={t('Open on the server')}>
+              <span className="codicon codicon-link-external" aria-hidden="true" /> {t('Open in browser')}
             </a>
           )}
-          <button type="button" onClick={() => setReload((n) => n + 1)} aria-label="Reload" title="Reload">
+          <button type="button" onClick={() => setReload((n) => n + 1)} aria-label={t('Reload')} title={t('Reload')}>
             <span className="codicon codicon-refresh" aria-hidden="true" />
           </button>
-          <button type="button" onClick={onClose} aria-label={`Close ${what.toLowerCase()}`} title="Close (Esc)">
+          <button type="button" onClick={onClose} aria-label={t('Close {what}', { what: what.toLowerCase() })} title={t('Close (Esc)')}>
             ✕
           </button>
         </div>
@@ -101,21 +102,21 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
       {error ? (
         <div className="diff-message error">{error}</div>
       ) : !details ? (
-        <div className="diff-message">Loading…</div>
+        <div className="diff-message">{t('Loading…')}</div>
       ) : (
         <div className="hosting-body">
           <div className="hosting-meta">
-            <span className={`hosting-state state-${details.state}`}>{details.state}</span>
-            {pullDetails?.draft && <span className="hosting-state state-draft">draft</span>}
+            <span className={`hosting-state state-${details.state}`}>{stateName(details.state)}</span>
+            {pullDetails?.draft && <span className="hosting-state state-draft">{t('draft')}</span>}
             <span>
-              {details.author} opened {when(details.createdAt)}
+              {t('{author} opened {when}', { author: details.author, when: when(details.createdAt) })}
             </span>
             {pullDetails && (
               <span className="hosting-branches">
                 <span className="branch">{pullDetails.headRepo ? `${pullDetails.headRepo}:${pullDetails.head}` : pullDetails.head}</span> → <span className="branch">{pullDetails.base}</span>
               </span>
             )}
-            {pullDetails?.state === 'open' && pullDetails.mergeable === false && <span className="setting-error">has conflicts with {pullDetails.base}</span>}
+            {pullDetails?.state === 'open' && pullDetails.mergeable === false && <span className="setting-error">{t('has conflicts with {branch}', { branch: pullDetails.base })}</span>}
             {'labels' in details &&
               details.labels.map((label) => (
                 <span key={label.name} className="hosting-label" style={{ borderColor: /^[0-9a-f]{6}$/i.test(label.color) ? `#${label.color}` : undefined }}>
@@ -124,17 +125,17 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
               ))}
           </div>
           <div className="hosting-text">
-            {details.body.trim() ? <Markdown text={details.body} provider={provider} onOpen={onOpen} onShowCommit={onShowCommit} /> : <span className="empty-note">No description</span>}
+            {details.body.trim() ? <Markdown text={details.body} provider={provider} onOpen={onOpen} onShowCommit={onShowCommit} /> : <span className="empty-note">{t('No description')}</span>}
           </div>
           {pullDetails && (
             <>
               <h3>
-                Commits <span className="count">{pullDetails.commits.length}</span>
+                {t('Commits')} <span className="count">{pullDetails.commits.length}</span>
               </h3>
               <ul className="hosting-commits">
                 {pullDetails.commits.map((commit) => (
                   <li key={commit.sha}>
-                    <button type="button" className="link-button hash" onClick={() => onShowCommit(commit.sha)} title="Show in the graph (after fetching)">
+                    <button type="button" className="link-button hash" onClick={() => onShowCommit(commit.sha)} title={t('Show in the graph (after fetching)')}>
                       {commit.sha.slice(0, 7)}
                     </button>
                     <span className="hosting-commit-subject">{commit.message.split('\n')[0]}</span>
@@ -143,7 +144,7 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
                 ))}
               </ul>
               <h3>
-                Files <span className="count">{pullDetails.files.length}</span>
+                {t('Files')} <span className="count">{pullDetails.files.length}</span>
               </h3>
               <ul className="hosting-files">
                 {pullDetails.files.map((file) => (
@@ -158,7 +159,7 @@ export function HostingView({ repo, hosting, item, onChanged, onOpen, onShowComm
             </>
           )}
           <h3>
-            Discussion <span className="count">{details.discussion.length}</span>
+            {t('Discussion')} <span className="count">{details.discussion.length}</span>
           </h3>
           <ol className="hosting-discussion">
             {details.discussion.map((comment) => (
@@ -216,8 +217,8 @@ function CommentForm({ onSubmit }: { onSubmit(body: string): Promise<void> }) {
       }}
     >
       <textarea
-        aria-label="New comment"
-        placeholder="Leave a comment (Ctrl+Enter sends)"
+        aria-label={t('New comment')}
+        placeholder={t('Leave a comment (Ctrl+Enter sends)')}
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
@@ -229,7 +230,7 @@ function CommentForm({ onSubmit }: { onSubmit(body: string): Promise<void> }) {
       />
       {error && <p className="setting-error">{error}</p>}
       <button type="submit" disabled={busy || !text.trim()}>
-        {busy ? 'Sending…' : 'Comment'}
+        {busy ? t('Sending…') : t('verb|Comment')}
       </button>
     </form>
   );

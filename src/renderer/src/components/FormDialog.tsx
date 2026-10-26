@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { t } from '../../../shared/i18n';
 
 export interface FormField {
   name: string;
@@ -158,7 +159,7 @@ function FormDialog({ options, onClose }: { options: FormOptions; onClose(done: 
         )}
         <div className="modal-actions">
           <button type="button" onClick={() => onClose(false)}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button type="submit" className="primary" disabled={busy || Boolean(problem)}>
             {options.confirmLabel}

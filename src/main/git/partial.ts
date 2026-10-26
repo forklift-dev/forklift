@@ -1,4 +1,5 @@
 import { toBlock, type LineChange } from '../../shared/staging';
+import { t } from '../../shared/i18n';
 
 /** Lines the way Monaco models them: split on \r\n, \r or \n; a trailing newline leaves an empty last line. */
 interface SplitText {
@@ -66,7 +67,7 @@ export function applyLineChanges(
   const copyUnchanged = (count: number) => {
     for (let i = 0; i < count; i++, o++, m++) {
       if (orig.lines[o] !== mod.lines[m]) {
-        throw new PartialApplyError(`Line ${o + 1} differs outside the reported changes; the diff is out of date`);
+        throw new PartialApplyError(t('Line {line} differs outside the reported changes; the diff is out of date', { line: o + 1 }));
       }
       out.push({ text: orig.lines[o]!, eol: originalEol && orig.eols[o] ? originalEol : orig.eols[o]! });
     }
@@ -75,11 +76,11 @@ export function applyLineChanges(
   for (const block of changes.map(toBlock)) {
     const before = block.origStart - o;
     if (before < 0 || block.modStart - m !== before || block.origCount < 0 || block.modCount < 0) {
-      throw new PartialApplyError('Changes are out of order or do not match the file');
+      throw new PartialApplyError(t('Changes are out of order or do not match the file'));
     }
     copyUnchanged(before);
     if (o + block.origCount > orig.lines.length || m + block.modCount > mod.lines.length) {
-      throw new PartialApplyError('A change reaches past the end of the file');
+      throw new PartialApplyError(t('A change reaches past the end of the file'));
     }
     // Removals that are not picked stay; picked additions follow, as in `git add -p` edits.
     for (let i = 0; i < block.origCount; i++, o++) {
@@ -89,7 +90,7 @@ export function applyLineChanges(
       if (pick.modified(m + 1)) out.push({ text: mod.lines[m]!, eol: mod.eols[m]! });
     }
   }
-  if (orig.lines.length - o !== mod.lines.length - m) throw new PartialApplyError('Changes do not cover the end of the file');
+  if (orig.lines.length - o !== mod.lines.length - m) throw new PartialApplyError(t('Changes do not cover the end of the file'));
   copyUnchanged(orig.lines.length - o);
 
   // A line that was last in its file has no EOL of its own; when something follows it now, it needs one.

@@ -1,5 +1,6 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
+import { t } from '../../shared/i18n';
 import type { AskpassServer } from '../askpass/server';
 import { GitCliError, type GitCli } from './cli';
 import type { CommitOpResult } from './commitOps';
@@ -95,7 +96,7 @@ export class RemoteService {
   private async assertRemoteName(root: string, name: string): Promise<void> {
     assertName(name, 'remote');
     const { exitCode } = await this.git.exec(['check-ref-format', `refs/remotes/${name}/x`], { cwd: root, readOnly: true, allowedExitCodes: [1] });
-    if (exitCode !== 0 || name.includes('/')) throw new RemoteError(`"${name}" is not a valid remote name`);
+    if (exitCode !== 0 || name.includes('/')) throw new RemoteError(t('"{name}" is not a valid remote name', { name }));
   }
 
   private async admin(root: string, args: string[]): Promise<void> {
@@ -135,11 +136,11 @@ export class RemoteService {
   async push(root: string, remote: string | null, force: boolean, run: RemoteRun): Promise<void> {
     if (remote !== null) assertName(remote, 'remote');
     const branch = (await this.git.exec(['symbolic-ref', '-q', '--short', 'HEAD'], { cwd: root, readOnly: true, allowedExitCodes: [1] })).stdout.trim();
-    if (!branch) throw new RemoteError('HEAD is detached: check out a branch to push it');
+    if (!branch) throw new RemoteError(t('HEAD is detached: check out a branch to push it'));
     const upstream = await this.git.exec(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], { cwd: root, readOnly: true, allowedExitCodes: [128] });
     const args = ['push', '--progress', '--porcelain', ...(force ? ['--force-with-lease'] : [])];
     if (upstream.exitCode !== 0) {
-      if (!remote) throw new RemoteError(`${branch} has no upstream branch: choose a remote to push it to`);
+      if (!remote) throw new RemoteError(t('{branch} has no upstream branch: choose a remote to push it to', { branch }));
       args.push('--set-upstream', remote, `refs/heads/${branch}:refs/heads/${branch}`);
     }
     await this.network(root, args, run);
@@ -190,11 +191,11 @@ export class RemoteService {
 
 function parseUrl(url: string): string {
   if (typeof url !== 'string' || !url.trim() || url.length > 4096 || /[\0\r\n]/.test(url) || url.trim().startsWith('-')) {
-    throw new RemoteError('Enter a repository URL or path');
+    throw new RemoteError(t('Enter a repository URL or path'));
   }
   return url.trim();
 }
 
-function assertName(name: string, what: string): void {
-  if (!NAME.test(name)) throw new RemoteError(`"${name}" is not a valid ${what} name`);
+function assertName(name: string, _what: string): void {
+  if (!NAME.test(name)) throw new RemoteError(t('"{name}" is not a valid remote name', { name }));
 }

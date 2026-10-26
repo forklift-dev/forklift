@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { t } from '../shared/i18n';
 import { BUILTIN_THEMES, parseUserTheme, type Theme, type ThemeProblem, type UserThemesState } from '../shared/themes';
 
 const MAX_FILES = 100;
@@ -15,16 +16,16 @@ export async function readUserThemes(folder: string): Promise<UserThemesState> {
   for (const file of names.slice(0, MAX_FILES)) {
     const stem = file.replace(/\.jsonc?$/i, '');
     try {
-      if (!STEM.test(stem)) throw new Error('Use letters, digits, spaces, dots, dashes and underscores in the file name');
+      if (!STEM.test(stem)) throw new Error(t('Use letters, digits, spaces, dots, dashes and underscores in the file name'));
       const info = await stat(join(folder, file));
-      if (info.size > MAX_SIZE) throw new Error('The file is larger than 256 KB');
-      if (themes.some((theme) => theme.id === `user:${stem}`)) throw new Error(`Another file is also named "${stem}"`);
+      if (info.size > MAX_SIZE) throw new Error(t('The file is larger than 256 KB'));
+      if (themes.some((theme) => theme.id === `user:${stem}`)) throw new Error(t('Another file is also named "{name}"', { name: stem }));
       themes.push(parseUserTheme(stem, await readFile(join(folder, file), 'utf8')));
     } catch (error) {
       problems.push({ file, message: error instanceof Error ? error.message : String(error) });
     }
   }
-  if (names.length > MAX_FILES) problems.push({ file: names[MAX_FILES]!, message: `Only the first ${MAX_FILES} theme files are read` });
+  if (names.length > MAX_FILES) problems.push({ file: names[MAX_FILES]!, message: t('Only the first {count} theme files are read', { count: MAX_FILES }) });
   return { folder, themes, problems };
 }
 

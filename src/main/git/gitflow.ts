@@ -1,4 +1,5 @@
 import { flowBranch, type FlowFinishOptions, type FlowKind, type GitflowConfig } from '../../shared/gitflow';
+import { t } from '../../shared/i18n';
 import { GitCliError, type GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
 
@@ -49,7 +50,7 @@ export class GitflowService {
   async init(root: string, raw: unknown): Promise<GitflowConfig> {
     const config = this.parseConfig(raw);
     return this.queue.run(root, async () => {
-      if (!(await this.branchExists(root, config.production))) throw new GitflowError(`There is no branch ${config.production} to use for production`);
+      if (!(await this.branchExists(root, config.production))) throw new GitflowError(t('There is no branch {branch} to use for production', { branch: config.production }));
       if (!(await this.branchExists(root, config.develop))) await this.exec(root, ['branch', '--', config.develop, config.production]);
       for (const [key, name] of Object.entries(KEYS)) await this.exec(root, ['config', name, config[key as keyof GitflowConfig]]);
       return config;
@@ -59,14 +60,17 @@ export class GitflowService {
   /** Creates and checks out `<prefix><name>` from develop (a hotfix from production). */
   async start(root: string, kind: FlowKind, name: unknown): Promise<string> {
     const config = await this.require(root);
-    if (typeof name !== 'string' || !NAME.test(name.trim())) throw new GitflowError(`Enter a ${kind === 'feature' ? 'name' : 'version'}`);
+    if (typeof name !== 'string' || !NAME.test(name.trim())) throw new GitflowError(kind === 'feature' ? t('Enter a name') : t('Enter a version'));
     const branch = `${config[kind]}${name.trim()}`;
     await this.assertBranchName(root, branch);
     return this.queue.run(root, async () => {
-      if (await this.branchExists(root, branch)) throw new GitflowError(`${branch} already exists`);
+      if (await this.branchExists(root, branch)) throw new GitflowError(t('{path} already exists', { path: branch }));
       if (kind !== 'feature') {
         const open = (await this.branches(root)).find((b) => b.startsWith(config[kind]));
-        if (open) throw new GitflowError(`${open} is not finished yet: finish it before starting another ${kind}`);
+        if (open) {
+          const kindName = kind === 'release' ? t('flow|release') : t('flow|hotfix');
+          throw new GitflowError(t('{branch} is not finished yet: finish it before starting another {kind}', { branch: open, kind: kindName }));
+        }
       }
       await this.exec(root, ['checkout', '-b', branch, kind === 'hotfix' ? config.production : config.develop]);
       return branch;
@@ -77,12 +81,12 @@ export class GitflowService {
   async finish(root: string, branch: unknown, options: FlowFinishOptions): Promise<void> {
     const config = await this.require(root);
     const flow = typeof branch === 'string' ? flowBranch(config, branch) : null;
-    if (!flow || typeof branch !== 'string') throw new GitflowError('Choose a feature, release or hotfix branch');
+    if (!flow || typeof branch !== 'string') throw new GitflowError(t('Choose a feature, release or hotfix branch'));
     const tagMessage = options.tagMessage?.trim() || `${flow.kind === 'release' ? 'Release' : 'Hotfix'} ${flow.name}`;
     await this.queue.run(root, async () => {
-      if (!(await this.branchExists(root, branch))) throw new GitflowError(`There is no branch ${branch}`);
+      if (!(await this.branchExists(root, branch))) throw new GitflowError(t('There is no branch {branch}', { branch }));
       const dirty = (await this.git.exec(['status', '--porcelain', '--untracked-files=no'], { cwd: root, readOnly: true })).stdout.trim();
-      if (dirty) throw new GitflowError('Commit or stash your changes first: finishing merges branches');
+      if (dirty) throw new GitflowError(t('Commit or stash your changes first: finishing merges branches'));
       if (flow.kind === 'feature') await this.mergeInto(root, config.develop, branch);
       else {
         await this.mergeInto(root, config.production, branch);
@@ -102,23 +106,23 @@ export class GitflowService {
       await this.exec(root, ['merge', '--no-ff', '--no-edit', branch]);
     } catch (error) {
       const conflicted = (await this.git.exec(['diff', '--name-only', '--diff-filter=U'], { cwd: root, readOnly: true })).stdout.trim();
-      if (conflicted) throw new GitflowError(`Merging ${branch} into ${target} stopped with conflicts. Resolve them and commit the merge, then finish again.`, true);
+      if (conflicted) throw new GitflowError(t('Merging {branch} into {target} stopped with conflicts. Resolve them and commit the merge, then finish again.', { branch, target }), true);
       throw error;
     }
   }
 
   private async require(root: string): Promise<GitflowConfig> {
     const config = await this.config(root);
-    if (!config) throw new GitflowError('Gitflow is not set up in this repository');
+    if (!config) throw new GitflowError(t('Gitflow is not set up in this repository'));
     return config;
   }
 
   private parseConfig(raw: unknown): GitflowConfig {
-    if (typeof raw !== 'object' || raw === null) throw new GitflowError('Enter the Gitflow settings');
+    if (typeof raw !== 'object' || raw === null) throw new GitflowError(t('Enter the Gitflow settings'));
     const values = raw as Record<string, unknown>;
     const text = (key: keyof GitflowConfig, allowEmpty: boolean) => {
       const value = values[key];
-      if (typeof value !== 'string' || /[\s\0~^:?*[\\]/.test(value) || value.startsWith('-') || (!allowEmpty && !value)) throw new GitflowError(`"${String(value)}" is not valid for ${key}`);
+      if (typeof value !== 'string' || /[\s\0~^:?*[\\]/.test(value) || value.startsWith('-') || (!allowEmpty && !value)) throw new GitflowError(t('"{value}" is not valid for {key}', { value: String(value), key }));
       return value;
     };
     const config: GitflowConfig = {
@@ -129,7 +133,7 @@ export class GitflowService {
       hotfix: text('hotfix', false),
       versionTag: text('versionTag', true),
     };
-    if (config.production === config.develop) throw new GitflowError('Production and develop must be different branches');
+    if (config.production === config.develop) throw new GitflowError(t('Production and develop must be different branches'));
     return config;
   }
 
@@ -152,7 +156,7 @@ export class GitflowService {
 
   private async assertBranchName(root: string, name: string): Promise<void> {
     const { exitCode } = await this.git.exec(['check-ref-format', '--branch', name], { cwd: root, readOnly: true, allowedExitCodes: [1, 128] });
-    if (exitCode !== 0) throw new GitflowError(`"${name}" is not a valid branch name`);
+    if (exitCode !== 0) throw new GitflowError(t('"{name}" is not a valid branch name', { name }));
   }
 
   private async exec(root: string, args: string[]): Promise<void> {

@@ -167,8 +167,9 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 52px;
-  padding: 0;
+  /* As wide as the caption needs (Russian ones are longer), at least the width of the English row. */
+  min-width: 52px;
+  padding: 0 6px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -183,6 +184,7 @@ button:disabled {
   font-size: 11px;
   line-height: 1;
   color: var(--fg-muted);
+  white-space: nowrap;
 }
 
 .tool-button .codicon {
@@ -439,6 +441,13 @@ body.resizing * {
 /* Lanes wider than the column scroll sideways (shift+wheel over the graph, or the bar under it). */
 .commit-row .cell.graph .graph-cell {
   transform: translateX(calc(var(--graph-scroll, 0) * -1px));
+}
+
+/* The label is cut with an ellipsis; the cell itself stays overflow: visible for the column resizers. */
+.commit-header .header-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .commit-header .cell {

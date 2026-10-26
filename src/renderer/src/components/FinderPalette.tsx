@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import type { CheckoutTarget } from '../../../shared/branches';
 import { fuzzyFilter } from '../../../shared/fuzzy';
 import type { FoundCommit, HistoryFilter } from '../../../shared/history';
+import { formatDate, t } from '../../../shared/i18n';
 import type { FileChange, RepoData } from '../../../shared/state';
 import { invoke } from '../api';
 import { OPEN_COMMANDS_EVENT } from '../commands';
+import { tx } from '../i18n';
 import { Palette, type PaletteItem } from './Palette';
 
 interface FinderProps {
@@ -18,7 +20,7 @@ interface FinderProps {
   onFileHistory(path: string): void;
 }
 
-const date = (seconds: number) => new Date(seconds * 1000).toLocaleDateString();
+const date = (seconds: number) => formatDate(seconds * 1000, { year: 'numeric', month: 'numeric', day: 'numeric' });
 
 // The working tree's file list, per repository, until it is read again on the next open.
 const fileCache = new Map<string, { loadedAt: number; paths: string[] }>();
@@ -73,11 +75,11 @@ export function FinderPalette({ data, filter, onClose, onShowCommit, onCheckout,
     const change = changes.get(path);
     return {
       key: `file:${path}`,
-      group: 'Files',
+      group: t('Files'),
       icon: change ? 'diff' : 'file',
       label: path,
       positions,
-      detail: change ? (change.kind === 'conflicted' ? 'conflict' : 'changed') : undefined,
+      detail: change ? (change.kind === 'conflicted' ? t('conflict') : t('changed')) : undefined,
       run: ({ shift }) => (change && !shift ? onOpenChange(change) : onFileHistory(path)),
     };
   });
@@ -92,11 +94,11 @@ export function FinderPalette({ data, filter, onClose, onShowCommit, onCheckout,
     text ? 15 : 8,
   ).map(({ item: ref, positions }) => ({
     key: `${ref.kind}:${ref.name}`,
-    group: 'Branches and tags',
+    group: t('Branches and tags'),
     icon: ref.kind === 'tag' ? 'tag' : ref.kind === 'remote' ? 'cloud' : 'git-branch',
     label: ref.name,
     positions,
-    detail: ref.current ? 'checked out' : ref.kind === 'tag' ? 'tag' : undefined,
+    detail: ref.current ? t('checked out') : ref.kind === 'tag' ? t('tag') : undefined,
     run: ({ shift }) => {
       if (shift && ref.kind === 'branch' && !ref.current) return onCheckout({ kind: 'branch', name: ref.name });
       if (shift && ref.kind === 'remote') return onCheckout({ kind: 'remote', name: ref.name, remote: (ref as { remote: string }).remote });
@@ -107,7 +109,7 @@ export function FinderPalette({ data, filter, onClose, onShowCommit, onCheckout,
     commits.text === text && text.length >= 2
       ? commits.found.map((commit) => ({
           key: `commit:${commit.sha}`,
-          group: 'Commits',
+          group: t('Commits'),
           icon: 'git-commit',
           label: commit.subject,
           positions: commit.positions,
@@ -118,17 +120,21 @@ export function FinderPalette({ data, filter, onClose, onShowCommit, onCheckout,
 
   return (
     <Palette
-      label="Go to"
-      placeholder="File, branch, tag or commit (type > for commands)"
+      label={t('Go to')}
+      placeholder={t('File, branch, tag or commit (type > for commands)')}
       query={query}
       onQuery={onQuery}
       items={[...fileItems, ...refItems, ...commitItems]}
-      empty="Nothing matches"
+      empty={t('Nothing matches')}
       // Commits for this text are still being looked up.
       busy={text.length >= 2 && commits.text !== text}
       footer={
         <>
-          <kbd>Enter</kbd> show · <kbd>Shift+Enter</kbd> check out the branch, or the file’s history · <kbd>&gt;</kbd> commands
+          {tx('{enter} show · {shiftEnter} check out the branch, or the file’s history · {greater} commands', {
+            enter: <kbd>Enter</kbd>,
+            shiftEnter: <kbd>Shift+Enter</kbd>,
+            greater: <kbd>&gt;</kbd>,
+          })}
         </>
       }
       onClose={onClose}

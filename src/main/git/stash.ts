@@ -1,4 +1,5 @@
 import { GitCliError, isVersionAtLeast, type GitCli, type GitCliResult } from './cli';
+import { t } from '../../shared/i18n';
 import { RepoQueue } from './repoQueue';
 
 /** How applying a stash went: cleanly, without its index, with conflicts, or not at all (stash kept). */
@@ -43,10 +44,10 @@ export class StashService {
   push(root: string, options: StashOptions): Promise<string | null> {
     return this.queue.run(root, async () => {
       if (options.stagedOnly) {
-        if (options.includeUntracked) throw new StashError('Untracked files cannot be stashed together with "only staged changes"');
+        if (options.includeUntracked) throw new StashError(t('Untracked files cannot be stashed together with "only staged changes"'));
         const version = await (this.gitVersion ??= this.git.version());
         if (!version || !isVersionAtLeast(version, STAGED_STASH_GIT)) {
-          throw new StashError(`Stashing only staged changes needs git ${STAGED_STASH_GIT} or newer (this is ${version ?? 'unknown'})`);
+          throw new StashError(t('Stashing only staged changes needs git {required} or newer (this is {version})', { required: STAGED_STASH_GIT, version: version ?? 'unknown' }));
         }
       }
       return this.pushNow(root, options);
@@ -76,7 +77,7 @@ export class StashService {
 
   /** Applies with the index when possible; `drop` removes the stash only after a clean apply. */
   async applyNow(root: string, sha: string, drop: boolean): Promise<ApplyOutcome> {
-    if (!SHA.test(sha)) throw new StashError('A stash commit hash is required');
+    if (!SHA.test(sha)) throw new StashError(t('A stash commit hash is required'));
     await this.position(root, sha);
     let result = await this.run(root, ['--index', sha]);
     let outcome: ApplyOutcome['outcome'] = 'applied';
@@ -104,7 +105,7 @@ export class StashService {
   private async position(root: string, sha: string): Promise<number> {
     const { stdout } = await this.git.exec(['stash', 'list', '--format=%H'], { cwd: root, readOnly: true });
     const index = stdout.split('\n').indexOf(sha);
-    if (index < 0) throw new StashError('This stash does not exist any more');
+    if (index < 0) throw new StashError(t('This stash does not exist any more'));
     return index;
   }
 

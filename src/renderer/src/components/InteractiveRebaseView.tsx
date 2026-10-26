@@ -3,13 +3,14 @@ import { planProblem, type RebaseAction, type RebaseCommit, type RebaseStep } fr
 import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { useCommand } from '../useCommand';
+import { t, translate } from '../../../shared/i18n';
 
-const ACTIONS: Array<{ value: RebaseAction; label: string; title: string }> = [
-  { value: 'pick', label: 'Pick', title: 'Keep the commit' },
-  { value: 'reword', label: 'Reword', title: 'Keep it with a new message' },
-  { value: 'squash', label: 'Squash', title: 'Combine into the commit below, messages joined' },
-  { value: 'fixup', label: 'Fixup', title: 'Combine into the commit below, keeping its message' },
-  { value: 'drop', label: 'Drop', title: 'Leave the commit out' },
+const actions = (): Array<{ value: RebaseAction; label: string; title: string }> => [
+  { value: 'pick', label: t('Pick'), title: t('Keep the commit') },
+  { value: 'reword', label: t('Reword'), title: t('Keep it with a new message') },
+  { value: 'squash', label: t('Squash'), title: t('Combine into the commit below, messages joined') },
+  { value: 'fixup', label: t('Fixup'), title: t('Combine into the commit below, keeping its message') },
+  { value: 'drop', label: t('Drop'), title: t('Leave the commit out') },
 ];
 
 interface Row extends RebaseCommit {
@@ -41,7 +42,7 @@ export function InteractiveRebaseView(props: InteractiveRebaseViewProps) {
       </section>
     );
   }
-  if (!data) return <div className="diff-message">Loading…</div>;
+  if (!data) return <div className="diff-message">{t('Loading…')}</div>;
   // Remount per plan: the rows start from it.
   return <Editor key={data.map((c) => c.sha).join()} {...props} plan={data} />;
 }
@@ -50,18 +51,18 @@ function Header({ branch, base, onClose, problem, onStart }: InteractiveRebaseVi
   return (
     <header className="diff-header">
       <div className="diff-title">
-        <strong>Interactive rebase of {branch}</strong>
-        <span className="diff-subtitle">onto {base.slice(0, 7)}</span>
+        <strong>{t('Interactive rebase of {branch}', { branch })}</strong>
+        <span className="diff-subtitle">{t('onto {base}', { base: base.slice(0, 7) })}</span>
       </div>
       <div className="diff-toolbar">
-        {problem && <span className="setting-error">{problem}</span>}
+        {problem && <span className="setting-error">{translate(problem)}</span>}
         {onStart && (
           <button type="button" className="primary" disabled={Boolean(problem)} onClick={onStart}>
-            Start rebase
+            {t('Start rebase')}
           </button>
         )}
-        <button type="button" onClick={onClose} aria-label="Cancel interactive rebase">
-          Cancel
+        <button type="button" onClick={onClose} aria-label={t('Cancel interactive rebase')}>
+          {t('Cancel')}
         </button>
       </div>
     </header>
@@ -110,9 +111,9 @@ function Editor(props: InteractiveRebaseViewProps & { plan: RebaseCommit[] }) {
   };
 
   return (
-    <section className="rebase-view" aria-label="Interactive rebase">
+    <section className="rebase-view" aria-label={t('Interactive rebase')}>
       <Header {...props} problem={problem} onStart={() => void start()} />
-      <p className="rebase-hint">Newest commit on top. Squash and fixup combine a commit into the one below it. Drag rows or use the arrows to reorder.</p>
+      <p className="rebase-hint">{t('Newest commit on top. Squash and fixup combine a commit into the one below it. Drag rows or use the arrows to reorder.')}</p>
       <ol className="rebase-list">
         {rows.map((row, index) => {
           const group = squashedInto(index);
@@ -138,8 +139,8 @@ function Editor(props: InteractiveRebaseViewProps & { plan: RebaseCommit[] }) {
             >
               <div className="rebase-line">
                 <span className="codicon codicon-gripper drag-handle" aria-hidden="true" />
-                <select aria-label={`Action for ${row.subject}`} value={row.action} onChange={(event) => update(index, { action: event.target.value as RebaseAction, edited: undefined })}>
-                  {ACTIONS.map((action) => (
+                <select aria-label={t('Action for {subject}', { subject: row.subject })} value={row.action} onChange={(event) => update(index, { action: event.target.value as RebaseAction, edited: undefined })}>
+                  {actions().map((action) => (
                     <option key={action.value} value={action.value} title={action.title}>
                       {action.label}
                     </option>
@@ -147,16 +148,16 @@ function Editor(props: InteractiveRebaseViewProps & { plan: RebaseCommit[] }) {
                 </select>
                 <span className="hash">{row.sha.slice(0, 7)}</span>
                 <span className="rebase-subject">{row.subject}</span>
-                <button type="button" className="icon-button" aria-label="Move up (later)" disabled={index === 0} onClick={() => move(index, index - 1)}>
+                <button type="button" className="icon-button" aria-label={t('Move up (later)')} disabled={index === 0} onClick={() => move(index, index - 1)}>
                   <span className="codicon codicon-arrow-up" aria-hidden="true" />
                 </button>
-                <button type="button" className="icon-button" aria-label="Move down (earlier)" disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>
+                <button type="button" className="icon-button" aria-label={t('Move down (earlier)')} disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>
                   <span className="codicon codicon-arrow-down" aria-hidden="true" />
                 </button>
               </div>
               {showMessage && (
                 <label className="rebase-message">
-                  {group.length ? `Message of the combined commit (${group.length + 1} commits)` : 'New message'}
+                  {group.length ? t('Message of the combined commit ({count} commits)', { count: group.length + 1 }) : t('New message')}
                   <textarea rows={Math.min(8, Math.max(3, (row.edited ?? defaultMessage(index)).split('\n').length))} value={row.edited ?? (group.length ? defaultMessage(index) : row.message)} onChange={(event) => update(index, { edited: event.target.value })} />
                 </label>
               )}

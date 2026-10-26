@@ -1,5 +1,6 @@
 import { formatShortcut } from '../../../shared/keybindings';
 import { fuzzyFilter } from '../../../shared/fuzzy';
+import { t } from '../../../shared/i18n';
 import { currentShortcuts, registeredCommands, useCommandsVersion } from '../commands';
 import { useAppState } from '../state';
 import { Palette, type PaletteItem } from './Palette';
@@ -22,5 +23,5 @@ export function CommandPalette({ query, onQuery, onClose }: { query: string; onQ
     hint: item.keys[0] && formatShortcut(item.keys[0], platform),
     run: () => item.handler.run(),
   }));
-  return <Palette label="Commands" placeholder="Type a command" query={query} onQuery={onQuery} items={items} empty="No matching commands" onClose={onClose} />;
+  return <Palette label={t('Commands')} placeholder={t('Type a command')} query={query} onQuery={onQuery} items={items} empty={t('No matching commands')} onClose={onClose} />;
 }

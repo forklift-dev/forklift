@@ -2,6 +2,7 @@ import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import { folderNameProblem, type CloneRequest, type CreateDefaults, type InitRequest } from '../../shared/repos';
+import { t, translate } from '../../shared/i18n';
 import { GitCliError, type GitCli } from '../git/cli';
 import type { RemoteRun, RemoteService } from '../git/remote';
 import { gitignoreText, GITIGNORE_TEMPLATES, LICENSE_TEMPLATES, licenseText } from './templates';
@@ -24,22 +25,22 @@ type FolderState = 'missing' | 'empty' | 'files' | 'repository';
 async function folderState(path: string): Promise<FolderState> {
   const info = await stat(path).catch(() => null);
   if (!info) return 'missing';
-  if (!info.isDirectory()) throw new CreateError(`${path} exists and is not a folder`);
+  if (!info.isDirectory()) throw new CreateError(t('{path} exists and is not a folder', { path }));
   const entries = await readdir(path);
   if (entries.includes('.git')) return 'repository';
   return entries.length ? 'files' : 'empty';
 }
 
 async function assertParent(parent: unknown): Promise<string> {
-  if (typeof parent !== 'string' || !isAbsolute(parent)) throw new CreateError('Choose the folder to create the repository in');
+  if (typeof parent !== 'string' || !isAbsolute(parent)) throw new CreateError(t('Choose the folder to create the repository in'));
   const info = await stat(parent).catch(() => null);
-  if (!info?.isDirectory()) throw new CreateError(`${parent} is not an existing folder`);
+  if (!info?.isDirectory()) throw new CreateError(t('{path} is not an existing folder', { path: parent }));
   return parent;
 }
 
 function assertName(name: unknown): string {
   const problem = typeof name === 'string' ? folderNameProblem(name) : 'Enter a folder name';
-  if (problem) throw new CreateError(problem);
+  if (problem) throw new CreateError(translate(problem));
   return name as string;
 }
 
@@ -60,8 +61,8 @@ export class RepoCreator {
       parent: this.defaultParent() || homedir(),
       branch: branch || 'main',
       holder,
-      gitignore: Object.entries(GITIGNORE_TEMPLATES).map(([key, { label }]) => ({ key, label })),
-      licenses: Object.entries(LICENSE_TEMPLATES).map(([key, { label }]) => ({ key, label })),
+      gitignore: Object.entries(GITIGNORE_TEMPLATES).map(([key, { label }]) => ({ key, label: translate(label) })),
+      licenses: Object.entries(LICENSE_TEMPLATES).map(([key, { label }]) => ({ key, label: translate(label) })),
     };
   }
 
@@ -69,7 +70,7 @@ export class RepoCreator {
   async targetProblem(kind: 'clone' | 'init', parent: unknown, name: unknown): Promise<string | null> {
     try {
       if (kind === 'clone') await this.cloneTarget(parent, name);
-      else if ((await folderState(join(await assertParent(parent), assertName(name)))) === 'repository') return 'This folder is already a git repository';
+      else if ((await folderState(join(await assertParent(parent), assertName(name)))) === 'repository') return t('This folder is already a git repository');
       return null;
     } catch (error) {
       if (error instanceof CreateError) return error.message;
@@ -81,7 +82,7 @@ export class RepoCreator {
   async cloneTarget(parent: unknown, name: unknown): Promise<string> {
     const target = join(await assertParent(parent), assertName(name));
     const state = await folderState(target);
-    if (state !== 'missing' && state !== 'empty') throw new CreateError(`${target} already exists and is not empty`);
+    if (state !== 'missing' && state !== 'empty') throw new CreateError(t('{path} already exists and is not empty', { path: target }));
     return target;
   }
 
@@ -106,13 +107,13 @@ export class RepoCreator {
    */
   async init(request: InitRequest): Promise<InitResult> {
     const target = join(await assertParent(request.parent), assertName(request.name));
-    if ((await folderState(target)) === 'repository') throw new CreateError(`${target} is already a git repository`);
+    if ((await folderState(target)) === 'repository') throw new CreateError(t('{path} is already a git repository', { path: target }));
     const branch = await this.branchName(request.branch, target);
     const gitignore = parseKeys(request.gitignore);
     if (request.license !== null && !(typeof request.license === 'string' && Object.hasOwn(LICENSE_TEMPLATES, request.license))) {
-      throw new CreateError('Unknown license');
+      throw new CreateError(t('Unknown license'));
     }
-    if (typeof request.holder !== 'string' || request.holder.length > 200 || /[\0\r\n]/.test(request.holder)) throw new CreateError('Enter the copyright holder on one line');
+    if (typeof request.holder !== 'string' || request.holder.length > 200 || /[\0\r\n]/.test(request.holder)) throw new CreateError(t('Enter the copyright holder on one line'));
 
     await mkdir(target, { recursive: true });
     await this.git.exec(['init', `--initial-branch=${branch}`], { cwd: target });
@@ -132,29 +133,29 @@ export class RepoCreator {
     await add('.gitignore', gitignore.length ? gitignoreText(gitignore) : null);
     await add('LICENSE', request.license && licenseText(request.license, request.holder.trim()));
 
-    const warnings = skipped.map((file) => `${file} already existed and was kept`);
+    const warnings = skipped.map((file) => t('{file} already existed and was kept', { file }));
     if (request.initialCommit) {
       try {
         if (written.length) await this.git.exec(['add', '--', ...written], { cwd: target });
         await this.git.exec(['commit', '--no-verify', ...(written.length ? [] : ['--allow-empty']), '-m', 'Initial commit', '--', ...written], { cwd: target });
       } catch (error) {
         if (!(error instanceof GitCliError)) throw error;
-        warnings.push(`The first commit was not made: ${error.stderr.trim().split('\n').slice(-3).join(' ') || error.message}`);
+        warnings.push(t('The first commit was not made: {message}', { message: error.stderr.trim().split('\n').slice(-3).join(' ') || error.message }));
       }
     }
-    return { root: target, warning: warnings.length ? `${target}: ${warnings.join('; ')}` : null };
+    return { root: target, warning: warnings.length ? t('{path}: {warnings}', { path: target, warnings: warnings.join('; ') }) : null };
   }
 
   private async branchName(branch: unknown, cwd: string): Promise<string> {
-    if (typeof branch !== 'string' || !branch || branch.startsWith('-') || branch.length > 255) throw new CreateError('Enter a branch name');
+    if (typeof branch !== 'string' || !branch || branch.startsWith('-') || branch.length > 255) throw new CreateError(t('Enter a branch name'));
     const { exitCode } = await this.git.exec(['check-ref-format', '--branch', branch], { cwd: dirname(cwd), readOnly: true, allowedExitCodes: [1, 128] });
-    if (exitCode !== 0) throw new CreateError(`"${branch}" is not a valid branch name`);
+    if (exitCode !== 0) throw new CreateError(t('"{name}" is not a valid branch name', { name: branch }));
     return branch;
   }
 }
 
 function parseKeys(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > Object.keys(GITIGNORE_TEMPLATES).length) throw new CreateError('Unknown .gitignore template');
-  for (const key of value) if (typeof key !== 'string' || !Object.hasOwn(GITIGNORE_TEMPLATES, key)) throw new CreateError('Unknown .gitignore template');
+  if (!Array.isArray(value) || value.length > Object.keys(GITIGNORE_TEMPLATES).length) throw new CreateError(t('Unknown .gitignore template'));
+  for (const key of value) if (typeof key !== 'string' || !Object.hasOwn(GITIGNORE_TEMPLATES, key)) throw new CreateError(t('Unknown .gitignore template'));
   return [...new Set(value as string[])];
 }

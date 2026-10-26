@@ -1,4 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
+import { t } from '../../../shared/i18n';
 import type { RepoData } from '../../../shared/state';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
@@ -30,9 +31,9 @@ export function useRemoteActions(repo: string | null, data: RepoData | null, run
       if (/has no upstream branch/.test(message)) return choosePushTarget();
       if (message.startsWith('Rejected:') && !force) {
         const ok = await confirm({
-          title: `The remote has commits that ${data.branch.head} does not have`,
-          detail: `Pull first to bring them in. Or force push (with lease): the remote branch is replaced by yours, unless it moved again since your last fetch.\n\n${message.replace(/^Rejected: /, '')}`,
-          confirmLabel: 'Force push',
+          title: t('The remote has commits that {branch} does not have', { branch: data.branch.head ?? '' }),
+          detail: t('Pull first to bring them in. Or force push (with lease): the remote branch is replaced by yours, unless it moved again since your last fetch.\n\n{message}', { message: message.replace(/^Rejected: /, '') }),
+          confirmLabel: t('Force push'),
           danger: true,
         });
         if (ok) await run(() => invoke('remote:push', repo, remote, true));
@@ -46,18 +47,18 @@ export function useRemoteActions(repo: string | null, data: RepoData | null, run
   const choosePushTarget = async () => {
     if (!repo || !data) return;
     const branch = data.branch.head ?? '';
-    if (data.remotes.length === 0) return void run(() => Promise.reject(new Error('This repository has no remotes to push to')));
+    if (data.remotes.length === 0) return void run(() => Promise.reject(new Error(t('This repository has no remotes to push to'))));
     if (data.remotes.length === 1) {
       const remote = data.remotes[0]!;
-      const ok = await confirm({ title: `Push ${branch} to ${remote}?`, detail: `It is created as ${remote}/${branch} and becomes the branch's upstream.`, confirmLabel: 'Push' });
+      const ok = await confirm({ title: t('Push {branch} to {remote}?', { branch, remote }), detail: t("It is created as {remote}/{branch} and becomes the branch's upstream.", { remote, branch }), confirmLabel: t('Push') });
       if (ok) await run(() => invoke('remote:push', repo, remote, false));
       return;
     }
     await form({
-      title: `Push ${branch}`,
-      detail: 'The new remote branch becomes its upstream.',
-      fields: [{ name: 'remote', label: 'Remote', type: 'select', initial: data.remotes.includes('origin') ? 'origin' : data.remotes[0], options: data.remotes.map((r) => ({ value: r, label: r })) }],
-      confirmLabel: 'Push',
+      title: t('Push {branch}', { branch }),
+      detail: t('The new remote branch becomes its upstream.'),
+      fields: [{ name: 'remote', label: t('field|Remote'), type: 'select', initial: data.remotes.includes('origin') ? 'origin' : data.remotes[0], options: data.remotes.map((r) => ({ value: r, label: r })) }],
+      confirmLabel: t('Push'),
       submit: async (values) => {
         try {
           await invoke('remote:push', repo, String(values['remote']), false);
@@ -75,10 +76,10 @@ export function useRemoteActions(repo: string | null, data: RepoData | null, run
     push: () => void push(null, false),
     pullMenu: (event, open) =>
       open(event, [
-        { label: 'Fetch all', onSelect: () => repo && void run(() => invoke('remote:fetch', repo, null, true)) },
+        { label: t('Fetch all'), onSelect: () => repo && void run(() => invoke('remote:fetch', repo, null, true)) },
         'separator',
-        { label: `Pull (merge)${data?.pullRebase ? '' : ' — default'}`, disabled: !data?.branch.head, onSelect: () => repo && void run(() => invoke('remote:pull', repo, false)) },
-        { label: `Pull (rebase)${data?.pullRebase ? ' — default' : ''}`, disabled: !data?.branch.head, onSelect: () => repo && void run(() => invoke('remote:pull', repo, true)) },
+        { label: data?.pullRebase ? t('Pull (merge)') : t('Pull (merge) — default'), disabled: !data?.branch.head, onSelect: () => repo && void run(() => invoke('remote:pull', repo, false)) },
+        { label: data?.pullRebase ? t('Pull (rebase) — default') : t('Pull (rebase)'), disabled: !data?.branch.head, onSelect: () => repo && void run(() => invoke('remote:pull', repo, true)) },
       ]),
     dialogs: (
       <>

@@ -2,6 +2,7 @@ import { useState, type DragEvent } from 'react';
 import type { TabsState } from '../../../shared/state';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
+import { t } from '../../../shared/i18n';
 
 interface TabBarProps {
   tabs: TabsState;
@@ -32,10 +33,10 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
   const loadedAt = useAppState((s) => s.repo.data?.loadedAt ?? 0);
   const profiles = useAppState((s) => s.settings.values['profiles.list']);
   const current = useCommand('profile:current', [repo], { reloadKey: [loadedAt, profiles], keepPrevious: true });
-  const profile = profiles.find((p) => p.id === current.data?.current)?.label ?? (current.data?.userName || 'Profiles');
+  const profile = profiles.find((p) => p.id === current.data?.current)?.label ?? (current.data?.userName || t('Profiles'));
 
   return (
-    <nav className="tab-bar" aria-label="Open repositories">
+    <nav className="tab-bar" aria-label={t('Open repositories')}>
       <div className="tabs" role="tablist">
         {tabs.tabs.map((tab, index) => {
           const active = !managerOpen && tab.id === tabs.activeId;
@@ -67,16 +68,16 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
                 if (!id) return;
                 event.preventDefault();
                 const target = dropPosition(event, index);
-                const from = tabs.tabs.findIndex((t) => t.id === id);
+                const from = tabs.tabs.findIndex((other) => other.id === id);
                 // Removing the dragged tab first shifts later positions left by one.
                 onMove(id, from < target ? target - 1 : target);
               }}
               onDragEnd={() => setDropIndex(null)}
             >
               {tab.loading ? (
-                <span className="tab-spinner spinner" aria-label="Loading" />
+                <span className="tab-spinner spinner" aria-label={t('Loading')} />
               ) : tab.error ? (
-                <span className="codicon codicon-warning tab-icon" aria-label="Unavailable" />
+                <span className="codicon codicon-warning tab-icon" aria-label={t('Unavailable')} />
               ) : (
                 <span className="codicon codicon-repo tab-icon" aria-hidden="true" />
               )}
@@ -84,8 +85,8 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
               <button
                 type="button"
                 className="tab-close icon-button"
-                aria-label={`Close ${tab.name}`}
-                title="Close (Ctrl+W)"
+                aria-label={t('Close {name}', { name: tab.name })}
+                title={t('Close (Ctrl+W)')}
                 onClick={(event) => {
                   event.stopPropagation();
                   onClose(tab.id);
@@ -100,8 +101,8 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
       <button
         type="button"
         className={`icon-button new-tab${managerOpen ? ' active' : ''}`}
-        aria-label="Open a repository in a new tab"
-        title="Repositories (Ctrl+T)"
+        aria-label={t('Open a repository in a new tab')}
+        title={t('Repositories (Ctrl+T)')}
         onClick={onNewTab}
       >
         <span className="codicon codicon-add" aria-hidden="true" />
@@ -109,15 +110,15 @@ export function TabBar({ tabs, managerOpen, onActivate, onClose, onMove, onNewTa
       {/* As in GitKraken: app-wide things at the right end of the tab row. The profile name loads later and
           changes width, so it comes first and the icons keep their place at the edge. */}
       <div className="tab-bar-end">
-        <button type="button" className="profile-button" title="Switch profile" onClick={onProfiles}>
+        <button type="button" className="profile-button" title={t('Switch profile')} onClick={onProfiles}>
           <span className="codicon codicon-account" aria-hidden="true" />
           <span className="profile-name">{profile}</span>
           <span className="codicon codicon-chevron-down" aria-hidden="true" />
         </button>
-        <button type="button" className="icon-button" aria-label="Operation log" title="Operation log" onClick={onShowLog}>
+        <button type="button" className="icon-button" aria-label={t('Operation log')} title={t('Operation log')} onClick={onShowLog}>
           <span className="codicon codicon-bell" aria-hidden="true" />
         </button>
-        <button type="button" className="icon-button" aria-label="Preferences" title="Preferences (Ctrl+,)" onClick={onPreferences}>
+        <button type="button" className="icon-button" aria-label={t('Preferences')} title={t('Preferences (Ctrl+,)')} onClick={onPreferences}>
           <span className="codicon codicon-settings-gear" aria-hidden="true" />
         </button>
       </div>

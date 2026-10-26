@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { t } from '../../../shared/i18n';
 
 export interface ConfirmOptions {
   title: string;
@@ -51,7 +52,7 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose(
         {options.detail && <p>{options.detail}</p>}
         <div className="modal-actions">
           <button type="button" ref={cancelRef} onClick={() => onClose(false)}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button type="button" className={options.danger ? 'danger' : 'primary'} onClick={() => onClose(true)}>
             {options.confirmLabel}

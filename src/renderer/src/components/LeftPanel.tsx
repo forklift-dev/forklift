@@ -8,6 +8,7 @@ import type { Gitflow } from './useGitflow';
 import { flowBranch } from '../../../shared/gitflow';
 import { pullTerm, refLabel, type RepoHosting } from '../../../shared/hosting';
 import type { HostingItem } from './HostingView';
+import { t, translate } from '../../../shared/i18n';
 
 /** The repository's server (when an account matches its remotes): pull requests and issues sections. */
 export interface LeftPanelHosting {
@@ -69,11 +70,11 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
     const solo = graphFilter.solo.includes(ref);
     return [
       solo
-        ? { label: 'Show all branches in the graph', onSelect: () => onFilter({ solo: [], hidden: [] }) }
-        : { label: 'Show only this in the graph', onSelect: () => onFilter({ solo: [ref], hidden: [] }) },
+        ? { label: t('Show all branches in the graph'), onSelect: () => onFilter({ solo: [], hidden: [] }) }
+        : { label: t('Show only this in the graph'), onSelect: () => onFilter({ solo: [ref], hidden: [] }) },
       hidden
-        ? { label: 'Show in the graph', onSelect: () => onFilter({ ...graphFilter, hidden: graphFilter.hidden.filter((r) => r !== ref) }) }
-        : { label: 'Hide in the graph', disabled: graphFilter.solo.length > 0, onSelect: () => onFilter({ solo: [], hidden: [...graphFilter.hidden, ref] }) },
+        ? { label: t('Show in the graph'), onSelect: () => onFilter({ ...graphFilter, hidden: graphFilter.hidden.filter((r) => r !== ref) }) }
+        : { label: t('Hide in the graph'), disabled: graphFilter.solo.length > 0, onSelect: () => onFilter({ solo: [], hidden: [...graphFilter.hidden, ref] }) },
     ];
   };
   const [filter, setFilter] = useState('');
@@ -106,18 +107,18 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
     const draggedCurrent = data.branches.some((b) => b.current && b.name === dragged);
     if (targetCurrent) {
       return [
-        { label: `Merge ${dragged} into ${target}…`, disabled: busy, onSelect: () => actions.merge(dragged, dragged) },
-        { label: `Rebase ${target} onto ${dragged}…`, disabled: busy, onSelect: () => actions.rebase(dragged, dragged) },
+        { label: t('Merge {source} into {target}…', { source: dragged, target }), disabled: busy, onSelect: () => actions.merge(dragged, dragged) },
+        { label: t('Rebase {source} onto {target}…', { source: target, target: dragged }), disabled: busy, onSelect: () => actions.rebase(dragged, dragged) },
       ];
     }
     if (draggedCurrent) {
       return [
-        { label: `Rebase ${dragged} onto ${target}…`, disabled: busy, onSelect: () => actions.rebase(target, target) },
-        { label: `Merge ${target} into ${dragged}…`, disabled: busy, onSelect: () => actions.merge(target, target) },
+        { label: t('Rebase {source} onto {target}…', { source: dragged, target }), disabled: busy, onSelect: () => actions.rebase(target, target) },
+        { label: t('Merge {source} into {target}…', { source: target, target: dragged }), disabled: busy, onSelect: () => actions.merge(target, target) },
       ];
     }
     return [
-      { label: `Check out ${target} to merge ${dragged} into it`, onSelect: () => actions.checkout({ kind: 'branch', name: target }) },
+      { label: t('Check out {target} to merge {source} into it', { target, source: dragged }), onSelect: () => actions.checkout({ kind: 'branch', name: target }) },
     ];
   };
 
@@ -128,16 +129,16 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
   );
 
   return (
-    <aside className="left-panel" aria-label="Branches and tags">
-      <input className="ref-filter" type="search" placeholder="Filter" aria-label="Filter branches and tags" value={filter} onChange={(event) => setFilter(event.target.value)} />
+    <aside className="left-panel" aria-label={t('Branches and tags')}>
+      <input className="ref-filter" type="search" placeholder={t('Filter')} aria-label={t('Filter branches and tags')} value={filter} onChange={(event) => setFilter(event.target.value)} />
       <div className="ref-sections">
         <Section
           id="local"
-          title="Local"
+          title={t('Local')}
           count={data.branches.length}
           collapsed={Boolean(collapsed['local'])}
           onToggle={toggle}
-          action={head && addButton('Create branch', () => actions.createBranch(head, headLabel(data)))}
+          action={head && addButton(t('Create branch'), () => actions.createBranch(head, headLabel(data)))}
         >
           {local.map((branch) => (
             <li
@@ -158,33 +159,33 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               }}
               onContextMenu={(event) =>
                 openMenu(event, [
-                  { label: `Check out ${branch.name}`, disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
-                  { label: 'Check out in a new working tree…', disabled: branch.current || (worktreeList.data ?? []).some((tree) => tree.branch === branch.name), onSelect: () => actions.addWorktree(branch.name) },
+                  { label: t('Check out {branch}', { branch: branch.name }), disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
+                  { label: t('Check out in a new working tree…'), disabled: branch.current || (worktreeList.data ?? []).some((tree) => tree.branch === branch.name), onSelect: () => actions.addWorktree(branch.name) },
                   'separator',
-                  { label: `Merge ${branch.name} into ${current}…`, disabled: branch.current || busy, onSelect: () => actions.merge(branch.name, branch.name) },
-                  { label: `Rebase ${current} onto ${branch.name}…`, disabled: branch.current || busy, onSelect: () => actions.rebase(branch.name, branch.name) },
+                  { label: t('Merge {source} into {target}…', { source: branch.name, target: current }), disabled: branch.current || busy, onSelect: () => actions.merge(branch.name, branch.name) },
+                  { label: t('Rebase {source} onto {target}…', { source: current, target: branch.name }), disabled: branch.current || busy, onSelect: () => actions.rebase(branch.name, branch.name) },
                   'separator',
-                  { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
-                  { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },
+                  { label: t('Create branch here…'), onSelect: () => actions.createBranch(branch.sha, branch.name) },
+                  { label: t('Create tag here…'), onSelect: () => actions.createTag(branch.sha, branch.name) },
                   'separator',
                   ...filterItems(`refs/heads/${branch.name}`),
                   'separator',
                   branch.upstream
-                    ? { label: `Change upstream (now ${branch.upstream})…`, onSelect: () => actions.setUpstream(branch.name) }
-                    : { label: 'Set upstream…', disabled: data.remoteBranches.length === 0, onSelect: () => actions.setUpstream(branch.name) },
-                  ...(branch.upstream ? [{ label: `Stop tracking ${branch.upstream}`, onSelect: () => actions.unsetUpstream(branch.name) }] : []),
+                    ? { label: t('Change upstream (now {upstream})…', { upstream: branch.upstream }), onSelect: () => actions.setUpstream(branch.name) }
+                    : { label: t('Set upstream…'), disabled: data.remoteBranches.length === 0, onSelect: () => actions.setUpstream(branch.name) },
+                  ...(branch.upstream ? [{ label: t('Stop tracking {upstream}', { upstream: branch.upstream }), onSelect: () => actions.unsetUpstream(branch.name) }] : []),
                   'separator',
-                  { label: 'Rename…', onSelect: () => actions.renameBranch(branch.name) },
-                  { label: 'Delete…', danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
+                  { label: t('Rename…'), onSelect: () => actions.renameBranch(branch.name) },
+                  { label: t('Delete…'), danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
                   'separator',
-                  { label: 'Copy branch name', onSelect: () => copyText(branch.name) },
+                  { label: t('Copy branch name'), onSelect: () => copyText(branch.name) },
                 ])
               }
             >
               <span className={`codicon ${branch.current ? 'codicon-check' : 'codicon-git-branch'}`} aria-hidden="true" />
               <span className="ref-name">{branch.name}</span>
               {(branch.ahead > 0 || branch.behind > 0) && (
-                <span className="ahead-behind-badge" title={`${branch.ahead} ahead, ${branch.behind} behind ${branch.upstream}`}>
+                <span className="ahead-behind-badge" title={t('{ahead} ahead, {behind} behind {upstream}', { ahead: branch.ahead, behind: branch.behind, upstream: branch.upstream ?? '' })}>
                   {branch.ahead > 0 && `↑${branch.ahead}`}
                   {branch.behind > 0 && `↓${branch.behind}`}
                 </span>
@@ -195,12 +196,12 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
 
         <Section
           id="remote"
-          title="Remote"
+          title={t('Remote')}
           count={data.remoteBranches.length}
           collapsed={Boolean(collapsed['remote'])}
           onToggle={toggle}
           action={
-            <button type="button" className="icon-button" aria-label="Add remote" title="Add remote" onClick={actions.addRemote}>
+            <button type="button" className="icon-button" aria-label={t('Add remote')} title={t('Add remote')} onClick={actions.addRemote}>
               <span className="codicon codicon-add" aria-hidden="true" />
             </button>
           }
@@ -219,13 +220,13 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
                   onClick={() => toggle(key)}
                   onContextMenu={(event) =>
                     openMenu(event, [
-                      { label: `Fetch ${name}`, onSelect: () => actions.fetchRemote(name) },
+                      { label: t('Fetch {remote}', { remote: name }), onSelect: () => actions.fetchRemote(name) },
                       'separator',
-                      { label: 'Edit URL…', onSelect: () => actions.editRemote(name) },
-                      { label: 'Rename…', onSelect: () => actions.renameRemote(name) },
-                      { label: 'Remove…', danger: true, onSelect: () => actions.removeRemote(name) },
+                      { label: t('Edit URL…'), onSelect: () => actions.editRemote(name) },
+                      { label: t('Rename…'), onSelect: () => actions.renameRemote(name) },
+                      { label: t('Remove…'), danger: true, onSelect: () => actions.removeRemote(name) },
                       'separator',
-                      { label: 'Copy URL', onSelect: () => copyText(data.remoteUrls[name]?.fetch ?? '') },
+                      { label: t('Copy URL'), onSelect: () => copyText(data.remoteUrls[name]?.fetch ?? '') },
                     ])
                   }
                 >
@@ -247,17 +248,17 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
                         onDragStart={(event) => event.dataTransfer.setData(REF_MIME, branch.name)}
                         onContextMenu={(event) =>
                           openMenu(event, [
-                            { label: `Check out ${branch.name}`, onSelect: () => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote }) },
+                            { label: t('Check out {branch}', { branch: branch.name }), onSelect: () => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote }) },
                             'separator',
-                            { label: `Merge ${branch.name} into ${current}…`, disabled: busy, onSelect: () => actions.merge(branch.name, branch.name) },
-                            { label: `Rebase ${current} onto ${branch.name}…`, disabled: busy, onSelect: () => actions.rebase(branch.name, branch.name) },
+                            { label: t('Merge {source} into {target}…', { source: branch.name, target: current }), disabled: busy, onSelect: () => actions.merge(branch.name, branch.name) },
+                            { label: t('Rebase {source} onto {target}…', { source: current, target: branch.name }), disabled: busy, onSelect: () => actions.rebase(branch.name, branch.name) },
                             'separator',
-                            { label: 'Create branch here…', onSelect: () => actions.createBranch(branch.sha, branch.name) },
-                            { label: 'Create tag here…', onSelect: () => actions.createTag(branch.sha, branch.name) },
+                            { label: t('Create branch here…'), onSelect: () => actions.createBranch(branch.sha, branch.name) },
+                            { label: t('Create tag here…'), onSelect: () => actions.createTag(branch.sha, branch.name) },
                             'separator',
                             ...filterItems(`refs/remotes/${branch.name}`),
                             'separator',
-                            { label: 'Copy branch name', onSelect: () => copyText(branch.name) },
+                            { label: t('Copy branch name'), onSelect: () => copyText(branch.name) },
                           ])
                         }
                       >
@@ -274,27 +275,27 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
 
         <Section
           id="tags"
-          title="Tags"
+          title={t('Tags')}
           count={data.tags.length}
           collapsed={Boolean(collapsed['tags'])}
           onToggle={toggle}
-          action={head && addButton('Create tag', () => actions.createTag(head, headLabel(data)))}
+          action={head && addButton(t('Create tag'), () => actions.createTag(head, headLabel(data)))}
         >
           {tags.map((tag) => (
             <li
               key={tag.name}
               className="ref-item"
               data-ref={tag.name}
-              title={tag.annotated ? `${tag.name} (annotated)` : tag.name}
+              title={tag.annotated ? t('{tag} (annotated)', { tag: tag.name }) : tag.name}
               onClick={() => onSelectCommit(tag.sha)}
               onContextMenu={(event) =>
                 openMenu(event, [
-                  { label: `Check out ${tag.name} (detached)`, onSelect: () => actions.checkout({ kind: 'commit', sha: tag.sha }) },
-                  { label: 'Create branch here…', onSelect: () => actions.createBranch(tag.sha, tag.name) },
+                  { label: t('Check out {tag} (detached)', { tag: tag.name }), onSelect: () => actions.checkout({ kind: 'commit', sha: tag.sha }) },
+                  { label: t('Create branch here…'), onSelect: () => actions.createBranch(tag.sha, tag.name) },
                   'separator',
-                  { label: 'Delete tag…', danger: true, onSelect: () => actions.deleteTag(tag.name) },
+                  { label: t('Delete tag…'), danger: true, onSelect: () => actions.deleteTag(tag.name) },
                   'separator',
-                  { label: 'Copy tag name', onSelect: () => copyText(tag.name) },
+                  { label: t('Copy tag name'), onSelect: () => copyText(tag.name) },
                 ])
               }
             >
@@ -306,12 +307,12 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
 
         <Section
           id="stashes"
-          title="Stashes"
+          title={t('Stashes')}
           count={data.stashes.length}
           collapsed={Boolean(collapsed['stashes'])}
           onToggle={toggle}
           action={
-            <button type="button" className="icon-button" aria-label="Stash changes" title="Stash changes" onClick={actions.stash} disabled={data.changes.length === 0}>
+            <button type="button" className="icon-button" aria-label={t('Stash changes')} title={t('Stash changes')} onClick={actions.stash} disabled={data.changes.length === 0}>
               <span className="codicon codicon-add" aria-hidden="true" />
             </button>
           }
@@ -328,12 +329,12 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
                 onDoubleClick={() => actions.applyStash(stash.sha)}
                 onContextMenu={(event) =>
                   openMenu(event, [
-                    { label: 'Apply stash', onSelect: () => actions.applyStash(stash.sha) },
-                    { label: 'Pop stash', onSelect: () => actions.popStash(stash.sha) },
+                    { label: t('Apply stash'), onSelect: () => actions.applyStash(stash.sha) },
+                    { label: t('Pop stash'), onSelect: () => actions.popStash(stash.sha) },
                     'separator',
-                    { label: 'Delete stash…', danger: true, onSelect: () => actions.dropStash(stash.sha, label) },
+                    { label: t('Delete stash…'), danger: true, onSelect: () => actions.dropStash(stash.sha, label) },
                     'separator',
-                    { label: 'Copy stash message', onSelect: () => copyText(stash.message) },
+                    { label: t('Copy stash message'), onSelect: () => copyText(stash.message) },
                   ])
                 }
               >
@@ -348,43 +349,43 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
 
         <Section
           id="submodules"
-          title="Submodules"
+          title={t('Submodules')}
           count={submoduleList.data?.length ?? 0}
           collapsed={Boolean(collapsed['submodules'])}
           onToggle={toggle}
           action={
-            <button type="button" className="icon-button" aria-label="Add a submodule" title="Add a submodule" onClick={actions.addSubmodule}>
+            <button type="button" className="icon-button" aria-label={t('Add a submodule')} title={t('Add a submodule')} onClick={actions.addSubmodule}>
               <span className="codicon codicon-add" aria-hidden="true" />
             </button>
           }
         >
           {submodules.map((submodule) => {
             const ready = submodule.state !== 'uninitialized';
-            const note = { uninitialized: 'not initialized', current: '', moved: 'at another commit', conflict: 'conflict' }[submodule.state];
+            const note = { uninitialized: t('not initialized'), current: '', moved: t('at another commit'), conflict: t('conflict') }[submodule.state];
             return (
               <li
                 key={submodule.path}
                 className={`ref-item submodule ${submodule.state}`}
                 data-submodule={submodule.path}
-                title={`${submodule.path} — ${submodule.url}${note ? ` (${note})` : ''}${submodule.dirty ? ', changed inside' : ''}`}
+                title={t('{path} — {url}{note}{dirty}', { path: submodule.path, url: submodule.url, note: note ? ` (${note})` : '', dirty: submodule.dirty ? t(', changed inside') : '' })}
                 onDoubleClick={() => (ready ? actions.openSubmodule(submodule.path) : actions.updateSubmodules(submodule.path))}
                 onContextMenu={(event) =>
                   openMenu(event, [
-                    { label: 'Open in a new tab', disabled: !ready, onSelect: () => actions.openSubmodule(submodule.path) },
-                    { label: ready ? 'Update' : 'Initialize and update', onSelect: () => actions.updateSubmodules(submodule.path) },
-                    { label: 'Update all submodules', onSelect: () => actions.updateSubmodules(null) },
-                    { label: 'Sync URLs from .gitmodules', onSelect: actions.syncSubmodules },
+                    { label: t('Open in a new tab'), disabled: !ready, onSelect: () => actions.openSubmodule(submodule.path) },
+                    { label: ready ? t('Update') : t('Initialize and update'), onSelect: () => actions.updateSubmodules(submodule.path) },
+                    { label: t('Update all submodules'), onSelect: () => actions.updateSubmodules(null) },
+                    { label: t('Sync URLs from .gitmodules'), onSelect: actions.syncSubmodules },
                     'separator',
-                    { label: 'Copy path', onSelect: () => copyText(submodule.path) },
-                    { label: 'Copy URL', onSelect: () => copyText(submodule.url) },
+                    { label: t('Copy path'), onSelect: () => copyText(submodule.path) },
+                    { label: t('Copy URL'), onSelect: () => copyText(submodule.url) },
                     'separator',
-                    { label: 'Remove submodule…', danger: true, onSelect: () => actions.removeSubmodule(submodule.path) },
+                    { label: t('Remove submodule…'), danger: true, onSelect: () => actions.removeSubmodule(submodule.path) },
                   ])
                 }
               >
                 <span className={`codicon ${ready ? 'codicon-file-submodule' : 'codicon-cloud-download'}`} aria-hidden="true" />
                 <span className="ref-name">{submodule.path}</span>
-                {(note || submodule.dirty) && <span className="submodule-state">{[note, submodule.dirty && 'changed'].filter(Boolean).join(', ')}</span>}
+                {(note || submodule.dirty) && <span className="submodule-state">{[note, submodule.dirty && t('changed')].filter(Boolean).join(', ')}</span>}
               </li>
             );
           })}
@@ -392,7 +393,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
 
         <Section
           id="gitflow"
-          title="Gitflow"
+          title={t('Gitflow')}
           count={flows.length}
           collapsed={Boolean(collapsed['gitflow'])}
           onToggle={toggle}
@@ -401,15 +402,15 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               <button
                 type="button"
                 className="icon-button"
-                aria-label="Start a feature, release or hotfix"
-                title="Start a feature, release or hotfix"
+                aria-label={t('Start a feature, release or hotfix')}
+                title={t('Start a feature, release or hotfix')}
                 onClick={(event) =>
                   openMenu(event, [
-                    { label: 'Start a feature…', onSelect: () => gitflow.start('feature') },
-                    { label: 'Start a release…', onSelect: () => gitflow.start('release') },
-                    { label: 'Start a hotfix…', onSelect: () => gitflow.start('hotfix') },
+                    { label: t('Start a feature…'), onSelect: () => gitflow.start('feature') },
+                    { label: t('Start a release…'), onSelect: () => gitflow.start('release') },
+                    { label: t('Start a hotfix…'), onSelect: () => gitflow.start('hotfix') },
                     'separator',
-                    { label: 'Gitflow settings…', onSelect: gitflow.init },
+                    { label: t('Gitflow settings…'), onSelect: gitflow.init },
                   ])
                 }
               >
@@ -421,7 +422,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
           {flowConfig === null && (
             <li className="ref-item gitflow-setup">
               <button type="button" className="link-button" onClick={gitflow.init}>
-                Set up Gitflow…
+                {t('Set up Gitflow…')}
               </button>
             </li>
           )}
@@ -435,54 +436,58 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               onDoubleClick={() => !branch.current && actions.checkout({ kind: 'branch', name: branch.name })}
               onContextMenu={(event) =>
                 openMenu(event, [
-                  { label: `Finish ${kind} ${name}…`, onSelect: () => gitflow.finish(branch.name) },
-                  { label: `Check out ${branch.name}`, disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
+                  { label: t('Finish {kind} {name}…', { kind, name }), onSelect: () => gitflow.finish(branch.name) },
+                  { label: t('Check out {branch}', { branch: branch.name }), disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
                   'separator',
-                  { label: 'Delete…', danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
+                  { label: t('Delete…'), danger: true, disabled: branch.current, onSelect: () => actions.deleteBranch(branch.name) },
                 ])
               }
             >
               <span className={`codicon ${kind === 'feature' ? 'codicon-sparkle' : kind === 'release' ? 'codicon-rocket' : 'codicon-flame'}`} aria-hidden="true" />
               <span className="ref-name">{name}</span>
-              <span className="submodule-state">{kind}</span>
+              <span className="submodule-state">{translate(`flow|${kind}`)}</span>
             </li>
           ))}
         </Section>
 
         <Section
           id="worktrees"
-          title="Worktrees"
+          title={t('Worktrees')}
           count={worktreeList.data?.length ?? 0}
           collapsed={Boolean(collapsed['worktrees'])}
           onToggle={toggle}
           action={
-            <button type="button" className="icon-button" aria-label="Add a working tree" title="Add a working tree" onClick={() => actions.addWorktree()}>
+            <button type="button" className="icon-button" aria-label={t('Add a working tree')} title={t('Add a working tree')} onClick={() => actions.addWorktree()}>
               <span className="codicon codicon-add" aria-hidden="true" />
             </button>
           }
         >
           {worktrees.map((tree) => {
             const name = tree.path.split(/[\\/]/).filter(Boolean).pop() ?? tree.path;
-            const note = [tree.current && 'this tab', tree.main && 'main', tree.locked !== null && 'locked', tree.prunable && 'missing'].filter(Boolean).join(', ');
+            const note = [tree.current && t('this tab'), tree.main && t('worktree|main'), tree.locked !== null && t('locked'), tree.prunable && t('missing')].filter(Boolean).join(', ');
             return (
               <li
                 key={tree.path}
                 className={`ref-item worktree${tree.current ? ' current' : ''}${tree.prunable ? ' prunable' : ''}`}
                 data-worktree={tree.path}
-                title={`${tree.path}${tree.branch ? ` — ${tree.branch}` : tree.head ? ` — detached at ${tree.head.slice(0, 7)}` : ''}${tree.locked ? ` (locked: ${tree.locked})` : ''}`}
+                title={t('{path}{ref}{lock}', {
+                  path: tree.path,
+                  ref: tree.branch ? ` — ${tree.branch}` : tree.head ? ` — ${t('detached at {sha}', { sha: tree.head.slice(0, 7) })}` : '',
+                  lock: tree.locked ? ` (${t('locked: {reason}', { reason: tree.locked })})` : '',
+                })}
                 onDoubleClick={() => !tree.current && !tree.prunable && !tree.bare && actions.openWorktree(tree.path)}
                 onContextMenu={(event) =>
                   openMenu(event, [
-                    { label: 'Open in a new tab', disabled: tree.current || tree.prunable || tree.bare, onSelect: () => actions.openWorktree(tree.path) },
+                    { label: t('Open in a new tab'), disabled: tree.current || tree.prunable || tree.bare, onSelect: () => actions.openWorktree(tree.path) },
                     'separator',
                     tree.locked === null
-                      ? { label: 'Lock', disabled: tree.main, onSelect: () => actions.lockWorktree(tree.path, true) }
-                      : { label: 'Unlock', onSelect: () => actions.lockWorktree(tree.path, false) },
-                    { label: 'Prune missing working trees', onSelect: actions.pruneWorktrees },
+                      ? { label: t('Lock'), disabled: tree.main, onSelect: () => actions.lockWorktree(tree.path, true) }
+                      : { label: t('Unlock'), onSelect: () => actions.lockWorktree(tree.path, false) },
+                    { label: t('Prune missing working trees'), onSelect: actions.pruneWorktrees },
                     'separator',
-                    { label: 'Copy path', onSelect: () => copyText(tree.path) },
+                    { label: t('Copy path'), onSelect: () => copyText(tree.path) },
                     'separator',
-                    { label: 'Remove working tree…', danger: true, disabled: tree.main || tree.current || tree.locked !== null, onSelect: () => actions.removeWorktree(tree.path) },
+                    { label: t('Remove working tree…'), danger: true, disabled: tree.main || tree.current || tree.locked !== null, onSelect: () => actions.removeWorktree(tree.path) },
                   ])
                 }
               >
@@ -509,10 +514,11 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
   const pulls = useCommand('hosting:pulls', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
   const issues = useCommand('hosting:issues', [repo, 'open'], { reloadKey: hosting.reloadKey, keepPrevious: true });
   const server = new URL(hosting.context.account.url).host;
-  const term = pullTerm(hosting.context.account.provider);
+  // GitLab says merge request; whole messages, since Russian does not pluralize by an appended "s".
+  const merge = pullTerm(hosting.context.account.provider) === 'Merge request';
   const buttons = (create: string, onCreate: () => void) => (
     <span className="ref-section-actions">
-      <button type="button" className="icon-button" aria-label={`Refresh from ${server}`} title={`Refresh from ${server}`} onClick={hosting.onRefresh}>
+      <button type="button" className="icon-button" aria-label={t('Refresh from {server}', { server })} title={t('Refresh from {server}', { server })} onClick={hosting.onRefresh}>
         <span className="codicon codicon-refresh" aria-hidden="true" />
       </button>
       <button type="button" className="icon-button" aria-label={create} title={create} onClick={onCreate}>
@@ -532,9 +538,9 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
         onClick={() => hosting.onOpen({ kind, number: entry.number })}
         onContextMenu={(event) =>
           openMenu(event, [
-            { label: 'Show', onSelect: () => hosting.onOpen({ kind, number: entry.number }) },
-            { label: 'Copy link', onSelect: () => copyText(entry.webUrl) },
-            { label: 'Copy number', onSelect: () => copyText(label) },
+            { label: t('Show'), onSelect: () => hosting.onOpen({ kind, number: entry.number }) },
+            { label: t('Copy link'), onSelect: () => copyText(entry.webUrl) },
+            { label: t('Copy number'), onSelect: () => copyText(label) },
           ])
         }
       >
@@ -549,15 +555,15 @@ function HostingSections({ hosting, repo, collapsed, onToggle, match, openMenu }
   const error = (text: string | null) => text && <li className="ref-error setting-error" title={text}>{text}</li>;
   return (
     <>
-      <Section id="pulls" title={`${term}s`} count={pulls.data?.length ?? 0} collapsed={Boolean(collapsed['pulls'])} onToggle={onToggle} action={buttons(`Create a ${term.toLowerCase()}`, hosting.onCreatePull)}>
+      <Section id="pulls" title={merge ? t('Merge requests') : t('Pull requests')} count={pulls.data?.length ?? 0} collapsed={Boolean(collapsed['pulls'])} onToggle={onToggle} action={buttons(merge ? t('Create a merge request') : t('Create a pull request'), hosting.onCreatePull)}>
         {error(pulls.error)}
-        {pulls.data?.filter((pull) => match(`${pull.number} ${pull.title} ${pull.head}`)).map((pull) => item('pull', pull, 'git-pull-request', pull.draft ? 'draft' : pull.head))}
-        {pulls.data?.length === 0 && <li className="empty-note">No open {term.toLowerCase()}s</li>}
+        {pulls.data?.filter((pull) => match(`${pull.number} ${pull.title} ${pull.head}`)).map((pull) => item('pull', pull, 'git-pull-request', pull.draft ? t('draft') : pull.head))}
+        {pulls.data?.length === 0 && <li className="empty-note">{merge ? t('No open merge requests') : t('No open pull requests')}</li>}
       </Section>
-      <Section id="issues" title="Issues" count={issues.data?.length ?? 0} collapsed={Boolean(collapsed['issues'])} onToggle={onToggle} action={buttons('Create an issue', hosting.onCreateIssue)}>
+      <Section id="issues" title={t('Issues')} count={issues.data?.length ?? 0} collapsed={Boolean(collapsed['issues'])} onToggle={onToggle} action={buttons(t('Create an issue'), hosting.onCreateIssue)}>
         {error(issues.error)}
         {issues.data?.filter((issue) => match(`${issue.number} ${issue.title}`)).map((issue) => item('issue', issue, 'issues', issue.labels.map((label) => label.name).join(', ')))}
-        {issues.data?.length === 0 && <li className="empty-note">No open issues</li>}
+        {issues.data?.length === 0 && <li className="empty-note">{t('No open issues')}</li>}
       </Section>
     </>
   );

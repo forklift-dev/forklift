@@ -1,4 +1,5 @@
 import type { GitToolInfo, GitToolKind, GitToolSetting } from '../../shared/settings';
+import { t } from '../../shared/i18n';
 import type { GitCli } from '../git/cli';
 import type { Runner } from '../process/types';
 import { findExecutable } from './which';
@@ -142,7 +143,10 @@ export class DiffTools {
     if (setting.mode === 'tool') return { name: setting.name, configArgs: [], source: 'settings' };
     if (setting.mode === 'custom') {
       if (!(await findExecutable(setting.command, await this.runner.environment()))) {
-        throw new DiffToolError(`${kind === 'diff' ? 'Diff' : 'Merge'} tool command "${setting.command}" was not found. Choose another one in Preferences → External tools.`);
+        throw new DiffToolError(t('{tool} tool command "{command}" was not found. Choose another one in Preferences → External tools.', {
+          tool: kind === 'diff' ? t('tool|Diff') : t('tool|Merge'),
+          command: setting.command,
+        }));
       }
       const section = `${kind}tool.${CUSTOM_TOOL}`;
       const configArgs = ['-c', `${section}.cmd=${gitToolCommand(setting.command, setting.args)}`];
@@ -155,10 +159,7 @@ export class DiffTools {
     const hasVsCode = !configured && (await findExecutable('code', await this.runner.environment())) !== null;
     const choice = chooseTool(kind, configured, parseToolHelp(help), hasVsCode);
     if (!choice) {
-      throw new DiffToolError(
-        `No graphical ${kind} tool found. Install one (e.g. Meld or KDiff3) or set it with ` +
-          `"git config --global ${kind}.tool <name>".`,
-      );
+      throw new DiffToolError(t('No graphical {kind} tool found. Install one (e.g. Meld or KDiff3) or set it with "git config --global {kind}.tool <name>".', { kind }));
     }
     return choice;
   }
@@ -180,7 +181,7 @@ export class DiffTools {
   }
 
   private async exclusive<T>(key: string, action: () => Promise<T>): Promise<T> {
-    if (this.open.has(key)) throw new DiffToolError('This file is already open in the external tool');
+    if (this.open.has(key)) throw new DiffToolError(t('This file is already open in the external tool'));
     this.open.add(key);
     try {
       return await action();

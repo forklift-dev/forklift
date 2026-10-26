@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { MAX_ACCOUNTS, matchRemote, normalizeServerUrl, type HostingAccount, type HostingProvider, type HostingRepo, type RepoHosting } from '../../shared/hosting';
+import { t } from '../../shared/i18n';
 import type { CredentialFields } from '../askpass/credentials';
 import { createClient, HostingError, type Fetch, type HostingApi } from './client';
 import type { TokenStore } from './tokens';
@@ -27,18 +28,18 @@ export class HostingService {
   /** Checks the token with the server, then keeps the account (the same user on the same server: a new token). */
   async add(provider: HostingProvider, rawUrl: string, token: string): Promise<HostingAccount> {
     const url = normalizeServerUrl(rawUrl);
-    if (!url) throw new Error(`"${rawUrl}" is not a server address`);
+    if (!url) throw new Error(t('"{address}" is not a server address', { address: rawUrl }));
     const trimmed = token.trim();
-    if (!trimmed || trimmed.length > MAX_TOKEN || /\s/.test(trimmed)) throw new Error('The token must be one word, as the server showed it');
+    if (!trimmed || trimmed.length > MAX_TOKEN || /\s/.test(trimmed)) throw new Error(t('The token must be one word, as the server showed it'));
     const user = await createClient(provider, url, trimmed, this.deps.fetch).user().catch((error: unknown) => {
       // An address typed without a scheme is tried over HTTPS only; never quietly over plain HTTP (the token would travel unencrypted).
-      if (error instanceof HostingError && error.status === null && !rawUrl.includes('://')) throw new HostingError(`${error.message}. If the server has no HTTPS, type its address with http://`);
+      if (error instanceof HostingError && error.status === null && !rawUrl.includes('://')) throw new HostingError(t('{message}. If the server has no HTTPS, type its address with http://', { message: error.message }));
       throw error;
     });
-    if (!user.login) throw new HostingError('The server did not say whose token this is');
+    if (!user.login) throw new HostingError(t('The server did not say whose token this is'));
     const accounts = this.accounts();
     const existing = accounts.find((account) => account.provider === provider && account.url === url && account.username === user.login);
-    if (!existing && accounts.length >= MAX_ACCOUNTS) throw new Error(`Up to ${MAX_ACCOUNTS} accounts can be added`);
+    if (!existing && accounts.length >= MAX_ACCOUNTS) throw new Error(t('Up to {count} accounts can be added', { count: MAX_ACCOUNTS }));
     const account: HostingAccount = { id: existing?.id ?? randomBytes(6).toString('hex'), provider, url, username: user.login, name: user.name };
     await this.deps.tokens.set(account.id, url, trimmed);
     await this.deps.saveAccounts(existing ? accounts.map((a) => (a.id === account.id ? account : a)) : [...accounts, account]);
@@ -56,13 +57,13 @@ export class HostingService {
 
   account(id: string): HostingAccount {
     const account = this.accounts().find((candidate) => candidate.id === id);
-    if (!account) throw new Error('There is no such account');
+    if (!account) throw new Error(t('There is no such account'));
     return account;
   }
 
   async client(account: HostingAccount): Promise<HostingApi> {
     const token = await this.deps.tokens.get(account.id, account.url);
-    if (!token) throw new HostingError(`No token is saved for ${account.username} on ${new URL(account.url).host}: add the account again in Preferences → Integrations`);
+    if (!token) throw new HostingError(t('No token is saved for {username} on {host}: add the account again in Preferences → Integrations', { username: account.username, host: new URL(account.url).host }));
     return createClient(account.provider, account.url, token, this.deps.fetch);
   }
 

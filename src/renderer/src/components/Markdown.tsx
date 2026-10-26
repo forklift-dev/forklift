@@ -5,6 +5,7 @@ import { PROVIDERS, type HostingProvider } from '../../../shared/hosting';
 import { monaco } from '../monaco/setup';
 import { REF, remarkRefs, urlTransform } from '../markdownRefs';
 import type { HostingItem } from './HostingView';
+import { t } from '../../../shared/i18n';
 
 // Markdown of pull requests, issues and comments: written by other people, so untrusted. It becomes React
 // elements only (no raw HTML, no innerHTML); links leave through the window's https-only handler; images are
@@ -84,7 +85,7 @@ function Link({ href, children }: { href?: string; children?: ReactNode }) {
     }
     if (what === 'sha') {
       return (
-        <button type="button" className="link-button hash" title="Show in the graph" onClick={() => onShowCommit(value)}>
+        <button type="button" className="link-button hash" title={t('Show in the graph')} onClick={() => onShowCommit(value)}>
           {children}
         </button>
       );
@@ -99,7 +100,7 @@ function Link({ href, children }: { href?: string; children?: ReactNode }) {
 }
 
 function Image({ src, alt }: { src?: string | Blob; alt?: string }) {
-  const label = `image${alt ? `: ${alt}` : ''}`;
+  const label = alt ? t('image: {alt}', { alt }) : t('image');
   return typeof src === 'string' && /^https:/i.test(src) ? (
     <a className="md-image" href={src} target="_blank" rel="noreferrer" title={src}>
       [{label}]
@@ -118,7 +119,7 @@ function Code({ className, children }: { className?: string; children?: ReactNod
 }
 
 const Pre = ({ children }: { children?: ReactNode }) => <>{children}</>;
-const Checkbox = ({ checked }: { checked?: boolean }) => <input type="checkbox" checked={Boolean(checked)} disabled aria-label={checked ? 'Done' : 'Not done'} />;
+const Checkbox = ({ checked }: { checked?: boolean }) => <input type="checkbox" checked={Boolean(checked)} disabled aria-label={checked ? t('Done') : t('Not done')} />;
 
 const COMPONENTS: Components = { a: Link, img: Image, pre: Pre, code: Code, input: Checkbox };
 

@@ -1,4 +1,5 @@
 import type { CheckoutTarget } from '../../shared/branches';
+import { t } from '../../shared/i18n';
 import type { ResetMode } from './commitOps';
 import type { RepoPosition, UndoService, UndoStep } from './undo';
 
@@ -44,7 +45,7 @@ export class UndoRecorder {
     if (target.kind === 'remote' && createdBefore === null && after.branch) undo.push({ kind: 'git', args: ['branch', '-D', after.branch] });
     const what = target.kind === 'commit' ? short(target.sha) : target.name;
     this.undo.record(root, {
-      label: `checkout of ${what}`,
+      label: t('checkout of {target}', { target: what }),
       undo,
       redo: [{ kind: 'checkout', target }],
       after: { head: after.head, branch: after.branch },
@@ -58,7 +59,7 @@ export class UndoRecorder {
     const result = await action();
     const ref = `refs/heads/${name}`;
     this.undo.record(root, {
-      label: `branch ${name}`,
+      label: t('branch {name}', { name }),
       undo: [...(checkout && before.head ? [{ kind: 'checkout' as const, target: backTo(before) }] : []), { kind: 'git', args: ['branch', '-D', name] }],
       redo: [{ kind: 'git', args: ['branch', name, sha] }, ...(checkout ? [{ kind: 'checkout' as const, target: { kind: 'branch' as const, name } }] : [])],
       after: { refs: { [ref]: sha }, ...(checkout && { branch: name }) },
@@ -71,7 +72,7 @@ export class UndoRecorder {
     const sha = await this.undo.rev(root, `refs/heads/${from}`);
     const result = await action();
     this.undo.record(root, {
-      label: `rename of ${from} to ${to}`,
+      label: t('rename of {from} to {to}', { from, to }),
       undo: [{ kind: 'git', args: ['branch', '-m', to, from] }],
       redo: [{ kind: 'git', args: ['branch', '-m', from, to] }],
       after: { refs: { [`refs/heads/${to}`]: sha, [`refs/heads/${from}`]: null } },
@@ -85,7 +86,7 @@ export class UndoRecorder {
     const result = await action();
     if (sha) {
       this.undo.record(root, {
-        label: `deletion of branch ${name}`,
+        label: t('deletion of branch {name}', { name }),
         undo: [{ kind: 'git', args: ['branch', name, sha] }],
         redo: [{ kind: 'git', args: ['branch', '-D', name] }],
         after: { refs: { [`refs/heads/${name}`]: null } },
@@ -106,7 +107,7 @@ export class UndoRecorder {
     const remove: UndoStep = { kind: 'git', args: ['tag', '-d', name] };
     const restore: UndoStep = { kind: 'git', args: ['update-ref', ref, object] };
     this.undo.record(root, {
-      label: created ? `tag ${name}` : `deletion of tag ${name}`,
+      label: created ? t('tag {name}', { name }) : t('deletion of tag {name}', { name }),
       undo: [created ? remove : restore],
       redo: [created ? restore : remove],
       after: { refs: { [ref]: after } },
@@ -127,7 +128,7 @@ export class UndoRecorder {
     if (mode === 'mixed' && index) undo.push({ kind: 'git', args: ['read-tree', index] });
     if (mode === 'hard' && work) undo.push({ kind: 'git', args: ['stash', 'apply', '--index', work] });
     this.undo.record(root, {
-      label: `${mode} reset to ${short(after.head)}`,
+      label: t('{mode} reset to {sha}', { mode, sha: short(after.head) }),
       undo,
       redo: [{ kind: 'git', args: ['reset', '-q', `--${mode}`, after.head] }],
       after: { head: after.head, branch: after.branch },
@@ -147,7 +148,7 @@ export class UndoRecorder {
     }
     const count = tracked.length + untracked.length;
     this.undo.record(root, {
-      label: count === 1 ? `discard of ${[...tracked, ...untracked][0]}` : `discard of ${count} files`,
+      label: count === 1 ? t('discard of {path}', { path: [...tracked, ...untracked][0]! }) : t('discard of {count} files', { count }),
       undo: [{ kind: 'restoreFiles', from: saved, paths: [...tracked, ...untracked] }],
       redo: [{ kind: 'discard', tracked, untracked }],
       after: { head: position.head },
@@ -161,7 +162,7 @@ export class UndoRecorder {
     const sha = await action();
     if (sha) {
       this.undo.record(root, {
-        label: 'stash',
+        label: t('undo-action|stash'),
         undo: [{ kind: 'stashApply', sha, drop: true }],
         redo: null,
         after: { refs: { 'refs/stash': sha } },
@@ -175,7 +176,7 @@ export class UndoRecorder {
   async stashDrop<T>(root: string, sha: string, message: string, action: () => Promise<T>): Promise<T> {
     const result = await action();
     this.undo.record(root, {
-      label: 'deletion of a stash',
+      label: t('deletion of a stash'),
       undo: [{ kind: 'git', args: ['stash', 'store', '-m', message, sha] }],
       redo: [{ kind: 'stashDrop', sha }],
       after: {},

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { HostingRepo } from '../../../shared/hosting';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
+import { t } from '../../../shared/i18n';
 
 /** Repositories of the accounts in Preferences → Integrations, for the Clone dialog; picking one fills the URL. */
 export function HostingRepoPicker({ selectedUrl, onPick }: { selectedUrl: string; onPick(repo: HostingRepo): void }) {
@@ -16,9 +17,9 @@ export function HostingRepoPicker({ selectedUrl, onPick }: { selectedUrl: string
   return (
     <div className="form-field hosting-repo-picker">
       <span className="hosting-picker-head">
-        From
+        {t('From')}
         {accounts.length > 1 ? (
-          <select aria-label="Account" value={account.id} onChange={(event) => setAccountId(event.target.value)}>
+          <select aria-label={t('Account')} value={account.id} onChange={(event) => setAccountId(event.target.value)}>
             {accounts.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.username} · {new URL(candidate.url).host}
@@ -30,12 +31,12 @@ export function HostingRepoPicker({ selectedUrl, onPick }: { selectedUrl: string
             {account.username} · {new URL(account.url).host}
           </strong>
         )}
-        <input type="search" aria-label="Filter repositories" placeholder="Filter" value={filter} onChange={(event) => setFilter(event.target.value)} />
+        <input type="search" aria-label={t('Filter repositories')} placeholder={t('Filter')} value={filter} onChange={(event) => setFilter(event.target.value)} />
       </span>
-      <ul className="hosting-repo-list" aria-label="Repositories on the server">
+      <ul className="hosting-repo-list" aria-label={t('Repositories on the server')}>
         {error && <li className="setting-error">{error}</li>}
-        {loading && !data && <li className="empty-note">Loading…</li>}
-        {data && shown.length === 0 && <li className="empty-note">No repositories</li>}
+        {loading && !data && <li className="empty-note">{t('Loading…')}</li>}
+        {data && shown.length === 0 && <li className="empty-note">{t('No repositories')}</li>}
         {shown.map((repo) => (
           <li key={repo.fullName}>
             <button type="button" className={repo.cloneUrl === selectedUrl ? 'selected' : undefined} data-repo={repo.fullName} title={repo.description || repo.fullName} onClick={() => onPick(repo)}>

@@ -32,14 +32,14 @@ import { useFormDialog } from './FormDialog';
 import { HostingView, type HostingItem } from './HostingView';
 import { useAppState } from '../state';
 import { pullTerm } from '../../../shared/hosting';
+import { t } from '../../../shared/i18n';
+import { tx } from '../i18n';
 
 interface RepoWorkspaceProps {
   data: RepoData;
   run: RunAction;
   runInBackground: RunAction;
 }
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /** Center: commit list or an open diff. Side: the selected commit's details, or working changes and the commit form. */
 export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps) {
@@ -100,15 +100,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const worktreeDiff = diffTarget?.kind === 'worktree' ? diffTarget : null;
 
   const confirmDiscard = (what: string) =>
-    confirm({ title: `Discard ${what}?`, detail: 'This cannot be undone.', confirmLabel: 'Discard', danger: true });
+    confirm({ title: t('Discard {what}?', { what }), detail: t('This cannot be undone.'), confirmLabel: t('Discard'), danger: true });
 
   const discardFiles = async (paths: string[]) => {
     const untracked = paths.filter((path) => data.changes.find((c) => c.path === path)?.kind === 'untracked').length;
-    const what = paths.length === 1 ? `changes in ${paths[0]}` : `changes in ${plural(paths.length, 'file')}`;
     const ok = await confirm({
-      title: `Discard ${what}?`,
-      detail: untracked ? `${plural(untracked, 'untracked file')} will be deleted. This cannot be undone.` : 'This cannot be undone.',
-      confirmLabel: 'Discard',
+      title: paths.length === 1 ? t('Discard changes in {path}?', { path: paths[0]! }) : t('Discard changes in {count} files?', { count: paths.length }),
+      detail: untracked ? t('{count} untracked files will be deleted. This cannot be undone.', { count: untracked }) : t('This cannot be undone.'),
+      confirmLabel: t('Discard'),
       danger: true,
     });
     if (ok) await run(() => invoke('index:discard', repo, paths));
@@ -162,18 +161,24 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
     // The branch's name on the server: its upstream there, or the same name.
     const upstream = data.branch.upstream;
     const pushed = upstream?.startsWith(`${remote}/`) ? upstream.slice(remote.length + 1) : data.branch.head;
-    const unpushed = !upstream?.startsWith(`${remote}/`) ? `${data.branch.head} is not on ${remote} yet: push it first.` : data.branch.ahead > 0 ? `${data.branch.ahead} commit(s) of ${data.branch.head} are not pushed yet; the ${term.toLowerCase()} will only have what is on ${remote}.` : null;
+    const unpushed = !upstream?.startsWith(`${remote}/`)
+      ? t('{branch} is not on {remote} yet: push it first.', { branch: data.branch.head, remote })
+      : data.branch.ahead > 0
+        ? t('{count} commits of {branch} are not pushed yet; the {term} will only have what is on {remote}.', { count: data.branch.ahead, branch: data.branch.head, term: term.toLowerCase(), remote })
+        : null;
     const bases = [...new Set([hosting.defaultBranch, ...data.remoteBranches.filter((branch) => branch.remote === remote).map((branch) => branch.name.slice(remote.length + 1)).filter((name) => name !== 'HEAD' && name !== pushed)])];
     void openForm({
-      title: `${term} from ${pushed}`,
-      detail: `${hosting.owner}/${hosting.name} on ${new URL(hosting.account.url).host}${unpushed ? `. ${unpushed}` : ''}`,
+      title: t('{term} from {branch}', { term, branch: pushed }),
+      detail: unpushed
+        ? t('{repository} on {host}. {warning}', { repository: `${hosting.owner}/${hosting.name}`, host: new URL(hosting.account.url).host, warning: unpushed })
+        : t('{repository} on {host}', { repository: `${hosting.owner}/${hosting.name}`, host: new URL(hosting.account.url).host }),
       fields: [
-        { name: 'title', label: 'Title', initial: pushed.replace(/^[\w-]+\//, '').replace(/[-_]+/g, ' ') },
-        { name: 'base', label: 'Into', type: 'select', options: bases.map((name) => ({ value: name, label: name })), initial: hosting.defaultBranch },
-        { name: 'body', label: 'Description', type: 'textarea' },
+        { name: 'title', label: t('Title'), initial: pushed.replace(/^[\w-]+\//, '').replace(/[-_]+/g, ' ') },
+        { name: 'base', label: t('Into'), type: 'select', options: bases.map((name) => ({ value: name, label: name })), initial: hosting.defaultBranch },
+        { name: 'body', label: t('Description'), type: 'textarea' },
       ],
-      confirmLabel: `Create ${term.toLowerCase()}`,
-      validate: async (values) => (String(values['title']).trim() ? null : 'A title is needed'),
+      confirmLabel: t('Create {term}', { term: term.toLowerCase() }),
+      validate: async (values) => (String(values['title']).trim() ? null : t('A title is needed')),
       submit: async (values) => {
         try {
           const pull = await invoke('hosting:createPull', repo, { head: pushed, base: String(values['base']), title: String(values['title']).trim(), body: String(values['body']) });
@@ -190,14 +195,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const createIssue = () => {
     if (!hosting) return;
     void openForm({
-      title: 'New issue',
-      detail: `${hosting.owner}/${hosting.name} on ${new URL(hosting.account.url).host}`,
+      title: t('New issue'),
+      detail: t('{repository} on {host}', { repository: `${hosting.owner}/${hosting.name}`, host: new URL(hosting.account.url).host }),
       fields: [
-        { name: 'title', label: 'Title' },
-        { name: 'body', label: 'Description', type: 'textarea' },
+        { name: 'title', label: t('Title') },
+        { name: 'body', label: t('Description'), type: 'textarea' },
       ],
-      confirmLabel: 'Create issue',
-      validate: async (values) => (String(values['title']).trim() ? null : 'A title is needed'),
+      confirmLabel: t('Create issue'),
+      validate: async (values) => (String(values['title']).trim() ? null : t('A title is needed')),
       submit: async (values) => {
         try {
           const issue = await invoke('hosting:createIssue', repo, { title: String(values['title']).trim(), body: String(values['body']) });
@@ -276,15 +281,15 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           onFilter={setFilter}
           hosting={hosting && { context: hosting, reloadKey: hostingReload, selected: hostingItem, onOpen: openHosting, onRefresh: () => setHostingReload((n) => n + 1), onCreatePull: createPull, onCreateIssue: createIssue }}
         />}
-      <Splitter label="Resize the left panel" className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
+      <Splitter label={t('Resize the left panel')} className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
       <CommitGraphHint data={data} filter={filter} run={run} />
       {lfsMissing && !lfsWarningHidden && (
         <div className="error-banner notices lfs-missing" role="alert">
-          This repository uses Git LFS, but git-lfs is not installed: LFS files show as pointers, and new ones would be committed as normal files. Install it from https://git-lfs.com and run “git lfs install” once.
+          {t('This repository uses Git LFS, but git-lfs is not installed: LFS files show as pointers, and new ones would be committed as normal files. Install it from https://git-lfs.com and run “git lfs install” once.')}
           <button type="button" onClick={() => setLfsWarningHidden(true)}>
-            Dismiss
+            {t('Dismiss')}
           </button>
         </div>
       )}
@@ -326,7 +331,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           repo={repo}
           target={diffTarget}
           title={diffTarget.oldPath ? `${diffTarget.oldPath} → ${diffTarget.path}` : diffTarget.path}
-          subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.staged ? 'Staged' : 'Unstaged'}
+          subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.staged ? t('Staged') : t('Unstaged')}
           // Working-tree diffs follow refreshes; commit diffs never change.
           reloadKey={diffTarget.kind === 'worktree' ? data.loadedAt : undefined}
           editing={editing}
@@ -335,13 +340,13 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             worktreeDiff && (
               <>
                 <button type="button" onClick={() => void run(() => invoke('file:openInEditor', repo, worktreeDiff.path))}>
-                  Edit
+                  {t('action|Edit')}
                 </button>
                 <button
                   type="button"
                   onClick={() => void runInBackground(() => invoke('file:externalDiff', repo, worktreeDiff.path, worktreeDiff.staged))}
                 >
-                  External
+                  {t('External')}
                 </button>
               </>
             )
@@ -374,39 +379,39 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             if (row.stash) {
               const label = `stash@{${row.stash.index}}`;
               return openMenu(event, [
-                { label: 'Apply stash', onSelect: () => refActions.applyStash(row.hash) },
-                { label: 'Pop stash', onSelect: () => refActions.popStash(row.hash) },
+                { label: t('Apply stash'), onSelect: () => refActions.applyStash(row.hash) },
+                { label: t('Pop stash'), onSelect: () => refActions.popStash(row.hash) },
                 'separator',
-                { label: 'Delete stash…', danger: true, onSelect: () => refActions.dropStash(row.hash, label) },
+                { label: t('Delete stash…'), danger: true, onSelect: () => refActions.dropStash(row.hash, label) },
               ]);
             }
             const isHead = row.hash === data.branch.oid;
             const busy = data.operation !== null;
             openMenu(event, [
-              { label: 'Check out this commit (detached)', disabled: isHead, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
+              { label: t('Check out this commit (detached)'), disabled: isHead, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
               'separator',
-              { label: 'Cherry-pick commit', disabled: isHead || busy, onSelect: () => refActions.cherryPick(row.hash, row.subject) },
-              { label: 'Revert commit…', disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },
-              { label: `Merge this commit into ${data.branch.head ?? 'HEAD'}…`, disabled: isHead || busy, onSelect: () => refActions.merge(row.hash, short) },
-              { label: `Rebase ${data.branch.head ?? 'HEAD'} onto this commit…`, disabled: isHead || busy, onSelect: () => refActions.rebase(row.hash, short) },
-              { label: `Interactive rebase ${data.branch.head ?? 'HEAD'} from here…`, disabled: isHead || busy, onSelect: () => setRebaseBase(row.hash) },
+              { label: t('Cherry-pick commit'), disabled: isHead || busy, onSelect: () => refActions.cherryPick(row.hash, row.subject) },
+              { label: t('Revert commit…'), disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },
+              { label: t('Merge this commit into {branch}…', { branch: data.branch.head ?? 'HEAD' }), disabled: isHead || busy, onSelect: () => refActions.merge(row.hash, short) },
+              { label: t('Rebase {branch} onto this commit…', { branch: data.branch.head ?? 'HEAD' }), disabled: isHead || busy, onSelect: () => refActions.rebase(row.hash, short) },
+              { label: t('Interactive rebase {branch} from here…', { branch: data.branch.head ?? 'HEAD' }), disabled: isHead || busy, onSelect: () => setRebaseBase(row.hash) },
               'separator',
-              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: soft…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'soft') },
-              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: mixed…`, disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'mixed') },
-              { label: `Reset ${data.branch.head ?? 'HEAD'} to here: hard…`, danger: true, disabled: busy, onSelect: () => refActions.reset(row.hash, 'hard') },
+              { label: t('Reset {branch} to here: soft…', { branch: data.branch.head ?? 'HEAD' }), disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'soft') },
+              { label: t('Reset {branch} to here: mixed…', { branch: data.branch.head ?? 'HEAD' }), disabled: isHead || busy, onSelect: () => refActions.reset(row.hash, 'mixed') },
+              { label: t('Reset {branch} to here: hard…', { branch: data.branch.head ?? 'HEAD' }), danger: true, disabled: busy, onSelect: () => refActions.reset(row.hash, 'hard') },
               'separator',
-              { label: 'Create branch here…', onSelect: () => refActions.createBranch(row.hash, short) },
-              { label: 'Create tag here…', onSelect: () => refActions.createTag(row.hash, short) },
+              { label: t('Create branch here…'), onSelect: () => refActions.createBranch(row.hash, short) },
+              { label: t('Create tag here…'), onSelect: () => refActions.createTag(row.hash, short) },
               'separator',
-              { label: 'Copy commit SHA', onSelect: () => copyText(row.hash) },
-              { label: 'Copy commit message', onSelect: () => copyText(row.subject) },
+              { label: t('Copy commit SHA'), onSelect: () => copyText(row.hash) },
+              { label: t('Copy commit message'), onSelect: () => copyText(row.subject) },
             ]);
           }}
         />
         </>
       )}
       </div>
-      <Splitter label="Resize the right panel" className="right" value={layout.rightHidden ? 0 : layout.right} min={LIMITS.right[0]} max={LIMITS.right[1]} direction={-1} onChange={(width) => setPanelWidth('right', width)} onReset={() => resetPanelWidth('right')} />
+      <Splitter label={t('Resize the right panel')} className="right" value={layout.rightHidden ? 0 : layout.right} min={LIMITS.right[0]} max={LIMITS.right[1]} direction={-1} onChange={(width) => setPanelWidth('right', width)} onReset={() => resetPanelWidth('right')} />
       <aside className="side" hidden={layout.rightHidden}>
         {selectedCommit ? (
           <CommitDetailsPanel
@@ -424,13 +429,13 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               <>
                 <span className="stash-label">stash@{`{${selectedStash.index}}`}</span>
                 <button type="button" onClick={() => refActions.applyStash(selectedStash.sha)}>
-                  Apply
+                  {t('Apply')}
                 </button>
                 <button type="button" onClick={() => refActions.popStash(selectedStash.sha)}>
-                  Pop
+                  {t('Pop')}
                 </button>
                 <button type="button" className="danger-text" onClick={() => refActions.dropStash(selectedStash.sha, `stash@{${selectedStash.index}}`)}>
-                  Delete
+                  {t('Delete')}
                 </button>
               </>
             )}
@@ -536,7 +541,9 @@ function CommitGraphHint({ data, filter, run }: { data: RepoData; filter: Histor
   return (
     <div className="notices commit-graph-hint" role="status">
       <span>
-        The history took {seconds} s to open. git’s commit-graph makes it several times faster for large repositories (it is what <code>git maintenance</code> writes).
+        {tx('The history took {seconds} s to open. git’s commit-graph makes it several times faster for large repositories (it is what {command} writes).', {
+          command: <code>git maintenance</code>,
+        }, { seconds })}
       </span>
       <button
         type="button"
@@ -546,7 +553,7 @@ function CommitGraphHint({ data, filter, run }: { data: RepoData; filter: Histor
           void run(() => invoke('repo:writeCommitGraph', data.root)).finally(() => setWriting(false));
         }}
       >
-        {writing ? 'Writing…' : 'Write the commit-graph'}
+        {writing ? t('Writing…') : t('Write the commit-graph')}
       </button>
       <button
         type="button"
@@ -560,7 +567,7 @@ function CommitGraphHint({ data, filter, run }: { data: RepoData; filter: Histor
           }
         }}
       >
-        Not for this repository
+        {t('Not for this repository')}
       </button>
     </div>
   );

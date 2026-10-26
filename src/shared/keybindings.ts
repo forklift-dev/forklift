@@ -2,11 +2,15 @@
 // A shortcut is "Ctrl+Shift+P": modifiers in the order Ctrl, Alt, Shift, Meta, then one key. "Mod" in the
 // defaults is Meta (⌘) on macOS and Ctrl elsewhere.
 
+import type { Params } from './i18n';
+
 export type KeyPlatform = 'darwin' | 'win32' | 'linux';
 
 export interface CommandInfo {
   id: string;
   title: string;
+  /** Values for placeholders in `title`, supplied when it is translated for display. */
+  titleParams?: Params;
   category: string;
   /** Default shortcuts; per OS where they differ. */
   keys?: string[] | Partial<Record<KeyPlatform | 'other', string[]>>;
@@ -16,7 +20,14 @@ export interface CommandInfo {
   notInFields?: boolean;
 }
 
-const tabCommands: CommandInfo[] = Array.from({ length: 8 }, (_, i) => ({ id: `tabs.select${i + 1}`, title: `Go to tab ${i + 1}`, category: 'Tabs', keys: [`Mod+${i + 1}`], hidden: true }));
+const tabCommands: CommandInfo[] = Array.from({ length: 8 }, (_, i) => ({
+  id: `tabs.select${i + 1}`,
+  title: 'Go to tab {number}',
+  titleParams: { number: i + 1 },
+  category: 'Tabs',
+  keys: [`Mod+${i + 1}`],
+  hidden: true,
+}));
 
 export const COMMANDS: readonly CommandInfo[] = [
   { id: 'palette.commands', title: 'Show all commands', category: 'View', keys: ['Mod+Shift+P'] },

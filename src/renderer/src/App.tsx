@@ -20,6 +20,7 @@ import { useRemoteActions } from './components/useRemoteActions';
 import { Toolbar } from './components/Toolbar';
 import { useAppState } from './state';
 import { useLanguage } from './i18n';
+import { t, translate } from '../../shared/i18n';
 
 /** Runs a command and reports failures in the banner; resolves to whether it succeeded. */
 export type RunAction = (action: () => Promise<unknown>) => Promise<boolean>;
@@ -155,7 +156,7 @@ export function App() {
   const themeCommands = Object.fromEntries(
     [...BUILTIN_THEMES, ...userThemes].map((theme) => [
       `theme.use.${theme.id}`,
-      { title: `Use the ${theme.name} theme`, category: 'View', run: () => void run(() => invoke('settings:update', { values: { 'ui.theme': theme.id } })) },
+      { title: t('Use the {theme} theme', { theme: translate(theme.name) }), category: 'View', run: () => void run(() => invoke('settings:update', { values: { 'ui.theme': theme.id } })) },
     ]),
   );
   useCommandHandlers({
@@ -264,12 +265,12 @@ export function App() {
               .slice(0, 8)
               .map((entry) => ({ label: entry.name, onSelect: () => void run(() => invoke('repo:open', entry.path)).then((ok) => ok && setScreen('repo')) })),
             ...(library.recent.some((entry) => entry.path !== activeId) ? (['separator'] as const) : []),
-            { label: 'Open a repository…', onSelect: () => setScreen('repositories') },
-            { label: 'Clone a repository…', onSelect: () => openCreate('clone') },
-            { label: 'Create a repository…', onSelect: () => openCreate('init') },
+            { label: t('Open a repository…'), onSelect: () => setScreen('repositories') },
+            { label: t('Clone a repository…'), onSelect: () => openCreate('clone') },
+            { label: t('Create a repository…'), onSelect: () => openCreate('init') },
             'separator',
-            { label: 'Refresh', disabled: !activeId, onSelect: () => activeId && void run(() => invoke('repo:refresh', activeId)) },
-            { label: 'Close tab', disabled: !activeId, onSelect: () => activeId && closeTab(activeId) },
+            { label: t('Refresh'), disabled: !activeId, onSelect: () => activeId && void run(() => invoke('repo:refresh', activeId)) },
+            { label: t('Close tab'), disabled: !activeId, onSelect: () => activeId && closeTab(activeId) },
           ])
         }
         onSwitchBranch={() => runCommand('branch.switch')}
@@ -280,7 +281,7 @@ export function App() {
         <div className="error-banner notices" role="alert">
           {notices.join('\n')}
           <button type="button" onClick={() => void invoke('app:dismissNotices')}>
-            Dismiss
+            {t('Dismiss')}
           </button>
         </div>
       )}
@@ -289,7 +290,7 @@ export function App() {
           {error.message}
           {error.logId !== null && (
             <button type="button" className="error-details" onClick={() => showLog(error.logId)}>
-              Details
+              {t('Details')}
             </button>
           )}
         </div>
@@ -320,7 +321,7 @@ export function App() {
           <RepoWorkspace key={data.root} data={data} run={run} runInBackground={runInBackground} />
         ) : repo.loading ? (
           <main className="empty">
-            <p>Loading {tabs.tabs.find((tab) => tab.id === activeId)?.name}…</p>
+            <p>{t('Loading {name}…', { name: tabs.tabs.find((tab) => tab.id === activeId)?.name ?? '' })}</p>
           </main>
         ) : (
           activeId &&
@@ -329,10 +330,10 @@ export function App() {
               <p>{repo.error}</p>
               <div className="empty-actions">
                 <button type="button" onClick={() => void run(() => invoke('repo:refresh', activeId))}>
-                  Try again
+                  {t('Try again')}
                 </button>
                 <button type="button" onClick={() => closeTab(activeId)}>
-                  Remove tab
+                  {t('Remove tab')}
                 </button>
               </div>
             </main>
@@ -344,7 +345,7 @@ export function App() {
             const visible = terminalOpen && id === activeId && Boolean(data);
             return (
               <div key={id} className="terminal-dock" hidden={!visible} style={{ height: terminalHeight }}>
-                <div className="terminal-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize terminal" onPointerDown={resizeTerminal} />
+                <div className="terminal-splitter" role="separator" aria-orientation="horizontal" aria-label={t('Resize terminal')} onPointerDown={resizeTerminal} />
                 <TerminalPanel
                   repo={id}
                   visible={visible}

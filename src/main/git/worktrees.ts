@@ -1,6 +1,7 @@
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute } from 'node:path';
 import type { WorktreeAddRequest, WorktreeInfo } from '../../shared/worktrees';
+import { t } from '../../shared/i18n';
 import type { GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
 
@@ -54,18 +55,18 @@ export class WorktreeService {
   }
 
   async add(root: string, request: unknown): Promise<string> {
-    if (typeof request !== 'object' || request === null) throw new WorktreeError('Choose a folder and a branch');
+    if (typeof request !== 'object' || request === null) throw new WorktreeError(t('Choose a folder and a branch'));
     const { path, branch, newBranch } = request as Record<string, unknown> as Partial<WorktreeAddRequest>;
-    if (typeof path !== 'string' || !isAbsolute(path) || /[\0\r\n]/.test(path)) throw new WorktreeError('Choose the folder for the working tree (a full path)');
-    if (!(await stat(dirname(path)).then((info) => info.isDirectory(), () => false))) throw new WorktreeError(`${dirname(path)} is not an existing folder`);
+    if (typeof path !== 'string' || !isAbsolute(path) || /[\0\r\n]/.test(path)) throw new WorktreeError(t('Choose the folder for the working tree (a full path)'));
+    if (!(await stat(dirname(path)).then((info) => info.isDirectory(), () => false))) throw new WorktreeError(t('{path} is not an existing folder', { path: dirname(path) }));
     const existing = await stat(path).catch(() => null);
-    if (existing && (!existing.isDirectory() || (await readdir(path)).length > 0)) throw new WorktreeError(`${path} already exists and is not empty`);
+    if (existing && (!existing.isDirectory() || (await readdir(path)).length > 0)) throw new WorktreeError(t('{path} already exists and is not empty', { path }));
     const args = ['worktree', 'add'];
     if (newBranch !== null && newBranch !== undefined) {
       await this.assertBranchName(root, newBranch);
       args.push('-b', newBranch, '--', path);
     } else {
-      if (typeof branch !== 'string' || !NAME.test(branch)) throw new WorktreeError('Choose a branch, or a name for a new one');
+      if (typeof branch !== 'string' || !NAME.test(branch)) throw new WorktreeError(t('Choose a branch, or a name for a new one'));
       args.push('--', path, branch);
     }
     return this.queue.run(root, async () => {
@@ -77,14 +78,14 @@ export class WorktreeService {
   /** `force`: also when it has uncommitted changes (they are lost). */
   async remove(root: string, path: unknown, force: boolean): Promise<void> {
     const tree = await this.find(root, path);
-    if (tree.main) throw new WorktreeError('The main working tree cannot be removed');
-    if (tree.current) throw new WorktreeError('Open another working tree to remove this one');
+    if (tree.main) throw new WorktreeError(t('The main working tree cannot be removed'));
+    if (tree.current) throw new WorktreeError(t('Open another working tree to remove this one'));
     await this.queue.run(root, () => this.git.exec(['worktree', 'remove', ...(force ? ['--force'] : []), '--', tree.path], { cwd: root }));
   }
 
   async lock(root: string, path: unknown, locked: boolean): Promise<void> {
     const tree = await this.find(root, path);
-    if (tree.main) throw new WorktreeError('The main working tree cannot be locked');
+    if (tree.main) throw new WorktreeError(t('The main working tree cannot be locked'));
     await this.queue.run(root, () => this.git.exec(['worktree', locked ? 'lock' : 'unlock', '--', tree.path], { cwd: root }));
   }
 
@@ -94,15 +95,15 @@ export class WorktreeService {
   }
 
   private async find(root: string, path: unknown): Promise<WorktreeInfo> {
-    if (typeof path !== 'string') throw new WorktreeError('Choose a working tree');
-    const tree = (await this.list(root)).find((t) => t.path === path);
-    if (!tree) throw new WorktreeError(`${path} is not a working tree of this repository`);
+    if (typeof path !== 'string') throw new WorktreeError(t('Choose a working tree'));
+    const tree = (await this.list(root)).find((entry) => entry.path === path);
+    if (!tree) throw new WorktreeError(t('{path} is not a working tree of this repository', { path }));
     return tree;
   }
 
   private async assertBranchName(root: string, name: unknown): Promise<void> {
-    if (typeof name !== 'string' || !NAME.test(name)) throw new WorktreeError('Enter a branch name');
+    if (typeof name !== 'string' || !NAME.test(name)) throw new WorktreeError(t('Enter a branch name'));
     const { exitCode } = await this.git.exec(['check-ref-format', '--branch', name], { cwd: root, readOnly: true, allowedExitCodes: [1, 128] });
-    if (exitCode !== 0) throw new WorktreeError(`"${name}" is not a valid branch name`);
+    if (exitCode !== 0) throw new WorktreeError(t('"{name}" is not a valid branch name', { name }));
   }
 }

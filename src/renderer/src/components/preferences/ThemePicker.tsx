@@ -1,21 +1,23 @@
 import { useState } from 'react';
+import { t, translate } from '../../../../shared/i18n';
 import { APP_THEME, BUILTIN_THEMES, resolveTheme, SYSTEM_THEME, type Theme } from '../../../../shared/themes';
 import { invoke } from '../../api';
+import { tx } from '../../i18n';
 import { useAppState } from '../../state';
 import { errorText, type ControlProps } from './SettingRow';
 
 /** A small picture of the app in the theme: panels, text, a button and graph lanes. */
 function AppPreview({ theme }: { theme: Theme }) {
-  const t = theme.tokens;
+  const colors = theme.tokens;
   return (
-    <span className="theme-preview" style={{ background: t.bg, borderColor: t.border }} aria-hidden="true">
-      <span className="theme-preview-bar" style={{ background: t['bg-panel'], borderColor: t.border }}>
-        <span style={{ background: t['primary-bg'] }} />
+    <span className="theme-preview" style={{ background: colors.bg, borderColor: colors.border }} aria-hidden="true">
+      <span className="theme-preview-bar" style={{ background: colors['bg-panel'], borderColor: colors.border }}>
+        <span style={{ background: colors['primary-bg'] }} />
       </span>
       {[0, 1, 2].map((row) => (
-        <span key={row} className="theme-preview-row" style={row === 0 ? { background: t.selection } : undefined}>
-          <span className="theme-preview-dot" style={{ background: t[`graph-${row}` as 'graph-0'] }} />
-          <span className="theme-preview-text" style={{ background: row === 0 ? t.fg : t['fg-muted'], width: `${60 - row * 12}%` }} />
+        <span key={row} className="theme-preview-row" style={row === 0 ? { background: colors.selection } : undefined}>
+          <span className="theme-preview-dot" style={{ background: colors[`graph-${row}` as 'graph-0'] }} />
+          <span className="theme-preview-text" style={{ background: row === 0 ? colors.fg : colors['fg-muted'], width: `${60 - row * 12}%` }} />
         </span>
       ))}
     </span>
@@ -24,21 +26,21 @@ function AppPreview({ theme }: { theme: Theme }) {
 
 /** Code with an added and a removed line, as the editor shows it. */
 function EditorPreview({ theme }: { theme: Theme }) {
-  const t = theme.tokens;
+  const tokens = theme.tokens;
   const line = (colors: string[], background?: string) => (
     <span className="theme-preview-row" style={background ? { background } : undefined}>
-      <span className="theme-preview-gutter" style={{ background: t['code-line-number'] }} />
+      <span className="theme-preview-gutter" style={{ background: tokens['code-line-number'] }} />
       {colors.map((color, i) => (
         <span key={i} className="theme-preview-text" style={{ background: color, width: `${14 + ((i * 7) % 12)}%` }} />
       ))}
     </span>
   );
   return (
-    <span className="theme-preview" style={{ background: t['code-bg'], borderColor: t.border }} aria-hidden="true">
-      {line([t['code-keyword'], t['code-type'], t['code-fg']])}
-      {line([t['code-fg'], t['code-string']], t['diff-removed-bg'])}
-      {line([t['code-fg'], t['code-number']], t['diff-added-bg'])}
-      {line([t['code-comment'], t['code-comment']])}
+    <span className="theme-preview" style={{ background: tokens['code-bg'], borderColor: tokens.border }} aria-hidden="true">
+      {line([tokens['code-keyword'], tokens['code-type'], tokens['code-fg']])}
+      {line([tokens['code-fg'], tokens['code-string']], tokens['diff-removed-bg'])}
+      {line([tokens['code-fg'], tokens['code-number']], tokens['diff-added-bg'])}
+      {line([tokens['code-comment'], tokens['code-comment']])}
     </span>
   );
 }
@@ -57,13 +59,13 @@ export function ThemePicker({ id, settingKey, value, save }: ControlProps) {
   const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const options: Option[] = [
     editor
-      ? { value: APP_THEME, label: 'Same as the app', preview: resolveTheme(appThemeId, dark, user) }
-      : { value: SYSTEM_THEME, label: 'System', preview: [resolveTheme('forklift-light', false), resolveTheme('forklift-dark', true)] },
+      ? { value: APP_THEME, label: t('Same as the app'), preview: resolveTheme(appThemeId, dark, user) }
+      : { value: SYSTEM_THEME, label: t('System'), preview: [resolveTheme('forklift-light', false), resolveTheme('forklift-dark', true)] },
     ...[...BUILTIN_THEMES, ...user].map((theme) => ({ value: theme.id, label: theme.name, preview: theme })),
   ];
   const Preview = editor ? EditorPreview : AppPreview;
   return (
-    <div id={id} className="theme-picker" role="radiogroup" aria-label={editor ? 'Editor theme' : 'Theme'}>
+    <div id={id} className="theme-picker" role="radiogroup" aria-label={editor ? t('Editor theme') : t('Theme')}>
       {options.map((option) => (
         <button
           key={option.value}
@@ -83,8 +85,8 @@ export function ThemePicker({ id, settingKey, value, save }: ControlProps) {
             <Preview theme={option.preview} />
           )}
           <span className="theme-option-label">
-            {option.label}
-            {option.value.startsWith('user:') && <span className="theme-option-note"> · custom</span>}
+            {option.value.startsWith('user:') ? option.label : translate(option.label)}
+            {option.value.startsWith('user:') && <span className="theme-option-note"> · {t('custom')}</span>}
           </span>
         </button>
       ))}
@@ -103,10 +105,14 @@ export function UserThemesNote() {
   return (
     <div className="user-themes">
       <p className="hint">
-        Custom themes are <code>.jsonc</code> files in the themes folder: <code>{'{ "meta": { "name": "…", "extends": "forklift-dark" }, "tokens": { "accent": "#ff8800" } }'}</code>. They are read again when a file changes.{' '}
-        <button type="button" className="link-button" disabled={!folder} onClick={open}>
-          Open themes folder
-        </button>
+        {tx('Custom themes are .jsonc files in the themes folder: {example}. They are read again when a file changes. {open}', {
+          example: <code>{'{ "meta": { "name": "…", "extends": "forklift-dark" }, "tokens": { "accent": "#ff8800" } }'}</code>,
+          open: (
+            <button type="button" className="link-button" disabled={!folder} onClick={open}>
+              {t('Open themes folder')}
+            </button>
+          ),
+        })}
       </p>
       {error && <p className="setting-error">{error}</p>}
       {problems.length > 0 && (

@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /** A clone in progress (one at a time), shown on the Repositories screen. */
 export interface CloneActivity {
   url: string;
@@ -54,9 +56,9 @@ export function repoNameFromUrl(url: string): string {
 
 /** Why `name` can't be a new folder's name on any supported system, or null. */
 export function folderNameProblem(name: string): string | null {
-  if (!name.trim()) return 'Enter a folder name';
-  if (name.length > 255) return 'The folder name is too long';
-  if (name === '.' || name === '..' || /[\\/\0<>:"|?*]/.test(name)) return `"${name}" is not a valid folder name`;
-  if (/[. ]$/.test(name) || /^\s/.test(name)) return 'A folder name cannot start with a space or end with a space or a dot';
+  if (!name.trim()) return t('Enter a folder name');
+  if (name.length > 255) return t('The folder name is too long');
+  if (name === '.' || name === '..' || /[\\/\0<>:"|?*]/.test(name)) return t('"{name}" is not a valid folder name', { name });
+  if (/[. ]$/.test(name) || /^\s/.test(name)) return t('A folder name cannot start with a space or end with a space or a dot');
   return null;
 }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { t } from '../../../../shared/i18n';
 import type { KeysInfo, Profile, SigningFormat } from '../../../../shared/profiles';
 import { invoke } from '../../api';
 import { useAppState } from '../../state';
 import { useCommand } from '../../useCommand';
+import { tx } from '../../i18n';
 import { copyText } from '../ContextMenu';
 import { errorText, type ControlProps } from './SettingRow';
 
@@ -21,7 +23,7 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
   const save = async () => {
     setStatus(null);
     const ok = await onSave(draft);
-    if (ok) setStatus({ error: false, text: 'Saved' });
+    if (ok) setStatus({ error: false, text: t('Saved') });
     return ok;
   };
   const apply = async (root: string | null) => {
@@ -29,7 +31,7 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
     setStatus(null);
     try {
       await invoke('profile:apply', profile.id, root);
-      setStatus({ error: false, text: root ? 'In use in this repository' : 'In use for all repositories' });
+      setStatus({ error: false, text: root ? t('In use in this repository') : t('In use for all repositories') });
     } catch (error) {
       setStatus({ error: true, text: errorText(error) });
     }
@@ -39,23 +41,23 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
     <fieldset className="profile-form" data-profile={profile.id}>
       <legend>{profile.label}</legend>
       <label className="form-field">
-        Profile name
+        {t('Profile name')}
         <input type="text" name="label" {...field('label')} />
       </label>
       <div className="profile-row">
         <label className="form-field">
-          Name for commits
+          {t('Name for commits')}
           <input type="text" name="userName" {...field('userName')} />
         </label>
         <label className="form-field">
-          Email
+          {t('Email')}
           <input type="text" name="email" {...field('email')} />
         </label>
       </div>
       <label className="form-field">
-        SSH key for remotes
+        {t('SSH key for remotes')}
         <select name="sshKey" {...field('sshKey')}>
-          <option value="">ssh’s own choice (agent, ~/.ssh/config)</option>
+          <option value="">{t('ssh’s own choice (agent, ~/.ssh/config)')}</option>
           {sshKeys.map((key) => (
             <option key={key.path} value={key.path}>
               {key.path} ({key.type}{key.comment && `, ${key.comment}`})
@@ -66,20 +68,20 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
       </label>
       <div className="profile-row">
         <label className="form-field">
-          Sign commits
+          {t('Sign commits')}
           <select name="signing" value={draft.signing} onChange={(event) => setDraft({ ...draft, signing: event.target.value as SigningFormat, signingKey: '' })}>
-            <option value="none">No</option>
-            <option value="ssh">With an SSH key</option>
+            <option value="none">{t('No')}</option>
+            <option value="ssh">{t('With an SSH key')}</option>
             <option value="openpgp" disabled={keys?.gpg === null}>
-              With GPG{keys?.gpg === null ? ' (gpg is not installed)' : ''}
+              {keys?.gpg === null ? t('With GPG (gpg is not installed)') : t('With GPG')}
             </option>
           </select>
         </label>
         {draft.signing !== 'none' && (
           <label className="form-field">
-            Signing key
+            {t('Signing key')}
             <select name="signingKey" {...field('signingKey')}>
-              <option value="">Choose…</option>
+              <option value="">{t('Choose…')}</option>
               {draft.signing === 'ssh'
                 ? sshKeys.map((key) => (
                     <option key={key.publicPath} value={key.publicPath}>
@@ -88,7 +90,7 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
                   ))
                 : (keys?.gpg ?? []).map((key) => (
                     <option key={key.fingerprint} value={key.fingerprint} disabled={key.expired}>
-                      {key.userIds[0] ?? key.id} ({key.id}){key.expired ? ' — expired' : ''}
+                      {key.userIds[0] ?? key.id} ({key.id}){key.expired ? ` — ${t('expired')}` : ''}
                     </option>
                   ))}
             </select>
@@ -97,18 +99,18 @@ function ProfileForm({ profile, keys, onSave, onDelete, repo }: { profile: Profi
       </div>
       <div className="profile-actions">
         <button type="button" disabled={!dirty} onClick={() => void save()}>
-          Save
+          {t('Save')}
         </button>
         <button type="button" onClick={() => void apply(null)}>
-          Use for all repositories
+          {t('Use for all repositories')}
         </button>
         {repo && (
           <button type="button" onClick={() => void apply(repo)}>
-            Use for this repository
+            {t('Use for this repository')}
           </button>
         )}
         <button type="button" className="danger-text" onClick={onDelete}>
-          Delete
+          {t('Delete')}
         </button>
         {status && <span className={status.error ? 'setting-error' : 'setting-ok'}>{status.text}</span>}
       </div>
@@ -131,7 +133,7 @@ export function ProfilesEditor({ value, save }: ControlProps) {
       ...profiles,
       {
         id: newId(profiles),
-        label: profiles.length ? `Profile ${profiles.length + 1}` : 'Default',
+        label: profiles.length ? t('Profile {number}', { number: profiles.length + 1 }) : t('Default'),
         userName: identity.data?.userName ?? '',
         email: identity.data?.email ?? '',
         sshKey: '',
@@ -145,7 +147,7 @@ export function ProfilesEditor({ value, save }: ControlProps) {
         <ProfileForm key={profile.id} profile={profile} keys={keys.data} repo={activeRepo} onSave={(next) => replace(index, next)} onDelete={() => void replace(index, null)} />
       ))}
       <button type="button" onClick={add}>
-        Add a profile
+        {t('Add a profile')}
       </button>
       <SshKeys data={keys.data} error={keys.error} onChanged={() => setReload((n) => n + 1)} />
       <SavedPasswords />
@@ -172,18 +174,19 @@ function SshKeys({ data, error, onChanged }: { data: KeysInfo | undefined; error
   };
   const generate = async () => {
     if (!form) return;
-    if (form.passphrase !== form.confirm) return setStatus({ error: true, text: 'The passphrases differ' });
-    if (await run(() => invoke('keys:generateSsh', form.name, form.comment, form.passphrase), `Created ${form.name}`)) setForm(null);
+    if (form.passphrase !== form.confirm) return setStatus({ error: true, text: t('The passphrases differ') });
+    if (await run(() => invoke('keys:generateSsh', form.name, form.comment, form.passphrase), t('Created {name}', { name: form.name }))) setForm(null);
   };
   const defaultName = data?.ssh.some((key) => key.path.endsWith('/id_ed25519')) ? 'id_ed25519_forklift' : 'id_ed25519';
   return (
     <div className="ssh-keys">
-      <h3>SSH keys</h3>
+      <h3>{t('SSH keys')}</h3>
       {error && <p className="setting-error">{error}</p>}
       {data && (
         <p className="hint">
-          {data.agent.running ? `ssh-agent is running with ${data.agent.fingerprints.length} key${data.agent.fingerprints.length === 1 ? '' : 's'}.` : 'No ssh-agent is running: keys with a passphrase will be asked for each time.'} Keys in{' '}
-          <code>{data.sshDir}</code>:
+          {data.agent.running
+            ? tx('ssh-agent is running with {count} keys. Keys in {directory}:', { directory: <code>{data.sshDir}</code> }, { count: data.agent.fingerprints.length })
+            : tx('No ssh-agent is running: keys with a passphrase will be asked for each time. Keys in {directory}:', { directory: <code>{data.sshDir}</code> })}
         </p>
       )}
       <ul className="ssh-key-list">
@@ -194,19 +197,19 @@ function SshKeys({ data, error, onChanged }: { data: KeysInfo | undefined; error
             <span className="ssh-key-meta">
               {key.type} · {key.fingerprint}
               {key.comment && ` · ${key.comment}`}
-              {key.inAgent && ' · in agent'}
+              {key.inAgent && ` · ${t('in agent')}`}
             </span>
-            <button type="button" onClick={() => void run(async () => copyText(await invoke('keys:publicKey', key.publicPath)), 'Public key copied')}>
-              Copy public key
+            <button type="button" onClick={() => void run(async () => copyText(await invoke('keys:publicKey', key.publicPath)), t('Public key copied'))}>
+              {t('Copy public key')}
             </button>
             {data.agent.running && !key.inAgent && (
-              <button type="button" onClick={() => void run(() => invoke('keys:addToAgent', key.path), 'Added to the agent')}>
-                Add to agent
+              <button type="button" onClick={() => void run(() => invoke('keys:addToAgent', key.path), t('Added to the agent'))}>
+                {t('Add to agent')}
               </button>
             )}
           </li>
         ))}
-        {data && data.ssh.length === 0 && <li className="empty-note">No keys yet</li>}
+        {data && data.ssh.length === 0 && <li className="empty-note">{t('No keys yet')}</li>}
       </ul>
       {form ? (
         <form
@@ -217,33 +220,33 @@ function SshKeys({ data, error, onChanged }: { data: KeysInfo | undefined; error
           }}
         >
           <label className="form-field">
-            File name
+            {t('File name')}
             <input type="text" name="keyName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           </label>
           <label className="form-field">
-            Comment
+            {t('Comment')}
             <input type="text" name="keyComment" value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} />
           </label>
           <label className="form-field">
-            Passphrase (optional)
+            {t('Passphrase (optional)')}
             <input type="password" name="keyPassphrase" autoComplete="new-password" value={form.passphrase} onChange={(event) => setForm({ ...form, passphrase: event.target.value })} />
           </label>
           <label className="form-field">
-            Repeat the passphrase
+            {t('Repeat the passphrase')}
             <input type="password" name="keyConfirm" autoComplete="new-password" value={form.confirm} onChange={(event) => setForm({ ...form, confirm: event.target.value })} />
           </label>
           <div className="profile-actions">
             <button type="button" onClick={() => setForm(null)}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button type="submit" className="primary" disabled={!form.name}>
-              Generate ed25519 key
+              {t('Generate ed25519 key')}
             </button>
           </div>
         </form>
       ) : (
         <button type="button" onClick={() => setForm({ name: defaultName, comment: email, passphrase: '', confirm: '' })}>
-          Generate a key…
+          {t('Generate a key…')}
         </button>
       )}
       {status && <p className={status.error ? 'setting-error' : 'setting-ok'}>{status.text}</p>}
@@ -258,11 +261,11 @@ function SavedPasswords() {
   const available = useAppState((s) => s.app.secretStorage);
   return (
     <div className="ssh-keys saved-passwords">
-      <h3>Saved passwords</h3>
+      <h3>{t('Saved passwords')}</h3>
       <p className="hint">
         {available
-          ? 'For HTTPS remotes, when you tick “Remember” in the sign-in dialog. Encrypted with the system keychain; git’s own credential helpers are asked first.'
-          : 'No system keychain is available to Forklift, so passwords are not saved (they are asked each time, unless your git credential helper keeps them).'}
+          ? t('For HTTPS remotes, when you tick “Remember” in the sign-in dialog. Encrypted with the system keychain; git’s own credential helpers are asked first.')
+          : t('No system keychain is available to Forklift, so passwords are not saved (they are asked each time, unless your git credential helper keeps them).')}
       </p>
       <ul className="ssh-key-list">
         {data?.map((entry) => (
@@ -274,11 +277,11 @@ function SavedPasswords() {
               {entry.path && `/${entry.path}`}
             </span>
             <button type="button" onClick={() => void invoke('credentials:remove', entry.id).then(() => setReload((n) => n + 1))}>
-              Forget
+              {t('Forget')}
             </button>
           </li>
         ))}
-        {data && data.length === 0 && <li className="empty-note">Nothing saved</li>}
+        {data && data.length === 0 && <li className="empty-note">{t('Nothing saved')}</li>}
       </ul>
     </div>
   );

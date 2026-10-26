@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { ChangeKind, FileChange } from '../../../shared/state';
+import { t } from '../../../shared/i18n';
 
 /** Height of a change row (fixed in CSS, `.change-row`), for drawing only the visible part of long lists. */
 const ROW_HEIGHT = 24;
@@ -88,11 +89,11 @@ function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }:
         </span>
         <span className="group-actions">
           {staged ? (
-            <IconButton icon="remove" label="Unstage all" onClick={() => actions.onUnstage(paths)} />
+            <IconButton icon="remove" label={t('Unstage all')} onClick={() => actions.onUnstage(paths)} />
           ) : (
             <>
-              {discardable.length > 0 && <IconButton icon="discard" label="Discard all" danger onClick={() => actions.onDiscard(discardable)} />}
-              <IconButton icon="add" label="Stage all" onClick={() => actions.onStage(paths)} />
+              {discardable.length > 0 && <IconButton icon="discard" label={t('Discard all')} danger onClick={() => actions.onDiscard(discardable)} />}
+              <IconButton icon="add" label={t('Stage all')} onClick={() => actions.onStage(paths)} />
             </>
           )}
         </span>
@@ -108,29 +109,29 @@ function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }:
               <button
                 type="button"
                 className={`change-item${isSelected ? ' selected' : ''}`}
-                title={`${label}\nShow changes`}
+                title={t('{label}\nShow changes', { label })}
                 onClick={() => actions.onShowDiff(change, staged)}
               >
                 <span className={`kind kind-${change.kind}`}>{KIND_LABEL[change.kind]}</span>
-                {change.submodule && <span className="codicon codicon-file-submodule" aria-label="submodule" title="Submodule: staged and discarded as a whole" />}
+                {change.submodule && <span className="codicon codicon-file-submodule" aria-label={t('submodule')} title={t('Submodule: staged and discarded as a whole')} />}
                 {change.path}
-                {lfsPaths?.has(change.path) && <span className="lfs-badge" title="Stored in Git LFS">LFS</span>}
+                {lfsPaths?.has(change.path) && <span className="lfs-badge" title={t('Stored in Git LFS')}>LFS</span>}
               </button>
               <span className="row-actions">
-                {change.kind !== 'deleted' && <IconButton icon="go-to-file" label="Open in editor" onClick={() => actions.onOpenInEditor(change.path)} />}
-                {change.kind !== 'untracked' && change.kind !== 'added' && <IconButton icon="history" label="File history and blame" onClick={() => actions.onFileHistory(change.path)} />}
+                {change.kind !== 'deleted' && <IconButton icon="go-to-file" label={t('Open in editor')} onClick={() => actions.onOpenInEditor(change.path)} />}
+                {change.kind !== 'untracked' && change.kind !== 'added' && <IconButton icon="history" label={t('File history and blame')} onClick={() => actions.onFileHistory(change.path)} />}
                 {conflicted ? (
-                  <IconButton icon="git-merge" label="Resolve in external merge tool" onClick={() => actions.onExternalMerge(change.path)} />
+                  <IconButton icon="git-merge" label={t('Resolve in external merge tool')} onClick={() => actions.onExternalMerge(change.path)} />
                 ) : (
                   change.kind !== 'untracked' && (
-                    <IconButton icon="diff" label="Open in external diff tool" onClick={() => actions.onExternalDiff(change.path, staged)} />
+                    <IconButton icon="diff" label={t('Open in external diff tool')} onClick={() => actions.onExternalDiff(change.path, staged)} />
                   )
                 )}
-                {!staged && !conflicted && <IconButton icon="discard" label="Discard changes" danger onClick={() => actions.onDiscard([change.path])} />}
+                {!staged && !conflicted && <IconButton icon="discard" label={t('Discard changes')} danger onClick={() => actions.onDiscard([change.path])} />}
                 {staged ? (
-                  <IconButton icon="remove" label="Unstage" onClick={() => actions.onUnstage([change.path])} />
+                  <IconButton icon="remove" label={t('Unstage')} onClick={() => actions.onUnstage([change.path])} />
                 ) : (
-                  <IconButton icon="add" label={conflicted ? 'Mark resolved (stage)' : 'Stage'} onClick={() => actions.onStage([change.path])} />
+                  <IconButton icon="add" label={conflicted ? t('Mark resolved (stage)') : t('Stage')} onClick={() => actions.onStage([change.path])} />
                 )}
               </span>
             </li>
@@ -150,12 +151,12 @@ interface ChangesPanelProps extends FileActions {
 
 export function ChangesPanel({ changes, ...rest }: ChangesPanelProps) {
   if (changes.length === 0) {
-    return <div className="changes empty-note">Working tree clean</div>;
+    return <div className="changes empty-note">{t('Working tree clean')}</div>;
   }
   return (
     <div className="changes">
-      <ChangeGroup title="Unstaged" staged={false} changes={changes.filter((c) => c.unstaged)} {...rest} />
-      <ChangeGroup title="Staged" staged changes={changes.filter((c) => c.staged)} {...rest} />
+      <ChangeGroup title={t('Unstaged')} staged={false} changes={changes.filter((c) => c.unstaged)} {...rest} />
+      <ChangeGroup title={t('Staged')} staged changes={changes.filter((c) => c.staged)} {...rest} />
     </div>
   );
 }

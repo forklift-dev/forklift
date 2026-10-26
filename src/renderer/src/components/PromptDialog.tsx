@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../../../shared/i18n';
 import type { AskPrompt } from '../../../shared/state';
 import { invoke } from '../api';
 import { useAppState } from '../state';
 
-const TITLES: Record<AskPrompt['kind'], string> = {
-  username: 'Sign in',
-  password: 'Sign in',
-  passphrase: 'Unlock SSH key',
-  confirm: 'Unknown SSH host',
-  other: 'git asks',
-};
+const title = (kind: AskPrompt['kind']) =>
+  ({ username: t('Sign in'), password: t('Sign in'), passphrase: t('Unlock SSH key'), confirm: t('Unknown SSH host'), other: t('git asks') })[kind];
 
 /**
  * A question from git or ssh during a fetch, pull or push (credentials, a key passphrase, a new host key).
@@ -48,17 +44,17 @@ export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName
         }}
       >
         <h2 id="prompt-title">
-          {TITLES[prompt.kind]}
+          {title(prompt.kind)}
           {repoName && <span className="prompt-repo"> — {repoName}</span>}
         </h2>
         <p className="prompt-text">{prompt.prompt.trim()}</p>
         {prompt.kind === 'confirm' ? (
           <div className="modal-actions">
             <button type="button" onClick={() => answer('no')}>
-              No
+              {t('No')}
             </button>
             <button type="button" className="primary" onClick={() => answer('yes')}>
-              Trust this host
+              {t('Trust this host')}
             </button>
           </div>
         ) : (
@@ -66,7 +62,7 @@ export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName
             <input
               ref={inputRef}
               type={secret ? 'password' : 'text'}
-              aria-label={prompt.kind === 'username' ? 'Username' : 'Answer'}
+              aria-label={prompt.kind === 'username' ? t('Username') : t('Answer')}
               autoComplete="off"
               spellCheck={false}
               value={value}
@@ -75,16 +71,16 @@ export function PromptDialog({ prompt, repoName }: { prompt: AskPrompt; repoName
             {canRemember && (
               <label className="checkbox-label prompt-remember">
                 <input type="checkbox" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-                Remember (in the system keychain, once git accepts it)
+                {t('Remember (in the system keychain, once git accepts it)')}
               </label>
             )}
-            {secret && !canRemember && prompt.kind === 'password' && <p className="prompt-note">Not saved: no system keychain is available. Your git credential helper may still save it.</p>}
+            {secret && !canRemember && prompt.kind === 'password' && <p className="prompt-note">{t('Not saved: no system keychain is available. Your git credential helper may still save it.')}</p>}
             <div className="modal-actions">
               <button type="button" onClick={() => answer(null)}>
-                Cancel
+                {t('Cancel')}
               </button>
               <button type="submit" className="primary">
-                Continue
+                {t('Continue')}
               </button>
             </div>
           </>

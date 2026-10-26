@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { commandInfo, effectiveShortcuts, keyPlatform, shortcutFromEvent, shortcutIndex } from '../../shared/keybindings';
+import { translate } from '../../shared/i18n';
 import { getState } from './state';
 
 // The command registry: what each command does right now. Components register the commands they can run
@@ -73,7 +74,15 @@ export function useCommandHandlers(commands: Record<string, CommandHandler | nul
 export function registeredCommands(): RegisteredCommand[] {
   return [...handlers].map(([id, handler]) => {
     const info = commandInfo(id);
-    return { id, title: handler.title ?? info?.title ?? id, category: handler.category ?? info?.category ?? '', hidden: info?.hidden ?? false, handler };
+    const title = handler.title ?? info?.title ?? id;
+    const category = handler.category ?? info?.category ?? '';
+    return {
+      id,
+      title: translate(title, handler.title ? undefined : info?.titleParams),
+      category: translate(category),
+      hidden: info?.hidden ?? false,
+      handler,
+    };
   });
 }
 

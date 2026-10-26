@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { t } from '../../../shared/i18n';
 
 export interface PaletteItem {
   key: string;
@@ -118,7 +119,7 @@ export function Palette({ label, placeholder, query, onQuery, items, empty, foot
               </div>
             </li>
           ))}
-          {items.length === 0 && <li className="palette-empty">{busy ? 'Searching…' : empty}</li>}
+          {items.length === 0 && <li className="palette-empty">{busy ? t('Searching…') : empty}</li>}
         </ul>
         {footer && <div className="palette-footer">{footer}</div>}
       </div>

@@ -1,6 +1,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { planProblem, type RebaseCommit, type RebaseStep } from '../../shared/rebase';
+import { t, translate } from '../../shared/i18n';
 import { GitCliError, type GitCli } from './cli';
 import type { CommitOpResult } from './commitOps';
 import { RepoQueue } from './repoQueue';
@@ -70,11 +71,11 @@ export class InteractiveRebase {
     const commits: RebaseCommit[] = [];
     for (const record of stdout.split('\x01').map((part) => part.replace(/^\n/, '')).filter(Boolean)) {
       const [sha = '', parents = '', message = ''] = record.split('\x00');
-      if (parents.trim().split(' ').length > 1) throw new RebaseError('There is a merge commit after this commit; interactive rebase across merges is not supported');
+      if (parents.trim().split(' ').length > 1) throw new RebaseError(t('There is a merge commit after this commit; interactive rebase across merges is not supported'));
       commits.push({ sha, subject: message.split('\n')[0] ?? '', message: message.trimEnd() });
     }
     const ancestor = await this.git.exec(['merge-base', '--is-ancestor', base, 'HEAD'], { cwd: root, readOnly: true, allowedExitCodes: [1] });
-    if (ancestor.exitCode !== 0) throw new RebaseError('Choose a commit of the current branch');
+    if (ancestor.exitCode !== 0) throw new RebaseError(t('Choose a commit of the current branch'));
     return commits;
   }
 
@@ -84,10 +85,10 @@ export class InteractiveRebase {
       const commits = await this.plan(root, base);
       const planned = commits.map((commit) => commit.sha);
       if (steps.length !== planned.length || [...steps.map((s) => s.sha)].sort().join() !== [...planned].sort().join()) {
-        throw new RebaseError('The branch changed since the plan was made; open the interactive rebase again');
+        throw new RebaseError(t('The branch changed since the plan was made; open the interactive rebase again'));
       }
       const problem = planProblem(steps);
-      if (problem) throw new RebaseError(problem);
+      if (problem) throw new RebaseError(translate(problem));
 
       // Inside the git directory: the messages must outlive an app restart in the middle of the rebase.
       const gitDir = (await this.git.exec(['rev-parse', '--absolute-git-dir'], { cwd: root, readOnly: true })).stdout.trim();

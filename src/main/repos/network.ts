@@ -1,4 +1,5 @@
 import type { RemoteProgress, RemoteRun } from '../git/remote';
+import { t } from '../../shared/i18n';
 import type { AppStore } from '../store';
 import { remoteActivity } from '../store/reposSlice';
 
@@ -22,7 +23,7 @@ export class NetworkOps {
   }
 
   async run<T>(root: string, kind: NetworkKind, work: (run: RemoteRun) => Promise<T>): Promise<T> {
-    if (this.running.has(root)) throw new Error('A fetch, pull, push or submodule update is already running in this repository');
+    if (this.running.has(root)) throw new Error(t('A fetch, pull, push or submodule update is already running in this repository'));
     const controller = new AbortController();
     this.running.set(root, controller);
     let last = 0;
@@ -38,7 +39,10 @@ export class NetworkOps {
         },
       });
     } catch (error) {
-      if (controller.signal.aborted) throw new Error(`The ${kind === 'submodules' ? 'submodule update' : kind} was cancelled`, { cause: error });
+      if (controller.signal.aborted) {
+        const operation = kind === 'submodules' ? t('operation|submodule update') : kind === 'fetch' ? t('operation|fetch') : kind === 'pull' ? t('operation|pull') : t('operation|push');
+        throw new Error(t('The {operation} was cancelled', { operation }), { cause: error });
+      }
       throw error;
     } finally {
       this.running.delete(root);

@@ -3,6 +3,7 @@ import { BrowserWindow, dialog, shell, type OpenDialogOptions, type WebContents 
 import type { CheckoutTarget } from '../../shared/branches';
 import type { DiffTarget } from '../../shared/diff';
 import type { HistoryFilter, HistorySearch } from '../../shared/history';
+import { t } from '../../shared/i18n';
 import type { GitToolKind, ToolKind } from '../../shared/settings';
 import type { LineAction, LineActionRequest, LineChange } from '../../shared/staging';
 import type { BranchService, SwitchResult } from '../git/branches';
@@ -267,7 +268,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   /** The tab's repository on its server; commands for pull requests and issues need one. */
   const hostingOf = async (root: string): Promise<RepoHosting & { client: Awaited<ReturnType<HostingService['client']>> }> => {
     const context = await hosting.context(root, repoData(root)?.remoteUrls ?? {});
-    if (!context) throw new Error('None of this repository\'s remotes is on a server added in Preferences → Integrations');
+    if (!context) throw new Error(t('None of this repository\'s remotes is on a server added in Preferences → Integrations'));
     return { ...context, client: await hosting.client(context.account) };
   };
 
@@ -296,25 +297,28 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
   const stashName = (root: string, sha: string) => {
     const stash = repoData(root)?.stashes.find((s) => s.sha === sha);
-    return stash ? `stash@{${stash.index}} (${stash.message})` : 'the stash';
+    return stash ? `stash@{${stash.index}} (${stash.message})` : t('the stash');
   };
   const reportApply = (what: string, popped: boolean, { outcome, detail }: ApplyOutcome) => {
-    if (outcome === 'applied-unstaged') store.dispatch(noticeAdded(`Applied ${what}, but what was staged in it is now unstaged.`));
-    else if (outcome === 'conflicts') store.dispatch(noticeAdded(`Applied ${what} with conflicts in ${detail}; resolve them.${popped ? ' The stash is kept.' : ''}`));
-    else if (outcome === 'failed') store.dispatch(noticeAdded(`Could not apply ${what}: ${detail}. The stash is unchanged.`));
+    if (outcome === 'applied-unstaged') store.dispatch(noticeAdded(t('Applied {stash}, but what was staged in it is now unstaged.', { stash: what })));
+    else if (outcome === 'conflicts') {
+      store.dispatch(noticeAdded(popped
+        ? t('Applied {stash} with conflicts in {detail}; resolve them. The stash is kept.', { stash: what, detail: detail ?? '' })
+        : t('Applied {stash} with conflicts in {detail}; resolve them.', { stash: what, detail: detail ?? '' })));
+    } else if (outcome === 'failed') store.dispatch(noticeAdded(t('Could not apply {stash}: {detail}. The stash is unchanged.', { stash: what, detail: detail ?? '' })));
   };
 
   return {
     async 'commit:cherryPick'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
-      return thenRefresh(root, () => recorder.history(root, `cherry-pick of ${sha.slice(0, 7)}`, () => commitOps.cherryPick(root, sha)));
+      return thenRefresh(root, () => recorder.history(root, t('cherry-pick of {sha}', { sha: sha.slice(0, 7) }), () => commitOps.cherryPick(root, sha)));
     },
 
     async 'commit:revert'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);
-      return thenRefresh(root, () => recorder.history(root, `revert of ${sha.slice(0, 7)}`, () => commitOps.revert(root, sha)));
+      return thenRefresh(root, () => recorder.history(root, t('revert of {sha}', { sha: sha.slice(0, 7) }), () => commitOps.revert(root, sha)));
     },
 
     async 'commit:reset'(_ctx, repo, sha, mode) {
@@ -329,13 +333,13 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (!['default', 'no-ff', 'ff-only', 'squash'].includes(mode as string)) throw new TypeError('unknown merge mode');
       if (message !== null && (typeof message !== 'string' || message.length > 100_000)) throw new TypeError('message must be text or null');
       const name = parseName(ref, 'ref');
-      return thenRefresh(root, () => recorder.history(root, `merge of ${name.length === 40 ? name.slice(0, 7) : name}`, () => commitOps.merge(root, name, mode, message)));
+      return thenRefresh(root, () => recorder.history(root, t('merge of {ref}', { ref: name.length === 40 ? name.slice(0, 7) : name }), () => commitOps.merge(root, name, mode, message)));
     },
 
     async 'branch:rebase'(_ctx, repo, onto) {
       const root = tab(repo);
       const name = parseName(onto, 'ref');
-      return thenRefresh(root, () => recorder.history(root, `rebase onto ${name.length === 40 ? name.slice(0, 7) : name}`, () => commitOps.rebase(root, name)));
+      return thenRefresh(root, () => recorder.history(root, t('rebase onto {ref}', { ref: name.length === 40 ? name.slice(0, 7) : name }), () => commitOps.rebase(root, name)));
     },
 
     async 'remote:fetch'(_ctx, repo, remote, prune) {
@@ -349,7 +353,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'remote:pull'(_ctx, repo, rebase) {
       const root = tab(repo);
       if (typeof rebase !== 'boolean') throw new TypeError('rebase must be a boolean');
-      const result = await thenRefresh(root, () => recorder.history(root, 'pull', () => network(root, 'pull', (run) => remotes.pull(root, rebase, run))));
+      const result = await thenRefresh(root, () => recorder.history(root, t('undo-action|pull'), () => network(root, 'pull', (run) => remotes.pull(root, rebase, run))));
       onFetched?.(root);
       return result;
     },
@@ -362,7 +366,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         await thenRefresh(root, () => withHooks(root, 'push', [...PUSH_HOOKS], (onOutput) => network(root, 'push', (run) => remotes.push(root, remote, force, { ...run, onOutput }))));
       } catch (error) {
         // The window offers pulling or a force push for this case.
-        if ((error as { rejected?: boolean }).rejected) throw new Error(`Rejected: ${(error as Error).message}`, { cause: error });
+        if ((error as { rejected?: boolean }).rejected) throw new Error(t('Rejected: {message}', { message: (error as Error).message }), { cause: error });
         throw error;
       }
     },
@@ -492,7 +496,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
           }
         });
         if (repoData(root)?.branches.some((branch) => branch.name === local)) {
-          store.dispatch(noticeAdded(`The branch ${local} already exists: it was checked out as it is, not moved to the pull request's latest commit.`));
+          store.dispatch(noticeAdded(t('The branch {branch} already exists: it was checked out as it is, not moved to the pull request\'s latest commit.', { branch: local })));
           report(await recorder.checkout(root, { kind: 'branch', name: local }, () => branches.checkout(root, { kind: 'branch', name: local })));
           return;
         }
@@ -545,7 +549,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         if (raw['message'] !== undefined && (typeof raw['message'] !== 'string' || raw['message'].length > 100_000)) throw new TypeError('message must be text');
         return { sha: raw['sha'], action: raw['action'] as RebaseStep['action'], ...(raw['message'] !== undefined && { message: raw['message'] as string }) };
       });
-      return thenRefresh(root, () => recorder.history(root, 'interactive rebase', () => interactiveRebase.run(root, base, parsed)));
+      return thenRefresh(root, () => recorder.history(root, t('interactive rebase'), () => interactiveRebase.run(root, base, parsed)));
     },
 
     async 'conflict:file'(_ctx, repo, path) {
@@ -575,7 +579,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       if (action !== 'continue' && action !== 'abort' && action !== 'skip') throw new TypeError('action must be continue, abort or skip');
       // The operation as git sees it now, not as the window last saw it.
       const data = await git.read(root);
-      if (!data.operation) throw new Error('No merge, rebase, cherry-pick or revert is in progress');
+      if (!data.operation) throw new Error(t('No merge, rebase, cherry-pick or revert is in progress'));
       await thenRefresh(root, () => conflicts.operation(root, data.operation!, action));
     },
 
@@ -607,7 +611,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const root = tab(repo);
       assertSha(sha);
       const stash = repoData(root)?.stashes.find((s) => s.sha === sha);
-      await thenRefresh(root, () => recorder.stashDrop(root, sha, stash?.message ?? 'Restored stash', () => stashes.drop(root, sha)));
+      await thenRefresh(root, () => recorder.stashDrop(root, sha, stash?.message ?? t('Restored stash'), () => stashes.drop(root, sha)));
     },
 
     async 'ref:validateName'(_ctx, repo, kind, name) {
@@ -682,8 +686,8 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const moved: string[] = [];
       for (const path of parsePaths(paths)) {
         const change = changes.get(path);
-        if (change === undefined) throw new Error(`${path} has no changes to discard`);
-        if (change.kind === 'conflicted') throw new Error(`${path} is in conflict; resolve it instead of discarding`);
+        if (change === undefined) throw new Error(t('{path} has no changes to discard', { path }));
+        if (change.kind === 'conflicted') throw new Error(t('{path} is in conflict; resolve it instead of discarding', { path }));
         (change.submodule ? moved : change.kind === 'untracked' ? untracked : tracked).push(path);
       }
       await thenRefresh(root, async () => {
@@ -709,7 +713,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const hooks = skipHooks ? ['prepare-commit-msg', 'post-commit'] : [...COMMIT_HOOKS];
       return thenRefresh(root, () =>
         withHooks(root, 'commit', hooks, (onOutput) =>
-          recorder.commit(root, `${amend ? 'amend' : 'commit'} “${subject}”`, () => staging.commit(root, message, amend, { skipHooks: skipHooks === true, onOutput })),
+          recorder.commit(root, amend ? t('amend “{subject}”', { subject }) : t('commit “{subject}”', { subject }), () => staging.commit(root, message, amend, { skipHooks: skipHooks === true, onOutput })),
         ),
       );
     },
@@ -766,7 +770,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     },
 
     async 'repo:pick'({ sender }, purpose) {
-      const title = purpose === 'scan' ? 'Choose a folder to search for repositories' : purpose === 'parent' ? 'Choose a folder' : 'Open repository';
+      const title = purpose === 'scan' ? t('Choose a folder to search for repositories') : purpose === 'parent' ? t('Choose a folder') : t('Open repository');
       return showOpenDialog(sender, { title, properties: ['openDirectory', ...(purpose === 'parent' ? (['createDirectory'] as const) : [])] });
     },
 
@@ -786,7 +790,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       assertString(url, 'url');
       assertAbsolutePath(parent, 'parent');
       assertString(name, 'name');
-      if (cloning) throw new Error('A clone is already running');
+      if (cloning) throw new Error(t('A clone is already running'));
       const controller = new AbortController();
       cloning = controller;
       let last = 0;
@@ -807,7 +811,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
         });
         return await openRepository(store, git, root);
       } catch (error) {
-        if (controller.signal.aborted) throw new Error('The clone was cancelled', { cause: error });
+        if (controller.signal.aborted) throw new Error(t('The clone was cancelled'), { cause: error });
         throw error;
       } finally {
         cloning = null;
@@ -963,12 +967,12 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     },
 
     async 'settings:browseExecutable'({ sender }) {
-      return showOpenDialog(sender, { title: 'Choose program', properties: ['openFile', 'dontAddToRecent'] });
+      return showOpenDialog(sender, { title: t('Choose program'), properties: ['openFile', 'dontAddToRecent'] });
     },
 
     async 'profile:apply'(_ctx, profileId, repo) {
       const profile = settings.values['profiles.list'].find((p) => p.id === profileId);
-      if (!profile) throw new Error('There is no such profile');
+      if (!profile) throw new Error(t('There is no such profile'));
       const root = optionalTab(repo);
       await profiles.apply(profile, root);
       // The commit form shows who commits; read the repository again.
@@ -1018,7 +1022,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'log:export'({ sender }) {
       const window = BrowserWindow.fromWebContents(sender);
-      const options = { title: 'Save the operation log', defaultPath: `forklift-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt` };
+      const options = { title: t('Save the operation log'), defaultPath: `forklift-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt` };
       const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
       if (result.canceled || !result.filePath) return null;
       await writeFile(result.filePath, `${log.text()}\n`, { mode: 0o600 });
@@ -1135,7 +1139,7 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'themes:openFolder'() {
       const folder = store.getState().app.userThemes.folder;
-      if (!folder) throw new Error('The themes folder is not available');
+      if (!folder) throw new Error(t('The themes folder is not available'));
       const failure = await shell.openPath(folder);
       if (failure) throw new Error(failure);
     },

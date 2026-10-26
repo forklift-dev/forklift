@@ -1,4 +1,5 @@
 import type { HostingComment, HostingRepo, IssueDetails, IssueSummary, PullDetails, PullSummary } from '../../shared/hosting';
+import { t } from '../../shared/i18n';
 
 export type Fetch = (
   url: string,
@@ -94,10 +95,10 @@ export class Transport {
       });
     } catch (error) {
       const host = new URL(this.options.server).host;
-      if (controller.signal.aborted) throw new HostingError(`${host} did not answer in time`);
+      if (controller.signal.aborted) throw new HostingError(t('{host} did not answer in time', { host }));
       const moved = await this.redirectTarget(url);
-      if (moved) throw new HostingError(`${host} sends requests on to ${moved}: add the account with that address`);
-      throw new HostingError(`Could not reach ${host}: ${error instanceof Error ? error.message : String(error)}`);
+      if (moved) throw new HostingError(t('{host} sends requests on to {address}: add the account with that address', { host, address: moved }));
+      throw new HostingError(t('Could not reach {host}: {message}', { host, message: error instanceof Error ? error.message : String(error) }));
     } finally {
       clearTimeout(timer);
     }
@@ -109,25 +110,27 @@ export class Transport {
       } catch {
         // not JSON
       }
-      if (response.status === 401) throw new HostingError('The server refused the token (wrong, expired or revoked)', 401);
+      if (response.status === 401) throw new HostingError(t('The server refused the token (wrong, expired or revoked)'), 401);
       // GitHub reports its rate limit as 403 with no requests remaining; others as 429.
       if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0')) {
         const retry = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
         const reset = Number.parseInt(response.headers.get('x-ratelimit-reset') ?? '', 10);
         const wait = Number.isFinite(retry) ? retry : Number.isFinite(reset) ? reset - Date.now() / 1000 : Number.NaN;
-        throw new HostingError(`Too many requests to the server${Number.isFinite(wait) ? `: try again in ${Math.max(1, Math.ceil(wait / 60))} min` : ', try again later'}`, 429);
+        throw new HostingError(Number.isFinite(wait)
+          ? t('Too many requests to the server: try again in {minutes} min', { minutes: Math.max(1, Math.ceil(wait / 60)) })
+          : t('Too many requests to the server, try again later'), 429);
       }
-      if (response.status === 403) throw new HostingError(`Not allowed${message ? `: ${message}` : ' (does the token have the needed access?)'}`, 403);
-      if (response.status === 404) throw new HostingError(`Not found on the server${message ? `: ${message}` : ''}`, 404);
-      throw new HostingError(`The server answered ${response.status}${message ? `: ${message}` : ''}`, response.status);
+      if (response.status === 403) throw new HostingError(message ? t('Not allowed: {message}', { message }) : t('Not allowed (does the token have the needed access?)'), 403);
+      if (response.status === 404) throw new HostingError(message ? t('Not found on the server: {message}', { message }) : t('Not found on the server'), 404);
+      throw new HostingError(message ? t('The server answered {status}: {message}', { status: response.status, message }) : t('The server answered {status}', { status: response.status }), response.status);
     }
     try {
       return JSON.parse(text);
     } catch {
       throw new HostingError(
         /<title>[^<]*bot/i.test(text)
-          ? 'The server answered with a bot check page instead of its API (its bot protection let no app through)'
-          : 'The server did not answer with JSON: is this the right server address for the service?',
+          ? t('The server answered with a bot check page instead of its API (its bot protection let no app through)')
+          : t('The server did not answer with JSON: is this the right server address for the service?'),
       );
     }
   }

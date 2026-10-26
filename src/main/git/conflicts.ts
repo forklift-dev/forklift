@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { Repository } from '@axosoft/nodegit';
 import type { ConflictFile, ConflictSide, OperationAction } from '../../shared/conflicts';
+import { t } from '../../shared/i18n';
 import type { RepoOperation } from '../../shared/state';
 import { resolveInsideRepo } from '../repoPaths';
 import { GitCliError, type GitCli } from './cli';
@@ -37,7 +38,7 @@ export class ConflictService {
       fromIndex(repo, path, 3),
       fromWorkingTree(root, path),
     ]);
-    if (!ours.exists && !theirs.exists && !base.exists) throw new ConflictError(`${path} is not in conflict`);
+    if (!ours.exists && !theirs.exists && !base.exists) throw new ConflictError(t('{path} is not in conflict', { path }));
     return { path, base, ours, theirs, merged };
   }
 
@@ -48,7 +49,7 @@ export class ConflictService {
   save(root: string, path: string, text: string, expectedHash: string | null, markResolved: boolean): Promise<void> {
     return this.queue.run(root, async () => {
       const current = await fromWorkingTree(root, path);
-      if (current.hash !== expectedHash) throw new ConflictError(`${path} changed on disk since it was opened; reopen it to see the changes`);
+      if (current.hash !== expectedHash) throw new ConflictError(t('{path} changed on disk since it was opened; reopen it to see the changes', { path }));
       await writeFile(await resolveInsideRepo(root, path), text, 'utf8');
       if (markResolved) await this.exec(root, ['add', '--', path]);
     });
@@ -72,7 +73,11 @@ export class ConflictService {
   operation(root: string, operation: RepoOperation, action: OperationAction): Promise<void> {
     return this.queue.run(root, async () => {
       const args = ACTIONS[operation.kind][action];
-      if (!args) throw new ConflictError(`A ${operation.kind} cannot be ${action === 'skip' ? 'skipped' : `${action}d`}`);
+      if (!args) {
+        const operationName = t(`operation|${operation.kind}`);
+        const actionName = action === 'skip' ? t('operation|skipped') : action === 'abort' ? t('operation|aborted') : t('operation|continued');
+        throw new ConflictError(t('A {operation} cannot be {action}', { operation: operationName, action: actionName }));
+      }
       const before = await this.position(root);
       try {
         await this.exec(root, args, true);

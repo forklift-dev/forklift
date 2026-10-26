@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { lfsAttributeLine, type LfsInfo } from '../../shared/lfs';
+import { t } from '../../shared/i18n';
 import type { GitCli } from './cli';
 import type { RemoteRun, RemoteService } from './remote';
 import { RepoQueue } from './repoQueue';
@@ -77,7 +78,7 @@ export class LfsService {
     await this.queue.run(root, async () => {
       const text = await this.attributes(root);
       const kept = text.split(/(?<=\n)/).filter((line) => !(lfsPatterns(line).length && lfsPatterns(line)[0] === valid));
-      if (kept.join('') === text) throw new LfsError(`${valid} is not tracked with LFS`);
+      if (kept.join('') === text) throw new LfsError(t('{pattern} is not tracked with LFS', { pattern: valid }));
       await writeFile(join(root, '.gitattributes'), kept.join(''));
     });
   }
@@ -98,12 +99,12 @@ export class LfsService {
 
   private async requireLfs(): Promise<void> {
     this.checked = null;
-    if (!(await this.version())) throw new LfsError(LFS_MISSING);
+    if (!(await this.version())) throw new LfsError(t(LFS_MISSING));
   }
 
   private pattern(pattern: unknown): string {
     if (typeof pattern !== 'string' || !pattern.trim() || pattern.length > 200 || /[\0\r\n]/.test(pattern) || /^[!#]/.test(pattern.trim())) {
-      throw new LfsError('Enter a file pattern such as *.psd or assets/**');
+      throw new LfsError(t('Enter a file pattern such as *.psd or assets/**'));
     }
     return pattern.trim();
   }

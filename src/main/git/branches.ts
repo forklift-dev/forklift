@@ -1,4 +1,5 @@
 import type { CheckoutTarget } from '../../shared/branches';
+import { t } from '../../shared/i18n';
 import { GitCliError, type GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
 import { StashService } from './stash';
@@ -28,11 +29,11 @@ export class BranchService {
 
   /** null when `name` is a valid new branch or tag name, else git's reason. */
   async invalidName(root: string, kind: 'branch' | 'tag', name: string): Promise<string | null> {
-    if (name.trim() === '') return 'Enter a name';
-    if (name.startsWith('-')) return 'A name cannot start with "-"';
+    if (name.trim() === '') return t('Enter a name');
+    if (name.startsWith('-')) return t('A name cannot start with "-"');
     const args = kind === 'branch' ? ['check-ref-format', '--branch', name] : ['check-ref-format', `refs/tags/${name}`];
     const { exitCode } = await this.git.exec(args, { cwd: root, readOnly: true, allowedExitCodes: [1, 128] });
-    return exitCode === 0 ? null : `"${name}" is not a valid ${kind} name`;
+    return exitCode === 0 ? null : kind === 'branch' ? t('"{name}" is not a valid branch name', { name }) : t('"{name}" is not a valid tag name', { name });
   }
 
   /** Creates a branch at a commit; with `checkout`, switches to it (carrying uncommitted changes along). */
@@ -62,9 +63,9 @@ export class BranchService {
       const remoteRef = `refs/remotes/${target.name}`;
       const sha = await this.resolve(root, remoteRef);
       const local = target.name.slice(target.remote.length + 1);
-      if (!local || !target.name.startsWith(`${target.remote}/`)) throw new BranchError(`${target.name} is not a branch of ${target.remote}`);
+      if (!local || !target.name.startsWith(`${target.remote}/`)) throw new BranchError(t('{name} is not a branch of {remote}', { name: target.name, remote: target.remote }));
       if (await this.exists(root, `refs/heads/${local}`)) {
-        throw new BranchError(`A local branch "${local}" already exists. Check it out, or create a branch with another name from ${target.name}.`);
+        throw new BranchError(t('A local branch "{local}" already exists. Check it out, or create a branch with another name from {remote}.', { local, remote: target.name }));
       }
       return this.switchTo(root, ['-c', local, '--track', target.name], sha, local);
     });
@@ -145,17 +146,17 @@ export class BranchService {
       case 'applied':
         return { stash: 'restored', message: null };
       case 'applied-unstaged':
-        return { stash: 'restored-unstaged', message: `Switched to ${description}. Your changes are back, but what was staged is now unstaged (it did not apply to the index here).` };
+        return { stash: 'restored-unstaged', message: t('Switched to {target}. Your changes are back, but what was staged is now unstaged (it did not apply to the index here).', { target: description }) };
       case 'conflicts':
-        return { stash: 'conflicts', message: `Switched to ${description}. Your uncommitted changes conflict with it in ${detail}; resolve the conflicts. The changes are also kept in the stash "${label}".` };
+        return { stash: 'conflicts', message: t('Switched to {target}. Your uncommitted changes conflict with it in {detail}; resolve the conflicts. The changes are also kept in the stash "{stash}".', { target: description, detail: detail ?? '', stash: label }) };
       case 'failed':
-        return { stash: 'kept', message: `Switched to ${description}, but your uncommitted changes could not be put back (${detail}). They are safe in the stash "${label}".` };
+        return { stash: 'kept', message: t('Switched to {target}, but your uncommitted changes could not be put back ({detail}). They are safe in the stash "{stash}".', { target: description, detail: detail ?? '', stash: label }) };
     }
   }
 
   private async resolve(root: string, ref: string): Promise<string> {
     const { exitCode, stdout } = await this.git.exec(['rev-parse', '--verify', '-q', `${ref}^{commit}`], { cwd: root, readOnly: true, allowedExitCodes: [1] });
-    if (exitCode !== 0) throw new BranchError(`${ref.replace(/^refs\/(heads|remotes|tags)\//, '')} does not exist`);
+    if (exitCode !== 0) throw new BranchError(t('{ref} does not exist', { ref: ref.replace(/^refs\/(heads|remotes|tags)\//, '') }));
     return stdout.trim();
   }
 

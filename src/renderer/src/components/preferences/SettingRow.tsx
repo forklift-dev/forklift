@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
+import { t, translate } from '../../../../shared/i18n';
 import { settingField, type SettingKey, type SettingsValues } from '../../../../shared/settings';
 import { invoke } from '../../api';
 import { useAppState } from '../../state';
@@ -50,16 +51,16 @@ export function SettingRow({ settingKey, repo, render, extra }: SettingRowProps)
   return (
     <div className="setting-row" data-setting={settingKey}>
       <div className="setting-text">
-        <label htmlFor={id}>{field.label}</label>
-        {field.description && <p>{field.description}</p>}
+        <label htmlFor={id}>{translate(field.label)}</label>
+        {field.description && <p>{translate(field.description)}</p>}
         {repo &&
           (override === undefined ? (
-            <p className="setting-scope">Uses the setting for all repositories</p>
+            <p className="setting-scope">{t('Uses the setting for all repositories')}</p>
           ) : (
             <p className="setting-scope overridden">
-              Set for this repository{' '}
+              {t('Set for this repository')}{' '}
               <button type="button" className="link-button" onClick={() => void save(null)}>
-                Use the setting for all repositories
+                {t('Use the setting for all repositories')}
               </button>
             </p>
           ))}
@@ -88,7 +89,7 @@ export function EnumControl({ id, settingKey, value, save }: ControlProps) {
     <select id={id} value={value as string} onChange={(event) => void save(event.target.value)}>
       {field.options.map((option) => (
         <option key={option.value} value={option.value}>
-          {option.label}
+          {translate(option.label)}
         </option>
       ))}
     </select>
@@ -127,7 +128,7 @@ function TextDraft({ id, settingKey, value, save, browse }: ControlProps & { bro
         value={draft}
         spellCheck={false}
         {...(field.type === 'integer' && { min: field.min, max: field.max, className: 'number-input' })}
-        {...(field.type === 'string' && { placeholder: field.placeholder, maxLength: field.maxLength })}
+        {...(field.type === 'string' && { placeholder: field.placeholder ? translate(field.placeholder) : undefined, maxLength: field.maxLength })}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => commit()}
         onKeyDown={(event) => {
@@ -140,7 +141,7 @@ function TextDraft({ id, settingKey, value, save, browse }: ControlProps & { bro
       />
       {browse && (
         <button type="button" onClick={() => void pick()}>
-          Browse…
+          {t('Browse…')}
         </button>
       )}
     </span>

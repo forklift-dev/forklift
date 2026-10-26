@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DiffTarget, FileDiff, FileVersion } from '../../../shared/diff';
+import { t } from '../../../shared/i18n';
 import type { LineAction, LineActionRequest, LineChange } from '../../../shared/staging';
 import { anchorLine, changeAt, hunkRequest, selectedLines, selectionRequest, type Side } from '../monaco/lineActions';
 import { invoke } from '../api';
@@ -52,9 +53,9 @@ const formatSize = (bytes: number) =>
 
 /** Why the text diff cannot be shown, or null when it can. */
 function unavailableReason({ original, modified }: FileDiff): string | null {
-  const describe = (v: FileVersion) => (v.exists ? formatSize(v.size) : 'none');
-  if (original.binary || modified.binary) return `Binary file (${describe(original)} → ${describe(modified)})`;
-  if (original.tooLarge || modified.tooLarge) return `File is too large to show (${describe(original)} → ${describe(modified)})`;
+  const describe = (v: FileVersion) => (v.exists ? formatSize(v.size) : t('none'));
+  if (original.binary || modified.binary) return t('Binary file ({original} → {modified})', { original: describe(original), modified: describe(modified) });
+  if (original.tooLarge || modified.tooLarge) return t('File is too large to show ({original} → {modified})', { original: describe(original), modified: describe(modified) });
   return null;
 }
 
@@ -65,7 +66,13 @@ export interface DiffEditing {
   confirmDiscard(what: string): Promise<boolean>;
 }
 
-const ACTION_LABEL: Record<LineAction, string> = { stage: 'Stage', unstage: 'Unstage', discard: 'Discard' };
+const actionLinesLabel = (action: LineAction) => ({ stage: t('Stage lines'), unstage: t('Unstage lines'), discard: t('Discard lines') })[action];
+const selectedLinesTitle = (action: LineAction) =>
+  ({
+    stage: t('Stage the selected lines (left: removals, right: additions)'),
+    unstage: t('Unstage the selected lines (left: removals, right: additions)'),
+    discard: t('Discard the selected lines (left: removals, right: additions)'),
+  })[action];
 
 interface DiffViewProps {
   /** Tab id (repository root) the target belongs to. */
@@ -106,11 +113,11 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
   // Why lines cannot be staged here; whole-file actions in the panel still work.
   let blocked: string | null = null;
   if (editing && data) {
-    if (reason) blocked = 'Use the whole-file actions for this file';
-    else if (data.original.lfs || data.modified.lfs) blocked = 'Stored in Git LFS: use the whole-file actions';
-    else if (data.original.lossy || data.modified.lossy) blocked = 'The file is not valid UTF-8; use the whole-file actions';
-    else if (!data.modified.exists) blocked = 'The file is deleted; use the whole-file actions';
-    else if (prefs.ignoreWhitespace) blocked = 'Turn off "Ignore whitespace" to work with lines';
+    if (reason) blocked = t('Use the whole-file actions for this file');
+    else if (data.original.lfs || data.modified.lfs) blocked = t('Stored in Git LFS: use the whole-file actions');
+    else if (data.original.lossy || data.modified.lossy) blocked = t('The file is not valid UTF-8; use the whole-file actions');
+    else if (!data.modified.exists) blocked = t('The file is deleted; use the whole-file actions');
+    else if (prefs.ignoreWhitespace) blocked = t('Turn off "Ignore whitespace" to work with lines');
   }
 
   /** Builds and sends a line request; `pick` gets the editor's current line changes. */
@@ -119,10 +126,10 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
     if (!editing || !data) return;
     if (blocked) return setHint(blocked);
     const lineChanges = editorRef.current?.getLineChanges();
-    if (!lineChanges?.length) return setHint('No changes to work with');
+    if (!lineChanges?.length) return setHint(t('No changes to work with'));
     const request = pick(lineChanges);
-    if (!request) return setHint('Select changed lines first (left side: removals, right side: additions)');
-    if (action === 'discard' && !(await editing.confirmDiscard(`the selected changes in ${target.path}`))) return;
+    if (!request) return setHint(t('Select changed lines first (left side: removals, right side: additions)'));
+    if (action === 'discard' && !(await editing.confirmDiscard(t('the selected changes in {path}', { path: target.path })))) return;
     await editing.apply(request);
   };
 
@@ -172,27 +179,27 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
           {subtitle && <span className="diff-subtitle">{subtitle}</span>}
         </div>
         <div className="diff-toolbar">
-          <button type="button" onClick={() => goToChange(-1)} disabled={!changeCount} title="Previous change">
+          <button type="button" onClick={() => goToChange(-1)} disabled={!changeCount} title={t('Previous change')}>
             ↑
           </button>
-          <button type="button" onClick={() => goToChange(1)} disabled={!changeCount} title="Next change">
+          <button type="button" onClick={() => goToChange(1)} disabled={!changeCount} title={t('Next change')}>
             ↓
           </button>
-          <span className="diff-count">{changeCount === null ? '' : `${changeCount} change${changeCount === 1 ? '' : 's'}`}</span>
-          <select aria-label="Diff layout" value={prefs.layout} onChange={(event) => setLayout(event.target.value as DiffLayout)}>
-            <option value="split">Split</option>
-            <option value="inline">Inline</option>
-            <option value="hunk">Hunks</option>
-            <option value="file">File</option>
+          <span className="diff-count">{changeCount === null ? '' : t('{count} changes', { count: changeCount })}</span>
+          <select aria-label={t('Diff layout')} value={prefs.layout} onChange={(event) => setLayout(event.target.value as DiffLayout)}>
+            <option value="split">{t('Split')}</option>
+            <option value="inline">{t('Inline')}</option>
+            <option value="hunk">{t('Hunks')}</option>
+            <option value="file">{t('File')}</option>
           </select>
           <label>
-            <input type="checkbox" checked={prefs.hideUnchanged} onChange={() => toggle('hideUnchanged')} /> Collapse unchanged
+            <input type="checkbox" checked={prefs.hideUnchanged} onChange={() => toggle('hideUnchanged')} /> {t('Collapse unchanged')}
           </label>
           <label>
-            <input type="checkbox" checked={prefs.ignoreWhitespace} onChange={() => toggle('ignoreWhitespace')} /> Ignore whitespace
+            <input type="checkbox" checked={prefs.ignoreWhitespace} onChange={() => toggle('ignoreWhitespace')} /> {t('Ignore whitespace')}
           </label>
           <label>
-            <input type="checkbox" checked={prefs.wordWrap} onChange={() => toggle('wordWrap')} /> Wrap
+            <input type="checkbox" checked={prefs.wordWrap} onChange={() => toggle('wordWrap')} /> {t('Wrap')}
           </label>
           {lineActions.map((action) => (
             <button
@@ -200,14 +207,14 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
               type="button"
               className={action === 'discard' ? 'danger-text' : undefined}
               disabled={Boolean(blocked) || !changeCount}
-              title={blocked ?? `${ACTION_LABEL[action]} the selected lines (left: removals, right: additions)`}
+              title={blocked ?? selectedLinesTitle(action)}
               onClick={() => void selectionAction(action)}
             >
-              {ACTION_LABEL[action]} lines
+              {actionLinesLabel(action)}
             </button>
           ))}
           {actions}
-          <button type="button" onClick={onClose} title="Close (Esc)">
+          <button type="button" onClick={onClose} title={t('Close (Esc)')}>
             ✕
           </button>
         </div>
@@ -218,11 +225,13 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
         </div>
       )}
       {error && <div className="diff-message error">{error}</div>}
-      {!error && !data && loading && <div className="diff-message">Loading…</div>}
+      {!error && !data && loading && <div className="diff-message">{t('Loading…')}</div>}
       {data && (data.original.lfs || data.modified.lfs) && (
         <div className="diff-hint lfs-note" role="note">
-          <span className="codicon codicon-database" aria-hidden="true" /> Stored in Git LFS
-          {[data.original, data.modified].some((v) => v.lfs && !v.lfs.downloaded) ? ' — the object is not downloaded, so the pointer is shown (LFS: Pull downloads it)' : ''}
+          <span className="codicon codicon-database" aria-hidden="true" />{' '}
+          {[data.original, data.modified].some((v) => v.lfs && !v.lfs.downloaded)
+            ? t('Stored in Git LFS — the object is not downloaded, so the pointer is shown (LFS: Pull downloads it)')
+            : t('Stored in Git LFS')}
         </div>
       )}
       {data && reason && <div className="diff-message">{reason}</div>}
@@ -289,6 +298,14 @@ function MonacoDiff({ data, path, prefs, editorRef, onChanges, hunks }: MonacoDi
   // New models take the current tab width; read through a ref so a model is not recreated when it changes.
   const tabSizeRef = useRef(prefs.tabSize);
   const refreshGlyphsRef = useRef<() => void>(() => {});
+  const stageHunkHover = t('Stage this hunk');
+  const unstageHunkHover = t('Unstage this hunk');
+  const stageHunkLabel = t('Stage Hunk');
+  const stageLinesLabel = t('Stage Selected Lines');
+  const discardHunkLabel = t('Discard Hunk');
+  const discardLinesLabel = t('Discard Selected Lines');
+  const unstageHunkLabel = t('Unstage Hunk');
+  const unstageLinesLabel = t('Unstage Selected Lines');
 
   // Editor callbacks are registered once; they read the latest controls through the ref.
   useLayoutEffect(() => {
@@ -318,13 +335,12 @@ function MonacoDiff({ data, path, prefs, editorRef, onChanges, hunks }: MonacoDi
     const refreshGlyphs = () => {
       const controls = hunksRef.current;
       const changes = controls ? (editor.getLineChanges() ?? []) : [];
-      const verb = controls?.mode === 'staged' ? 'Unstage' : 'Stage';
       glyphs.set(
         changes.map((change) => ({
           range: new monaco.Range(anchorLine(change), 1, anchorLine(change), 1),
           options: {
             glyphMarginClassName: `hunk-glyph codicon ${controls?.mode === 'staged' ? 'codicon-remove' : 'codicon-add'}`,
-            glyphMarginHoverMessage: { value: `${verb} this hunk` },
+            glyphMarginHoverMessage: { value: controls?.mode === 'staged' ? unstageHunkHover : stageHunkHover },
           },
         })),
       );
@@ -351,12 +367,12 @@ function MonacoDiff({ data, path, prefs, editorRef, onChanges, hunks }: MonacoDi
       ['modified', modified],
     ];
     const menu: Array<{ id: string; label: string; modes: string[]; action: LineAction; selection: boolean }> = [
-      { id: 'stageHunk', label: 'Stage Hunk', modes: ['unstaged'], action: 'stage', selection: false },
-      { id: 'stageLines', label: 'Stage Selected Lines', modes: ['unstaged'], action: 'stage', selection: true },
-      { id: 'discardHunk', label: 'Discard Hunk', modes: ['unstaged'], action: 'discard', selection: false },
-      { id: 'discardLines', label: 'Discard Selected Lines', modes: ['unstaged'], action: 'discard', selection: true },
-      { id: 'unstageHunk', label: 'Unstage Hunk', modes: ['staged'], action: 'unstage', selection: false },
-      { id: 'unstageLines', label: 'Unstage Selected Lines', modes: ['staged'], action: 'unstage', selection: true },
+      { id: 'stageHunk', label: stageHunkLabel, modes: ['unstaged'], action: 'stage', selection: false },
+      { id: 'stageLines', label: stageLinesLabel, modes: ['unstaged'], action: 'stage', selection: true },
+      { id: 'discardHunk', label: discardHunkLabel, modes: ['unstaged'], action: 'discard', selection: false },
+      { id: 'discardLines', label: discardLinesLabel, modes: ['unstaged'], action: 'discard', selection: true },
+      { id: 'unstageHunk', label: unstageHunkLabel, modes: ['staged'], action: 'unstage', selection: false },
+      { id: 'unstageLines', label: unstageLinesLabel, modes: ['staged'], action: 'unstage', selection: true },
     ];
     for (const [side, sideEditor] of sides) {
       for (const [order, item] of menu.entries()) {
@@ -391,14 +407,14 @@ function MonacoDiff({ data, path, prefs, editorRef, onChanges, hunks }: MonacoDi
       editorRef.current = null;
       refreshGlyphsRef.current = () => {};
     };
-  }, [editorRef, onChanges]);
+  }, [editorRef, onChanges, stageHunkHover, unstageHunkHover, stageHunkLabel, stageLinesLabel, discardHunkLabel, discardLinesLabel, unstageHunkLabel, unstageLinesLabel]);
 
   useEffect(() => {
     const editor = editorRef.current!;
-    const language = languageForPath(path);
+    const fileLanguage = languageForPath(path);
     const previous = editor.getModel();
     const model = (text: string | null) => {
-      const created = monaco.editor.createModel(text ?? '', language);
+      const created = monaco.editor.createModel(text ?? '', fileLanguage);
       created.updateOptions({ tabSize: tabSizeRef.current });
       return created;
     };

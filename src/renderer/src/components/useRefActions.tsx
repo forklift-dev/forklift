@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { CheckoutTarget } from '../../../shared/branches';
+import { t } from '../../../shared/i18n';
 import type { RepoData } from '../../../shared/state';
 import { invoke } from '../api';
 import type { RunAction } from '../App';
@@ -76,9 +77,9 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       void (async () => {
         if (target.kind === 'commit') {
           const ok = await confirm({
-            title: `Check out ${target.sha.slice(0, 7)}?`,
-            detail: 'You will be on a detached HEAD: new commits belong to no branch until you create one here. Uncommitted changes are carried along.',
-            confirmLabel: 'Check out',
+            title: t('Check out {sha}?', { sha: target.sha.slice(0, 7) }),
+            detail: t('You will be on a detached HEAD: new commits belong to no branch until you create one here. Uncommitted changes are carried along.'),
+            confirmLabel: t('Check out'),
           });
           if (!ok) return;
         }
@@ -89,7 +90,7 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     revert: (sha, subject) =>
       void (async () => {
-        const ok = await confirm({ title: `Revert “${subject}”?`, detail: 'A new commit that undoes its changes is added to the current branch.', confirmLabel: 'Revert' });
+        const ok = await confirm({ title: t('Revert “{subject}”?', { subject }), detail: t('A new commit that undoes its changes is added to the current branch.'), confirmLabel: t('Revert') });
         if (ok) await run(() => invoke('commit:revert', repo, sha));
       })(),
 
@@ -97,36 +98,36 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       void (async () => {
         const branch = headLabel(data);
         const detail = {
-          soft: 'The commits after it are undone; their changes stay staged.',
-          mixed: 'The commits after it are undone; their changes stay in the working tree, unstaged.',
-          hard: 'The commits after it and ALL uncommitted changes are discarded. This cannot be undone from Forklift.',
+          soft: t('The commits after it are undone; their changes stay staged.'),
+          mixed: t('The commits after it are undone; their changes stay in the working tree, unstaged.'),
+          hard: t('The commits after it and ALL uncommitted changes are discarded. This cannot be undone from Forklift.'),
         }[mode];
-        const ok = await confirm({ title: `Reset ${branch} to ${sha.slice(0, 7)} (${mode})?`, detail, confirmLabel: `Reset ${mode}`, danger: mode === 'hard' });
+        const ok = await confirm({ title: t('Reset {branch} to {sha} ({mode})?', { branch, sha: sha.slice(0, 7), mode }), detail, confirmLabel: t('Reset {mode}', { mode }), danger: mode === 'hard' });
         if (ok) await run(() => invoke('commit:reset', repo, sha, mode));
       })(),
 
     createBranch: (sha, from) =>
       void form({
-        title: 'Create branch',
-        detail: `From ${from}`,
+        title: t('Create branch'),
+        detail: t('From {from}', { from }),
         fields: [
-          { name: 'name', label: 'Branch name', placeholder: 'feature/my-change' },
-          { name: 'checkout', label: 'Check out the new branch', type: 'checkbox', initial: true },
+          { name: 'name', label: t('Branch name'), placeholder: 'feature/my-change' },
+          { name: 'checkout', label: t('Check out the new branch'), type: 'checkbox', initial: true },
         ],
-        confirmLabel: 'Create branch',
+        confirmLabel: t('Create branch'),
         validate: validate('branch'),
         submit: (values) => attempt(() => invoke('branch:create', repo, String(values['name']), sha, values['checkout'] === true)),
       }),
 
     createTag: (sha, from) =>
       void form({
-        title: 'Create tag',
-        detail: `At ${from}`,
+        title: t('Create tag'),
+        detail: t('At {from}', { from }),
         fields: [
-          { name: 'name', label: 'Tag name', placeholder: 'v1.0.0' },
-          { name: 'message', label: 'Message (optional; makes an annotated tag)', type: 'textarea' },
+          { name: 'name', label: t('Tag name'), placeholder: 'v1.0.0' },
+          { name: 'message', label: t('Message (optional; makes an annotated tag)'), type: 'textarea' },
         ],
-        confirmLabel: 'Create tag',
+        confirmLabel: t('Create tag'),
         validate: validate('tag'),
         submit: (values) => {
           const message = String(values['message'] ?? '');
@@ -136,10 +137,10 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     renameBranch: (name) =>
       void form({
-        title: `Rename ${name}`,
-        fields: [{ name: 'name', label: 'New name', initial: name }],
-        confirmLabel: 'Rename',
-        validate: async (values) => (values['name'] === name ? 'Enter a different name' : validate('branch')(values)),
+        title: t('Rename {name}', { name }),
+        fields: [{ name: 'name', label: t('New name'), initial: name }],
+        confirmLabel: t('Rename'),
+        validate: async (values) => (values['name'] === name ? t('Enter a different name') : validate('branch')(values)),
         submit: (values) => attempt(() => invoke('branch:rename', repo, name, String(values['name']))),
       }),
 
@@ -148,16 +149,16 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     deleteBranch: (name) =>
       void (async () => {
-        const ok = await confirm({ title: `Delete branch ${name}?`, detail: 'Only the branch is deleted; its commits stay while other branches contain them.', confirmLabel: 'Delete', danger: true });
+        const ok = await confirm({ title: t('Delete branch {name}?', { name }), detail: t('Only the branch is deleted; its commits stay while other branches contain them.'), confirmLabel: t('Delete'), danger: true });
         if (!ok) return;
         try {
           await invoke('branch:delete', repo, name, false);
         } catch (error) {
           if (!/not fully merged/i.test(errorText(error))) return void run(() => Promise.reject(error));
           const force = await confirm({
-            title: `${name} is not merged`,
-            detail: 'Its commits are not on any other branch and may be lost. Delete it anyway?',
-            confirmLabel: 'Delete anyway',
+            title: t('{name} is not merged', { name }),
+            detail: t('Its commits are not on any other branch and may be lost. Delete it anyway?'),
+            confirmLabel: t('Delete anyway'),
             danger: true,
           });
           if (force) await run(() => invoke('branch:delete', repo, name, true));
@@ -166,20 +167,20 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     deleteTag: (name) =>
       void (async () => {
-        const ok = await confirm({ title: `Delete tag ${name}?`, detail: 'The tag is deleted in this repository only.', confirmLabel: 'Delete', danger: true });
+        const ok = await confirm({ title: t('Delete tag {name}?', { name }), detail: t('The tag is deleted in this repository only.'), confirmLabel: t('Delete'), danger: true });
         if (ok) await run(() => invoke('tag:delete', repo, name));
       })(),
 
     stash: () =>
       void form({
-        title: 'Stash changes',
+        title: t('Stash changes'),
         fields: [
-          { name: 'message', label: 'Message (optional)', placeholder: 'What these changes are' },
-          { name: 'untracked', label: 'Include untracked files', type: 'checkbox', initial: true },
-          { name: 'staged', label: 'Only staged changes', type: 'checkbox', initial: false },
+          { name: 'message', label: t('Message (optional)'), placeholder: t('What these changes are') },
+          { name: 'untracked', label: t('Include untracked files'), type: 'checkbox', initial: true },
+          { name: 'staged', label: t('Only staged changes'), type: 'checkbox', initial: false },
         ],
-        confirmLabel: 'Stash',
-        validate: async (values) => (values['untracked'] && values['staged'] ? 'Untracked files cannot be stashed together with only staged changes' : null),
+        confirmLabel: t('Stash'),
+        validate: async (values) => (values['untracked'] && values['staged'] ? t('Untracked files cannot be stashed together with only staged changes') : null),
         submit: (values) =>
           attempt(async () => {
             const stashed = await invoke('stash:push', repo, {
@@ -187,7 +188,7 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
               includeUntracked: values['untracked'] === true,
               stagedOnly: values['staged'] === true,
             });
-            if (!stashed) throw new Error('There are no changes to stash');
+            if (!stashed) throw new Error(t('There are no changes to stash'));
           }),
       }),
 
@@ -195,30 +196,30 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
     popStash: (sha) => void run(() => invoke('stash:pop', repo, sha)),
     dropStash: (sha, label) =>
       void (async () => {
-        const ok = await confirm({ title: `Delete ${label}?`, detail: 'The stashed changes are lost.', confirmLabel: 'Delete', danger: true });
+        const ok = await confirm({ title: t('Delete {label}?', { label }), detail: t('The stashed changes are lost.'), confirmLabel: t('Delete'), danger: true });
         if (ok) await run(() => invoke('stash:drop', repo, sha));
       })(),
 
     merge: (ref, label) =>
       void form({
-        title: `Merge ${label} into ${headLabel(data)}`,
-        detail: 'Uncommitted changes are stashed and put back afterwards.',
+        title: t('Merge {label} into {branch}', { label, branch: headLabel(data) }),
+        detail: t('Uncommitted changes are stashed and put back afterwards.'),
         fields: [
           {
             name: 'mode',
-            label: 'How',
+            label: t('How'),
             type: 'select',
             initial: 'default',
             options: [
-              { value: 'default', label: 'Fast-forward if possible, otherwise a merge commit' },
-              { value: 'no-ff', label: 'Always create a merge commit' },
-              { value: 'ff-only', label: 'Fast-forward only' },
-              { value: 'squash', label: 'Squash into staged changes (commit them yourself)' },
+              { value: 'default', label: t('Fast-forward if possible, otherwise a merge commit') },
+              { value: 'no-ff', label: t('Always create a merge commit') },
+              { value: 'ff-only', label: t('Fast-forward only') },
+              { value: 'squash', label: t('Squash into staged changes (commit them yourself)') },
             ],
           },
-          { name: 'message', label: 'Merge commit message (optional)', placeholder: `Merge ${label}` },
+          { name: 'message', label: t('Merge commit message (optional)'), placeholder: t('Merge {label}', { label }) },
         ],
-        confirmLabel: 'Merge',
+        confirmLabel: t('Merge'),
         submit: (values) =>
           attempt(() => invoke('branch:merge', repo, ref, values['mode'] as 'default' | 'no-ff' | 'ff-only' | 'squash', String(values['message'] ?? '').trim() || null)),
       }),
@@ -226,34 +227,34 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
     rebase: (onto, label) =>
       void (async () => {
         const ok = await confirm({
-          title: `Rebase ${headLabel(data)} onto ${label}?`,
-          detail: `The commits of ${headLabel(data)} that ${label} does not have are re-applied on top of it (their hashes change). Uncommitted changes are stashed and put back afterwards.`,
-          confirmLabel: 'Rebase',
+          title: t('Rebase {branch} onto {label}?', { branch: headLabel(data), label }),
+          detail: t('The commits of {branch} that {label} does not have are re-applied on top of it (their hashes change). Uncommitted changes are stashed and put back afterwards.', { branch: headLabel(data), label }),
+          confirmLabel: t('Rebase'),
         });
         if (ok) await run(() => invoke('branch:rebase', repo, onto));
       })(),
 
     addRemote: () =>
       void form({
-        title: 'Add remote',
+        title: t('Add remote'),
         fields: [
-          { name: 'name', label: 'Name', initial: data.remotes.includes('origin') ? '' : 'origin', placeholder: 'upstream' },
-          { name: 'url', label: 'URL', placeholder: 'https://github.com/owner/repo.git or git@host:owner/repo.git' },
+          { name: 'name', label: t('Name'), initial: data.remotes.includes('origin') ? '' : 'origin', placeholder: 'upstream' },
+          { name: 'url', label: t('URL'), placeholder: t('{https} or {ssh}', { https: 'https://github.com/owner/repo.git', ssh: 'git@host:owner/repo.git' }) },
         ],
-        confirmLabel: 'Add remote',
-        validate: async (values) => (!String(values['name']).trim() ? 'Enter a name' : !String(values['url']).trim() ? 'Enter a URL' : null),
+        confirmLabel: t('Add remote'),
+        validate: async (values) => (!String(values['name']).trim() ? t('Enter a name') : !String(values['url']).trim() ? t('Enter a URL') : null),
         submit: (values) => attempt(() => invoke('remote:add', repo, String(values['name']).trim(), String(values['url']).trim())),
       }),
 
     editRemote: (name) =>
       void form({
-        title: `Edit ${name}`,
+        title: t('Edit {name}', { name }),
         fields: [
-          { name: 'url', label: 'Fetch URL', initial: data.remoteUrls[name]?.fetch ?? '' },
-          { name: 'push', label: 'Push URL (empty: same as fetch)', initial: data.remoteUrls[name]?.push ?? '' },
+          { name: 'url', label: t('Fetch URL'), initial: data.remoteUrls[name]?.fetch ?? '' },
+          { name: 'push', label: t('Push URL (empty: same as fetch)'), initial: data.remoteUrls[name]?.push ?? '' },
         ],
-        confirmLabel: 'Save',
-        validate: async (values) => (!String(values['url']).trim() ? 'Enter a URL' : null),
+        confirmLabel: t('Save'),
+        validate: async (values) => (!String(values['url']).trim() ? t('Enter a URL') : null),
         submit: (values) =>
           attempt(async () => {
             await invoke('remote:setUrl', repo, name, String(values['url']).trim(), false);
@@ -263,16 +264,16 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     renameRemote: (name) =>
       void form({
-        title: `Rename ${name}`,
-        fields: [{ name: 'name', label: 'New name', initial: name }],
-        confirmLabel: 'Rename',
-        validate: async (values) => (String(values['name']).trim() === name ? 'Enter a different name' : null),
+        title: t('Rename {name}', { name }),
+        fields: [{ name: 'name', label: t('New name'), initial: name }],
+        confirmLabel: t('Rename'),
+        validate: async (values) => (String(values['name']).trim() === name ? t('Enter a different name') : null),
         submit: (values) => attempt(() => invoke('remote:rename', repo, name, String(values['name']).trim())),
       }),
 
     removeRemote: (name) =>
       void (async () => {
-        const ok = await confirm({ title: `Remove remote ${name}?`, detail: 'Its remote branches disappear from this repository; nothing changes on the server.', confirmLabel: 'Remove', danger: true });
+        const ok = await confirm({ title: t('Remove remote {name}?', { name }), detail: t('Its remote branches disappear from this repository; nothing changes on the server.'), confirmLabel: t('Remove'), danger: true });
         if (ok) await run(() => invoke('remote:remove', repo, name));
       })(),
 
@@ -280,14 +281,14 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
 
     addSubmodule: () =>
       void form({
-        title: 'Add a submodule',
-        detail: 'The repository is cloned into the folder and recorded here; commit to keep it.',
+        title: t('Add a submodule'),
+        detail: t('The repository is cloned into the folder and recorded here; commit to keep it.'),
         fields: [
-          { name: 'url', label: 'Repository URL', placeholder: 'https://example.com/team/lib.git' },
-          { name: 'path', label: 'Folder (inside this repository)', placeholder: 'libs/lib' },
+          { name: 'url', label: t('Repository URL'), placeholder: 'https://example.com/team/lib.git' },
+          { name: 'path', label: t('Folder (inside this repository)'), placeholder: 'libs/lib' },
         ],
-        confirmLabel: 'Add',
-        validate: async (values) => (!String(values['url']).trim() ? 'Enter the repository URL' : !String(values['path']).trim() ? 'Enter the folder' : null),
+        confirmLabel: t('Add'),
+        validate: async (values) => (!String(values['url']).trim() ? t('Enter the repository URL') : !String(values['path']).trim() ? t('Enter the folder') : null),
         submit: (values) => attempt(() => invoke('submodule:add', repo, String(values['url']).trim(), String(values['path']).trim())),
       }),
 
@@ -298,9 +299,9 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
     removeSubmodule: (path) =>
       void (async () => {
         const ok = await confirm({
-          title: `Remove the submodule ${path}?`,
-          detail: 'Its folder and its clone in .git/modules are deleted, including changes not pushed from it. The removal is staged, to be committed.',
-          confirmLabel: 'Remove',
+          title: t('Remove the submodule {path}?', { path }),
+          detail: t('Its folder and its clone in .git/modules are deleted, including changes not pushed from it. The removal is staged, to be committed.'),
+          confirmLabel: t('Remove'),
           danger: true,
         });
         if (ok) await run(() => invoke('submodule:remove', repo, path));
@@ -312,23 +313,23 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       const folder = (name: string) => `${parent}${sep}${data.name}-${name.replace(/[\\/:*?"<>|\s]+/g, '-')}`;
       const busy = new Set(data.branches.filter((b) => b.current).map((b) => b.name));
       void form({
-        title: 'New working tree',
-        detail: 'A second folder with its own checkout of a branch, sharing this repository.',
+        title: t('New working tree'),
+        detail: t('A second folder with its own checkout of a branch, sharing this repository.'),
         fields: [
           {
             name: 'branch',
-            label: 'Branch',
+            label: t('Branch'),
             type: 'select',
             initial: branch ?? '',
-            options: [{ value: '', label: 'A new branch from HEAD…' }, ...data.branches.filter((b) => !busy.has(b.name)).map((b) => ({ value: b.name, label: b.name }))],
+            options: [{ value: '', label: t('A new branch from HEAD…') }, ...data.branches.filter((b) => !busy.has(b.name)).map((b) => ({ value: b.name, label: b.name }))],
           },
-          { name: 'newBranch', label: 'New branch name (for a new branch)', placeholder: 'feature/x' },
-          { name: 'path', label: 'Folder', initial: folder(branch ?? 'worktree') },
+          { name: 'newBranch', label: t('New branch name (for a new branch)'), placeholder: 'feature/x' },
+          { name: 'path', label: t('Folder'), initial: folder(branch ?? 'worktree') },
         ],
-        confirmLabel: 'Create',
+        confirmLabel: t('Create'),
         validate: async (values) => {
-          if (!String(values['path']).trim()) return 'Choose the folder';
-          if (!values['branch'] && !String(values['newBranch']).trim()) return 'Enter the new branch name';
+          if (!String(values['path']).trim()) return t('Choose the folder');
+          if (!values['branch'] && !String(values['newBranch']).trim()) return t('Enter the new branch name');
           return values['branch'] ? null : invoke('ref:validateName', repo, 'branch', String(values['newBranch']).trim()).catch(errorText);
         },
         submit: (values) =>
@@ -345,9 +346,9 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
     removeWorktree: (path) =>
       void (async () => {
         const ok = await confirm({
-          title: `Remove the working tree ${path}?`,
-          detail: 'Its folder is deleted, including uncommitted changes in it. Its branch and commits stay in the repository.',
-          confirmLabel: 'Remove',
+          title: t('Remove the working tree {path}?', { path }),
+          detail: t('Its folder is deleted, including uncommitted changes in it. Its branch and commits stay in the repository.'),
+          confirmLabel: t('Remove'),
           danger: true,
         });
         if (ok) await run(() => invoke('worktree:remove', repo, path, true));

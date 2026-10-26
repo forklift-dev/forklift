@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { AppToolSetting, DetectedProgram } from '../../shared/settings';
+import { t } from '../../shared/i18n';
 import type { Runner } from '../process/types';
 import { EDITORS, expandArgs, linuxTerminalCommand, presetId, terminalCandidates, terminalPresets, type ToolCommand, type ToolVars } from './commands';
 import { findExecutable } from './which';
@@ -20,7 +21,6 @@ export interface ExternalToolsDeps {
 }
 
 const AUTO: AppToolSetting = { mode: 'auto' };
-const CHANGE_HINT = 'Choose another one in Preferences → External tools.';
 
 /** Opens files and folders in the user's external editor and terminal. Programs are detached. */
 export class ExternalTools {
@@ -37,7 +37,7 @@ export class ExternalTools {
     if (editor) return this.launch(editor, vars, cwd);
 
     const error = await this.deps.openPath(file);
-    if (error) throw new ExternalToolError(`Could not open ${basename(file)}: ${error}`);
+    if (error) throw new ExternalToolError(t('Could not open {file}: {error}', { file: basename(file), error }));
     return 'default application';
   }
 
@@ -45,7 +45,7 @@ export class ExternalTools {
     const env = await this.deps.runner.environment();
     const terminal = await this.resolve(setting, terminalPresets(this.platform, env), 'Terminal', terminalCandidates(this.platform, env));
     if (!terminal) {
-      throw new ExternalToolError('No terminal emulator found. Choose one in Preferences → External tools or set the TERMINAL environment variable.');
+      throw new ExternalToolError(t('No terminal emulator found. Choose one in Preferences → External tools or set the TERMINAL environment variable.'));
     }
     return this.launch(terminal, { dir }, dir);
   }
@@ -65,16 +65,17 @@ export class ExternalTools {
     what: string,
     automatic: readonly ToolCommand[] = presets,
   ): Promise<ToolCommand | null> {
+    const tool = what === 'Editor' ? t('tool|Editor') : t('tool|Terminal');
     if (setting.mode === 'custom') {
       const found = await this.find([{ command: setting.command, args: setting.args }]);
-      if (!found) throw new ExternalToolError(`${what} command "${setting.command}" was not found. ${CHANGE_HINT}`);
+      if (!found) throw new ExternalToolError(t('{tool} command "{command}" was not found. Choose another one in Preferences → External tools.', { tool, command: setting.command }));
       return found;
     }
     if (setting.mode === 'preset') {
-      const preset = presets.find((tool) => presetId(tool) === setting.id);
-      if (!preset) throw new ExternalToolError(`${what} "${setting.id}" is not supported on this system. ${CHANGE_HINT}`);
+      const preset = presets.find((candidate) => presetId(candidate) === setting.id);
+      if (!preset) throw new ExternalToolError(t('{tool} "{id}" is not supported on this system. Choose another one in Preferences → External tools.', { tool, id: setting.id }));
       const found = await this.find([preset]);
-      if (!found) throw new ExternalToolError(`${what} "${setting.id}" is not installed (not found in PATH). ${CHANGE_HINT}`);
+      if (!found) throw new ExternalToolError(t('{tool} "{id}" is not installed (not found in PATH). Choose another one in Preferences → External tools.', { tool, id: setting.id }));
       return found;
     }
     return this.find(automatic);

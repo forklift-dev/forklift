@@ -7,6 +7,7 @@ import {
   type SettingKey,
   type SettingsSection,
 } from '../../../../shared/settings';
+import { t, translate } from '../../../../shared/i18n';
 import type { RepoData } from '../../../../shared/state';
 import { invoke } from '../../api';
 import { useAppState } from '../../state';
@@ -25,7 +26,9 @@ const IDENTITY_TERMS = 'commit author identity user name email';
 
 function matches(key: SettingKey, query: string): boolean {
   const field = settingField(key);
-  const haystack = `${key} ${field.label} ${field.description ?? ''} ${SETTINGS_SECTIONS[field.section]}`.toLowerCase();
+  const optionTexts = field.type === 'enum' ? field.options.flatMap((option) => [option.label, translate(option.label)]) : [];
+  const source = [key, field.label, field.description ?? '', SETTINGS_SECTIONS[field.section], ...optionTexts];
+  const haystack = [...source, ...source.map((text) => translate(text))].join(' ').toLowerCase();
   return query
     .toLowerCase()
     .split(/\s+/)
@@ -33,12 +36,21 @@ function matches(key: SettingKey, query: string): boolean {
     .every((word) => haystack.includes(word));
 }
 
+function matchesIdentity(query: string): boolean {
+  const translated = [t('Commit author'), t('Name'), t('Email')].join(' ').toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => IDENTITY_TERMS.includes(word) || translated.includes(word));
+}
+
 function GitStatus() {
   const gitCli = useAppState((s) => s.app.gitCli);
-  if (!gitCli) return <p className="tool-status">Checking git…</p>;
-  if (!gitCli.version) return <p className="setting-error">git was not found</p>;
-  if (!gitCli.meetsMinimum) return <p className="setting-error">git {gitCli.version} is older than {gitCli.minimumVersion}</p>;
-  return <p className="tool-status">Using git {gitCli.version}</p>;
+  if (!gitCli) return <p className="tool-status">{t('Checking git…')}</p>;
+  if (!gitCli.version) return <p className="setting-error">{t('git was not found')}</p>;
+  if (!gitCli.meetsMinimum) return <p className="setting-error">{t('git {version} is older than {minimumVersion}', { version: gitCli.version, minimumVersion: gitCli.minimumVersion })}</p>;
+  return <p className="tool-status">{t('Using git {version}', { version: gitCli.version })}</p>;
 }
 
 interface PreferencesProps {
@@ -70,8 +82,7 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
   const shownSection = sections.includes(section) ? section : sections[0]!;
   const searching = query.trim() !== '';
   const keys = available.filter((key) => (searching ? matches(key, query) : settingField(key).section === shownSection));
-  const words = query.trim().toLowerCase().split(/\s+/);
-  const showIdentity = searching ? words.every((word) => IDENTITY_TERMS.includes(word)) : shownSection === 'git';
+  const showIdentity = searching ? matchesIdentity(query.trim()) : shownSection === 'git';
 
   const render = (key: SettingKey) => (props: ControlProps): ReactNode => {
     const field = settingField(key);
@@ -113,7 +124,7 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
   return (
     <section
       className="preferences"
-      aria-label="Preferences"
+      aria-label={t('Preferences')}
       ref={rootRef}
       tabIndex={-1}
       onKeyDown={(event) => {
@@ -124,31 +135,31 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
       }}
     >
       <header className="preferences-header">
-        <h1>Preferences</h1>
-        <div className="scope-switch" role="tablist" aria-label="Settings scope">
+        <h1>{t('Preferences')}</h1>
+        <div className="scope-switch" role="tablist" aria-label={t('Settings scope')}>
           <button type="button" role="tab" aria-selected={scope === 'global'} onClick={() => setScope('global')}>
-            All repositories
+            {t('All repositories')}
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={scope === 'repository'}
             disabled={!repo}
-            title={repo ? `Overrides for ${repo.root}` : 'Open a repository to change its own settings'}
+            title={repo ? t('Overrides for {path}', { path: repo.root }) : t('Open a repository to change its own settings')}
             onClick={() => setScope('repository')}
           >
-            {repo ? `This repository (${repo.name})` : 'This repository'}
+            {repo ? t('This repository ({name})', { name: repo.name }) : t('This repository')}
           </button>
         </div>
         <input
           className="preferences-search"
           type="search"
-          placeholder="Search settings"
-          aria-label="Search settings"
+          placeholder={t('Search settings')}
+          aria-label={t('Search settings')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button type="button" onClick={onClose} title="Close (Esc)" aria-label="Close preferences">
+        <button type="button" onClick={onClose} title={t('Close (Esc)')} aria-label={t('Close preferences')}>
           ✕
         </button>
       </header>
@@ -160,12 +171,12 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
             ))}
           </ul>
           <button type="button" onClick={() => void invoke('settings:dismissProblems')}>
-            Dismiss
+            {t('Dismiss')}
           </button>
         </div>
       )}
       <div className="preferences-body">
-        <nav className="preferences-nav" aria-label="Sections">
+        <nav className="preferences-nav" aria-label={t('Sections')}>
           {sections.map((id) => (
             <button
               key={id}
@@ -177,17 +188,17 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
                 setSection(id);
               }}
             >
-              {SETTINGS_SECTIONS[id]}
+              {translate(SETTINGS_SECTIONS[id])}
             </button>
           ))}
         </nav>
         <div className="preferences-content">
-          {!searching && <h2>{SETTINGS_SECTIONS[shownSection]}</h2>}
-          {repoRoot && <p className="scope-note">Settings below apply only to {repo?.root}; anything not set here follows the settings for all repositories.</p>}
-          {shownSection === 'tools' && !searching && detected.error && <p className="setting-error">Could not detect installed tools: {detected.error}</p>}
+          {!searching && <h2>{translate(SETTINGS_SECTIONS[shownSection])}</h2>}
+          {repoRoot && <p className="scope-note">{t('Settings below apply only to {path}; anything not set here follows the settings for all repositories.', { path: repo?.root ?? '' })}</p>}
+          {shownSection === 'tools' && !searching && detected.error && <p className="setting-error">{t('Could not detect installed tools: {error}', { error: detected.error })}</p>}
           {rows(keys)}
           {showIdentity && <GitIdentityEditor key={repoRoot ?? 'global'} repo={repoRoot} />}
-          {searching && keys.length === 0 && !showIdentity && <p className="empty-note">No settings match “{query}”</p>}
+          {searching && keys.length === 0 && !showIdentity && <p className="empty-note">{t('No settings match “{query}”', { query })}</p>}
         </div>
       </div>
       {dialog}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { t } from '../../../shared/i18n';
 import { folderNameProblem, repoNameFromUrl, type CreateDefaults } from '../../../shared/repos';
 import { invoke } from '../api';
 import { useAppState } from '../state';
@@ -63,7 +64,7 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
     };
   }, [kind, parent, folder, busy, checkKey]);
 
-  const missing = !defaults ? '' : kind === 'clone' && !url.trim() ? 'Enter the repository URL' : !parent ? 'Choose a folder' : folderNameProblem(folder);
+  const missing = !defaults ? '' : kind === 'clone' && !url.trim() ? t('Enter the repository URL') : !parent ? t('Choose a folder') : folderNameProblem(folder);
   // An empty string blocks without a message (still loading or checking).
   const blocker = missing ?? (checked?.key === checkKey ? checked.problem : '');
   const target = parent && folder ? `${parent.replace(/[\\/]+$/, '')}${parent.includes('\\') ? '\\' : '/'}${folder}` : '';
@@ -117,33 +118,33 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
           void submit();
         }}
       >
-        <h2 id={`${id}-title`}>{kind === 'clone' ? 'Clone a repository' : 'Create a repository'}</h2>
+        <h2 id={`${id}-title`}>{kind === 'clone' ? t('Clone a repository') : t('Create a repository')}</h2>
         <fieldset disabled={busy} className="new-repo-fields">
           {kind === 'clone' && <HostingRepoPicker selectedUrl={url.trim()} onPick={(repo) => setUrl(repo.cloneUrl)} />}
           {kind === 'clone' && (
             <label className="form-field">
-              Repository URL
-              <input ref={firstRef} type="text" name="url" value={url} spellCheck={false} placeholder="https://example.com/team/project.git or git@example.com:team/project.git" onChange={(event) => setUrl(event.target.value)} />
+              {t('Repository URL')}
+              <input ref={firstRef} type="text" name="url" value={url} spellCheck={false} placeholder={t('{https} or {ssh}', { https: 'https://example.com/team/project.git', ssh: 'git@example.com:team/project.git' })} onChange={(event) => setUrl(event.target.value)} />
             </label>
           )}
           {kind === 'init' && (
             <label className="form-field">
-              Name
+              {t('Name')}
               <input ref={firstRef} type="text" name="name" value={name} spellCheck={false} placeholder="my-project" onChange={(event) => setName(event.target.value)} />
             </label>
           )}
           <div className="form-field">
-            <label htmlFor={`${id}-parent`}>{kind === 'clone' ? 'Clone into' : 'Create in'}</label>
+            <label htmlFor={`${id}-parent`}>{kind === 'clone' ? t('Clone into') : t('Create in')}</label>
             <span className="text-control">
               <input id={`${id}-parent`} type="text" name="parent" value={parent} spellCheck={false} onChange={(event) => setParent(event.target.value)} />
               <button type="button" onClick={() => void browse()}>
-                Browse…
+                {t('Browse…')}
               </button>
             </span>
           </div>
           {kind === 'clone' && (
             <label className="form-field">
-              Folder name
+              {t('Folder name')}
               <input
                 type="text"
                 name="name"
@@ -159,13 +160,13 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
           {kind === 'clone' && (
             <label className="checkbox-label">
               <input type="checkbox" name="recurseSubmodules" checked={recurseSubmodules} onChange={(event) => setRecurseSubmodules(event.target.checked)} />
-              Clone submodules too
+              {t('Clone submodules too')}
             </label>
           )}
           {kind === 'init' && (
             <>
               <label className="form-field">
-                Default branch
+                {t('Default branch')}
                 <input type="text" name="branch" value={branch} spellCheck={false} onChange={(event) => setBranch(event.target.value)} />
               </label>
               <fieldset className="template-list">
@@ -178,9 +179,9 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
                 ))}
               </fieldset>
               <label className="form-field">
-                License
+                {t('License')}
                 <select name="license" value={license} onChange={(event) => setLicense(event.target.value)}>
-                  <option value="">None</option>
+                  <option value="">{t('license|None')}</option>
                   {defaults?.licenses.map((template) => (
                     <option key={template.key} value={template.key}>
                       {template.label}
@@ -190,13 +191,13 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
               </label>
               {license && (
                 <label className="form-field">
-                  Copyright holder
-                  <input type="text" name="holder" value={holder} spellCheck={false} placeholder="Your name or organization" onChange={(event) => setHolder(event.target.value)} />
+                  {t('Copyright holder')}
+                  <input type="text" name="holder" value={holder} spellCheck={false} placeholder={t('Your name or organization')} onChange={(event) => setHolder(event.target.value)} />
                 </label>
               )}
               <label className="checkbox-label">
                 <input type="checkbox" name="initialCommit" checked={initialCommit} onChange={(event) => setInitialCommit(event.target.checked)} />
-                Make the first commit
+                {t('Make the first commit')}
               </label>
             </>
           )}
@@ -205,7 +206,8 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
         {busy && kind === 'clone' && (
           <div className="clone-progress" role="status">
             <span>
-              Cloning…{clone?.phase && ` ${clone.phase}`}
+              {t('Cloning…')}
+              {clone?.phase && ` ${clone.phase}`}
               {clone?.percent != null && ` ${clone.percent}%`}
             </span>
             <progress max={100} value={clone?.percent ?? undefined} />
@@ -218,10 +220,10 @@ export function NewRepoDialog({ kind, onClose, onOpened }: { kind: NewRepoKind; 
         )}
         <div className="modal-actions">
           <button type="button" onClick={close}>
-            {busy && kind === 'clone' ? 'Cancel clone' : 'Cancel'}
+            {busy && kind === 'clone' ? t('Cancel clone') : t('Cancel')}
           </button>
           <button type="submit" className="primary" disabled={busy || blocker !== null}>
-            {kind === 'clone' ? 'Clone' : 'Create'}
+            {kind === 'clone' ? t('verb|Clone') : t('Create')}
           </button>
         </div>
       </form>

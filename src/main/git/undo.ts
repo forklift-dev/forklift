@@ -1,6 +1,7 @@
 import { cp, mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { CheckoutTarget } from '../../shared/branches';
+import { t } from '../../shared/i18n';
 import type { BranchService } from './branches';
 import type { GitCli } from './cli';
 import type { RepoQueue } from './repoQueue';
@@ -94,7 +95,7 @@ export class UndoService {
   async undo(root: string): Promise<string> {
     const stack = this.stack(root);
     const entry = stack.undo.at(-1);
-    if (!entry) throw new UndoError('Nothing to undo');
+    if (!entry) throw new UndoError(t('Nothing to undo'));
     await this.check(root, entry.after);
     await this.execute(root, entry.undo);
     stack.undo.pop();
@@ -107,7 +108,7 @@ export class UndoService {
   async redo(root: string): Promise<string> {
     const stack = this.stack(root);
     const entry = stack.redo.at(-1);
-    if (!entry?.redo) throw new UndoError('Nothing to redo');
+    if (!entry?.redo) throw new UndoError(t('Nothing to redo'));
     await this.check(root, entry.before);
     await this.execute(root, entry.redo);
     stack.redo.pop();
@@ -160,7 +161,7 @@ export class UndoService {
     for (const [ref, sha] of Object.entries(expected.refs ?? {})) ok &&= (await this.rev(root, ref)) === sha;
     if (!ok) {
       this.forget(root);
-      throw new UndoError('The repository changed since then (outside this undo history), so it cannot be undone safely. The undo history was cleared.');
+      throw new UndoError(t('The repository changed since then (outside this undo history), so it cannot be undone safely. The undo history was cleared.'));
     }
   }
 
@@ -193,7 +194,7 @@ export class UndoService {
           break;
         case 'stashApply': {
           const { outcome, detail } = await stashes.apply(root, step.sha, step.drop);
-          if (outcome !== 'applied') throw new UndoError(`The stashed changes could not be restored cleanly (${detail ?? outcome})`);
+          if (outcome !== 'applied') throw new UndoError(t('The stashed changes could not be restored cleanly ({detail})', { detail: detail ?? outcome }));
           break;
         }
       }

@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from 'react';
 import { invoke } from '../api';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
+import { t } from '../../../shared/i18n';
 
 interface CommitPanelProps {
   repo: string;
@@ -22,20 +23,20 @@ function CommitIdentity({ repo, reloadKey }: { repo: string; reloadKey: unknown 
   if (!data) return null;
   const profile = profiles.find((p) => p.id === data.current);
   return (
-    <p className="commit-identity" title="Change it with a profile: Preferences → Profiles and keys, or “Switch profile…” in the command palette">
+    <p className="commit-identity" title={t('Change it with a profile: Preferences → Profiles and keys, or “Switch profile…” in the command palette')}>
       {data.userName || data.email ? (
         <>
-          as {data.userName || '(no name)'} &lt;{data.email || 'no email'}&gt;
+          {t('as {name} <{email}>', { name: data.userName || t('(no name)'), email: data.email || t('no email') })}
           {profile && <span className="commit-profile"> · {profile.label}</span>}
           {data.signing && (
             <span className="commit-signing">
               {' '}
-              · <span className="codicon codicon-verified" aria-hidden="true" /> signed
+              · <span className="codicon codicon-verified" aria-hidden="true" /> {t('signed')}
             </span>
           )}
         </>
       ) : (
-        <span className="setting-error">No name and email for commits: set them in Preferences → Git or with a profile</span>
+        <span className="setting-error">{t('No name and email for commits: set them in Preferences → Git or with a profile')}</span>
       )}
     </p>
   );
@@ -97,16 +98,16 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
     >
       <input
         className="commit-summary"
-        placeholder="Summary"
-        aria-label="Commit summary"
+        placeholder={t('Summary')}
+        aria-label={t('Commit summary')}
         value={summary}
         onChange={(event) => setSummary(event.target.value)}
         onKeyDown={onKeyDown}
       />
       <textarea
         className="commit-description"
-        placeholder="Description"
-        aria-label="Commit description"
+        placeholder={t('Description')}
+        aria-label={t('Commit description')}
         rows={3}
         value={description}
         onChange={(event) => setDescription(event.target.value)}
@@ -115,21 +116,21 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
       <CommitIdentity repo={repo} reloadKey={loadedAt} />
       {running && (
         <div className="hook-activity" role="status" aria-live="polite">
-          <span className="spinner" aria-hidden="true" /> Running {running.hooks.join(', ')} hook{running.hooks.length === 1 ? '' : 's'}…
+          <span className="spinner" aria-hidden="true" /> {t('Running {hooks} hooks…', { hooks: running.hooks.join(', '), count: running.hooks.length })}
           {running.output.length > 0 && <pre className="hook-output">{running.output.slice(-8).join('\n')}</pre>}
         </div>
       )}
       <div className="commit-actions">
         {verifyHooks.length > 0 && (
-          <label className={skipHooks ? 'skip-hooks on' : 'skip-hooks'} title={`Commit with --no-verify: the ${verifyHooks.join(' and ')} hook${verifyHooks.length === 1 ? '' : 's'} (${hooks.data?.dir}) will not check this commit`}>
-            <input type="checkbox" name="skipHooks" checked={skipHooks} onChange={(event) => setSkipHooks(event.target.checked)} /> Skip hooks
+          <label className={skipHooks ? 'skip-hooks on' : 'skip-hooks'} title={t('Commit with --no-verify: the {hooks} hooks ({dir}) will not check this commit', { hooks: verifyHooks.join(' and '), count: verifyHooks.length, dir: hooks.data?.dir ?? '' })}>
+            <input type="checkbox" name="skipHooks" checked={skipHooks} onChange={(event) => setSkipHooks(event.target.checked)} /> {t('Skip hooks')}
           </label>
         )}
-        <label title={headSha ? 'Replace the last commit' : 'Nothing to amend yet'}>
-          <input type="checkbox" checked={amend} disabled={!headSha} onChange={(event) => void toggleAmend(event.target.checked)} /> Amend
+        <label title={headSha ? t('Replace the last commit') : t('Nothing to amend yet')}>
+          <input type="checkbox" checked={amend} disabled={!headSha} onChange={(event) => void toggleAmend(event.target.checked)} /> {t('Amend')}
         </label>
-        <button type="submit" className="primary" disabled={!canCommit} title="Commit (Ctrl/Cmd+Enter)">
-          {committing ? 'Committing…' : amend ? 'Amend commit' : `Commit ${stagedCount} file${stagedCount === 1 ? '' : 's'}`}
+        <button type="submit" className="primary" disabled={!canCommit} title={t('Commit (Ctrl/Cmd+Enter)')}>
+          {committing ? t('Committing…') : amend ? t('Amend commit') : t('Commit {count} files', { count: stagedCount })}
         </button>
       </div>
     </form>

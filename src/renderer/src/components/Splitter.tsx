@@ -1,4 +1,5 @@
 import type { KeyboardEvent, PointerEvent } from 'react';
+import { t } from '../../../shared/i18n';
 
 interface SplitterProps {
   label: string;
@@ -58,7 +59,7 @@ export function Splitter({ label, value, min, max, onChange, onReset, direction,
       aria-valuemin={min}
       aria-valuemax={max}
       tabIndex={0}
-      title={`${label} (double-click: default width)`}
+      title={t('{label} (double-click: default width)', { label })}
       onPointerDown={onPointerDown}
       onDoubleClick={onReset}
       onKeyDown={onKeyDown}

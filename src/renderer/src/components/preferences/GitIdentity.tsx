@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '../../../../shared/i18n';
 import type { GitIdentity } from '../../../../shared/settings';
 import { invoke } from '../../api';
 import { useCommand } from '../../useCommand';
@@ -11,11 +12,11 @@ export function GitIdentityEditor({ repo }: { repo: string | null }) {
   return (
     <div className="setting-row" data-setting="git.identity">
       <div className="setting-text">
-        <label htmlFor={`identity-${scope}-name`}>Commit author</label>
+        <label htmlFor={`identity-${scope}-name`}>{t('Commit author')}</label>
         <p>
           {scope === 'global'
-            ? 'user.name and user.email in your global git config (~/.gitconfig): git uses them everywhere, not only in Forklift.'
-            : "user.name and user.email in this repository's .git/config. Leave empty to use the global identity."}
+            ? t('user.name and user.email in your global git config (~/.gitconfig): git uses them everywhere, not only in Forklift.')
+            : t("user.name and user.email in this repository's .git/config. Leave empty to use the global identity.")}
         </p>
       </div>
       <div className="setting-control">
@@ -40,7 +41,7 @@ function IdentityForm({ repo, initial }: { repo: string | null; initial: GitIden
       setSaved(trimmed);
       setName(trimmed.name);
       setEmail(trimmed.email);
-      setStatus({ text: 'Saved', ok: true });
+      setStatus({ text: t('Saved'), ok: true });
     } catch (error) {
       setStatus({ text: errorText(error), ok: false });
     }
@@ -54,10 +55,10 @@ function IdentityForm({ repo, initial }: { repo: string | null; initial: GitIden
         void save();
       }}
     >
-      <input id={`identity-${repo ? 'repository' : 'global'}-name`} aria-label="Name" placeholder="Name" value={name} maxLength={256} onChange={(e) => setName(e.target.value)} />
-      <input aria-label="Email" placeholder="Email" type="email" value={email} maxLength={256} onChange={(e) => setEmail(e.target.value)} />
+      <input id={`identity-${repo ? 'repository' : 'global'}-name`} aria-label={t('Name')} placeholder={t('Name')} value={name} maxLength={256} onChange={(e) => setName(e.target.value)} />
+      <input aria-label={t('Email')} placeholder={t('Email')} type="email" value={email} maxLength={256} onChange={(e) => setEmail(e.target.value)} />
       <button type="submit" disabled={!changed}>
-        Save
+        {t('Save')}
       </button>
       {status && <p className={status.ok ? 'tool-status' : 'setting-error'}>{status.text}</p>}
     </form>

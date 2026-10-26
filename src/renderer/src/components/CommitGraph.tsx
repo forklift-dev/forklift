@@ -3,6 +3,7 @@ import { colorIndex, initials } from '../../../shared/avatars';
 import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
 import type { HistoryFilter, HistoryRow } from '../../../shared/history';
 import type { RepoData } from '../../../shared/state';
+import { formatDate, t } from '../../../shared/i18n';
 import { historyPages } from '../history';
 import { Avatar, useAvatarPicture } from './Avatar';
 import { edgePath, graphStyle, laneX, type GraphStyle } from '../graphStyles';
@@ -13,8 +14,6 @@ import { useContextMenu } from './ContextMenu';
 
 const MAX_GRAPH_LANES = 16;
 const OVERSCAN = 20;
-
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 /** The author in a node: Gravatar picture when there is one, else initials on the author's color. */
 function AvatarNode({ x, y, r, name, email, ring }: { x: number; y: number; r: number; name: string; email: string; ring: string }) {
@@ -224,18 +223,18 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
   const { open: openMenu, menu } = useContextMenu();
   const headerMenu = (event: MouseEvent) =>
     openMenu(event, [
-      { label: `${layout.hidden.author ? 'Show' : 'Hide'} the Author column`, onSelect: () => toggleColumn('author') },
-      { label: `${layout.hidden.date ? 'Show' : 'Hide'} the Date column`, onSelect: () => toggleColumn('date') },
-      { label: `${layout.hidden.sha ? 'Show' : 'Hide'} the SHA column`, onSelect: () => toggleColumn('sha') },
+      { label: layout.hidden.author ? t('Show the Author column') : t('Hide the Author column'), onSelect: () => toggleColumn('author') },
+      { label: layout.hidden.date ? t('Show the Date column') : t('Hide the Date column'), onSelect: () => toggleColumn('date') },
+      { label: layout.hidden.sha ? t('Show the SHA column') : t('Hide the SHA column'), onSelect: () => toggleColumn('sha') },
       'separator',
-      { label: 'Fit the graph column to its lanes', disabled: layout.columns.graph === null, onSelect: () => setColumnWidth('graph', null) },
-      { label: 'Reset columns', onSelect: resetColumns },
+      { label: t('Fit the graph column to its lanes'), disabled: layout.columns.graph === null, onSelect: () => setColumnWidth('graph', null) },
+      { label: t('Reset columns'), onSelect: resetColumns },
     ]);
   const resizer = (column: ColumnId, label: string, edge: 'start' | 'end', width: number) => (
     <Splitter
       kind="col-resizer"
       className={edge}
-      label={`Resize the ${label} column`}
+      label={t('Resize the {label} column', { label })}
       value={width}
       min={LIMITS[column][0]}
       max={LIMITS[column][1]}
@@ -327,9 +326,9 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
           <div className="cell message">
             <span className="wip-label">{'// WIP'}</span>
             <span className="wip-counts">
-              {staged > 0 && `${staged} staged`}
+              {staged > 0 && t('{count} staged', { count: staged })}
               {staged > 0 && unstaged > 0 && ', '}
-              {unstaged > 0 && `${unstaged} unstaged`}
+              {unstaged > 0 && t('{count} unstaged', { count: unstaged })}
             </span>
           </div>
           <div className="cell author" />
@@ -378,7 +377,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
           <Avatar name={row.authorName} email={row.authorEmail} />
           <span className="author-name">{row.authorName}</span>
         </div>
-        <div className="cell date">{dateFormat.format(row.authorTime * 1000)}</div>
+        <div className="cell date">{formatDate(row.authorTime * 1000, { dateStyle: 'medium', timeStyle: 'short' })}</div>
         <div className="cell sha">{row.hash.slice(0, 7)}</div>
       </div>,
     );
@@ -388,7 +387,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
   return (
     <section
       className={`commits graph-style-${style.id}${style.laneRefs ? ' lane-refs' : ''}${style.streak ? ' streak-rows' : ''}${layout.hidden.author ? ' hide-author' : ''}${layout.hidden.date ? ' hide-date' : ''}${layout.hidden.sha ? ' hide-sha' : ''}`}
-      aria-label="Commit history"
+      aria-label={t('Commit history')}
       style={
         {
           '--row-height': `${ROW_HEIGHT}px`,
@@ -401,7 +400,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
       }
     >
       {pages.error && <div className="diff-message error">{pages.error}</div>}
-      {empty && <div className="empty-note">No commits yet</div>}
+      {empty && <div className="empty-note">{t('No commits yet')}</div>}
       <div
         className="commit-scroll"
         ref={scrollRef}
@@ -420,25 +419,27 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
         {/* Inside the scroll area (sticky), so its columns line up with the rows beside the scrollbar. */}
         <div className="commit-header" role="row" onContextMenu={headerMenu}>
           <div className="cell refs">
-            Branch / Tag
-            {resizer('refs', 'Branch / Tag', 'end', layout.columns.refs)}
+            <span className="header-label">{t('Branch / Tag')}</span>
+            {resizer('refs', t('Branch / Tag'), 'end', layout.columns.refs)}
           </div>
           <div className="cell graph" style={{ width: graphWidth }}>
-            Graph
-            {resizer('graph', 'Graph', 'end', graphWidth)}
+            <span className="header-label">{t('Graph')}</span>
+            {resizer('graph', t('Graph'), 'end', graphWidth)}
           </div>
-          <div className="cell message">Commit message</div>
+          <div className="cell message">
+            <span className="header-label">{t('Commit message')}</span>
+          </div>
           <div className="cell author">
-            {resizer('author', 'Author', 'start', layout.columns.author)}
-            Author
+            {resizer('author', t('Author'), 'start', layout.columns.author)}
+            <span className="header-label">{t('Author')}</span>
           </div>
           <div className="cell date">
-            {resizer('date', 'Date', 'start', layout.columns.date)}
-            Date
+            {resizer('date', t('Date'), 'start', layout.columns.date)}
+            <span className="header-label">{t('Date')}</span>
           </div>
           <div className="cell sha">
-            {resizer('sha', 'SHA', 'start', layout.columns.sha)}
-            SHA
+            {resizer('sha', t('SHA'), 'start', layout.columns.sha)}
+            <span className="header-label">{t('SHA')}</span>
           </div>
         </div>
         <div className="commit-rows" style={{ height: domHeight }}>
@@ -468,7 +469,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
 function GraphScrollbar({ left, width, content, scroll, onScroll }: { left: number; width: number; content: number; scroll: number; onScroll(value: number): void }) {
   const ratio = width / content;
   return (
-    <div className="graph-scrollbar" style={{ left, width }} role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the graph sideways" aria-valuenow={Math.round(scroll)} aria-valuemin={0} aria-valuemax={content - width}>
+    <div className="graph-scrollbar" style={{ left, width }} role="scrollbar" aria-orientation="horizontal" aria-label={t('Scroll the graph sideways')} aria-valuenow={Math.round(scroll)} aria-valuemin={0} aria-valuemax={content - width}>
       <div
         className="graph-scrollbar-thumb"
         style={{ left: scroll * ratio, width: Math.max(16, width * ratio) }}

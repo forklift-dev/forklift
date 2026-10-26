@@ -4,6 +4,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
+import { t } from '../../../shared/i18n';
 import type { TerminalEvent } from '../../../shared/terminal';
 import { invoke } from '../api';
 import { CODE_FONT } from '../monaco/setup';
@@ -78,7 +79,7 @@ function TerminalView({ repo, visible, onTitle, onExit }: { repo: string; visibl
         unsubscribe = onTerminalEvent(created, (event) => {
           if (event.type === 'data') terminal.write(event.data);
           else {
-            terminal.write(`\r\n\x1b[2m[process exited with code ${event.exitCode}]\x1b[0m\r\n`);
+            terminal.write(`\r\n\x1b[2m[${t('process exited with code {code}', { code: event.exitCode })}]\x1b[0m\r\n`);
             callbacks.current.onExit(event.exitCode);
           }
         });
@@ -118,13 +119,13 @@ interface TerminalTab {
 
 /** The terminals of one repository: tabs, a new one with "+", each in the repository's folder. */
 export function TerminalPanel({ repo, visible, onExternal, onHide, onEmpty }: { repo: string; visible: boolean; onExternal(): void; onHide(): void; onEmpty(): void }) {
-  const [tabs, setTabs] = useState<TerminalTab[]>([{ key: 1, title: 'Terminal 1', exited: false }]);
+  const [tabs, setTabs] = useState<TerminalTab[]>(() => [{ key: 1, title: t('Terminal {number}', { number: 1 }), exited: false }]);
   const [active, setActive] = useState(1);
   const next = useRef(2);
 
   const add = () => {
     const key = next.current++;
-    setTabs((current) => [...current, { key, title: `Terminal ${key}`, exited: false }]);
+    setTabs((current) => [...current, { key, title: t('Terminal {number}', { number: key }), exited: false }]);
     setActive(key);
   };
   const close = (key: number) => {
@@ -142,7 +143,7 @@ export function TerminalPanel({ repo, visible, onExternal, onHide, onEmpty }: { 
   const update = (key: number, change: Partial<TerminalTab>) => setTabs((current) => current.map((tab) => (tab.key === key ? { ...tab, ...change } : tab)));
 
   return (
-    <section className="terminal-panel" aria-label="Terminal">
+    <section className="terminal-panel" aria-label={t('Terminal')}>
       <header className="terminal-header">
         <div className="terminal-tabs" role="tablist">
           {tabs.map((tab) => (
@@ -152,7 +153,7 @@ export function TerminalPanel({ repo, visible, onExternal, onHide, onEmpty }: { 
               <button
                 type="button"
                 className="icon-button"
-                aria-label={`Close ${tab.title}`}
+                aria-label={t('Close {name}', { name: tab.title })}
                 onClick={(event) => {
                   event.stopPropagation();
                   close(tab.key);
@@ -162,15 +163,15 @@ export function TerminalPanel({ repo, visible, onExternal, onHide, onEmpty }: { 
               </button>
             </div>
           ))}
-          <button type="button" className="icon-button" aria-label="New terminal" title="New terminal" onClick={add}>
+          <button type="button" className="icon-button" aria-label={t('New terminal')} title={t('New terminal')} onClick={add}>
             <span className="codicon codicon-add" aria-hidden="true" />
           </button>
         </div>
         <div className="terminal-actions">
-          <button type="button" className="icon-button" aria-label="Open external terminal" title="Open the repository in your terminal app" onClick={onExternal}>
+          <button type="button" className="icon-button" aria-label={t('Open external terminal')} title={t('Open the repository in your terminal app')} onClick={onExternal}>
             <span className="codicon codicon-link-external" aria-hidden="true" />
           </button>
-          <button type="button" className="icon-button" aria-label="Hide terminal" title="Hide (Ctrl+`)" onClick={onHide}>
+          <button type="button" className="icon-button" aria-label={t('Hide terminal')} title={t('Hide (Ctrl+`)')} onClick={onHide}>
             <span className="codicon codicon-chevron-down" aria-hidden="true" />
           </button>
         </div>

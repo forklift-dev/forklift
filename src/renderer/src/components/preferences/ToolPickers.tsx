@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { joinArgs, splitArgs } from '../../../../shared/commandLine';
+import { t, translate } from '../../../../shared/i18n';
 import type {
   AppToolSetting,
   CommandLine,
@@ -70,7 +71,7 @@ function CustomCommand({
 
   const apply = async () => {
     setProblem(null);
-    if (!command.trim()) return setProblem('Choose a program');
+    if (!command.trim()) return setProblem(t('Choose a program'));
     let parsed: string[];
     try {
       parsed = splitArgs(args);
@@ -88,16 +89,16 @@ function CustomCommand({
   return (
     <div className="custom-command">
       <label>
-        Program
+        {t('Program')}
         <span className="text-control">
-          <input id={`${id}-command`} value={command} spellCheck={false} placeholder="Name in PATH or full path" onChange={(e) => setCommand(e.target.value)} />
+          <input id={`${id}-command`} value={command} spellCheck={false} placeholder={t('Name in PATH or full path')} onChange={(e) => setCommand(e.target.value)} />
           <button type="button" onClick={() => void browse()}>
-            Browse…
+            {t('Browse…')}
           </button>
         </span>
       </label>
       <label>
-        Arguments
+        {t('Arguments')}
         <input id={`${id}-args`} value={args} spellCheck={false} placeholder={ARG_HINTS[kind]} onChange={(e) => setArgs(e.target.value)} />
       </label>
       {children}
@@ -108,11 +109,11 @@ function CustomCommand({
       )}
       <div className="custom-command-actions">
         <button type="button" className="primary" onClick={() => void apply()}>
-          Apply
+          {t('Apply')}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </button>
         )}
       </div>
@@ -124,7 +125,7 @@ function CustomCommand({
 function TestButton({ kind, repo }: { kind: ToolKind; repo: string | null }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean; running: boolean } | null>(null);
   const test = async () => {
-    setStatus({ text: kind === 'diff' || kind === 'merge' ? 'Waiting for the tool to be closed…' : 'Starting…', ok: true, running: true });
+    setStatus({ text: kind === 'diff' || kind === 'merge' ? t('Waiting for the tool to be closed…') : t('Starting…'), ok: true, running: true });
     try {
       setStatus({ text: await invoke('tools:test', kind, repo), ok: true, running: false });
     } catch (error) {
@@ -134,7 +135,7 @@ function TestButton({ kind, repo }: { kind: ToolKind; repo: string | null }) {
   return (
     <>
       <button type="button" onClick={() => void test()} disabled={status?.running}>
-        Test
+        {t('Test')}
       </button>
       {status && (
         <p className={status.ok ? 'tool-status' : 'setting-error'} role="status">
@@ -145,14 +146,14 @@ function TestButton({ kind, repo }: { kind: ToolKind; repo: string | null }) {
   );
 }
 
-const programLabel = (id: string) => PROGRAM_NAMES[id] ?? id;
+const programLabel = (id: string) => translate(PROGRAM_NAMES[id] ?? id);
 
 export function AppToolPicker({ id, kind, value, repo, save, detected }: PickerProps) {
   const setting = value as AppToolSetting;
   const [editing, setEditing] = useState(false);
   const programs = (kind === 'editor' ? detected?.editors : detected?.terminals) ?? [];
   const installed = programs.filter((program) => program.path);
-  const automatic = installed[0] ? programLabel(installed[0].id) : kind === 'editor' ? 'the system default application' : 'none found';
+  const automatic = installed[0] ? programLabel(installed[0].id) : kind === 'editor' ? t('the system default application') : t('none found');
   const selected = editing ? 'custom' : setting.mode === 'preset' ? `preset:${setting.id}` : setting.mode;
   // A preset saved on another system (e.g. a synced settings file) that this one does not offer.
   const unknownPreset = detected && setting.mode === 'preset' && !programs.some((program) => program.id === setting.id) ? setting.id : null;
@@ -167,15 +168,14 @@ export function AppToolPicker({ id, kind, value, repo, save, detected }: PickerP
     <div className="tool-picker">
       <span className="text-control">
         <select id={id} value={selected} onChange={(event) => choose(event.target.value)}>
-          <option value="auto">Automatic ({automatic})</option>
+          <option value="auto">{t('Automatic ({choice})', { choice: automatic })}</option>
           {programs.map((program) => (
             <option key={program.id} value={`preset:${program.id}`} disabled={!program.path && !(setting.mode === 'preset' && setting.id === program.id)}>
-              {programLabel(program.id)}
-              {program.path ? '' : ' (not installed)'}
+              {program.path ? programLabel(program.id) : t('{name} (not installed)', { name: programLabel(program.id) })}
             </option>
           ))}
-          {unknownPreset && <option value={selected}>{unknownPreset} (not available)</option>}
-          <option value="custom">Custom command…</option>
+          {unknownPreset && <option value={selected}>{t('{name} (not available)', { name: unknownPreset })}</option>}
+          <option value="custom">{t('Custom command…')}</option>
         </select>
         {/* Test runs the saved choice, so it waits until a new custom command is applied. */}
         {!editing && <TestButton kind={kind} repo={repo} />}
@@ -214,16 +214,17 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
   };
 
   const writeToGitConfig = async () => {
-    const where = repo ? "this repository's .git/config" : 'your global git config (~/.gitconfig)';
     const ok = await confirm({
-      title: `Save the ${gitKind} tool to git config?`,
-      detail: `${gitKind}.tool will be set in ${where}. git and other git clients will use it too.`,
-      confirmLabel: 'Save to git config',
+      title: t('Save the {kind} tool to git config?', { kind: gitKind }),
+      detail: repo
+        ? t("{kind}.tool will be set in this repository's .git/config. git and other git clients will use it too.", { kind: gitKind })
+        : t('{kind}.tool will be set in your global git config (~/.gitconfig). git and other git clients will use it too.', { kind: gitKind }),
+      confirmLabel: t('Save to git config'),
     });
     if (!ok) return;
     try {
       await invoke('tools:writeGitConfig', gitKind, repo);
-      setWritten(`Saved to ${repo ? 'repository' : 'global'} git config`);
+      setWritten(repo ? t('Saved to repository git config') : t('Saved to global git config'));
     } catch (error) {
       setWritten(errorText(error));
     }
@@ -233,7 +234,7 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
     <div className="tool-picker">
       <span className="text-control">
         <select id={id} value={selected} onChange={(event) => choose(event.target.value)}>
-          <option value="git-config">As in git config ({configured ?? 'not set; chosen automatically'})</option>
+          <option value="git-config">{t('As in git config ({choice})', { choice: configured ?? t('not set; chosen automatically') })}</option>
           {tools.map((tool) => (
             <option key={tool.name} value={`tool:${tool.name}`} title={tool.description}>
               {tool.name}
@@ -241,14 +242,14 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
             </option>
           ))}
           {setting.mode === 'tool' && !tools.some((tool) => tool.name === setting.name) && (
-            <option value={selected}>{setting.name} (not available)</option>
+            <option value={selected}>{t('{name} (not available)', { name: setting.name })}</option>
           )}
-          <option value="custom">Custom command…</option>
+          <option value="custom">{t('Custom command…')}</option>
         </select>
         {!editing && <TestButton kind={kind} repo={repo} />}
         {setting.mode !== 'git-config' && (
           <button type="button" onClick={() => void writeToGitConfig()}>
-            Save to git config…
+            {t('Save to git config…')}
           </button>
         )}
       </span>
@@ -268,7 +269,7 @@ export function GitToolPicker({ id, kind, value, repo, save, detected, confirm }
           {gitKind === 'merge' && (
             <label className="checkbox-label">
               <input type="checkbox" checked={trustExitCode} onChange={(event) => setTrustExitCode(event.target.checked)} />
-              The tool's exit code tells whether the merge succeeded (otherwise git checks whether the file was saved)
+              {t("The tool's exit code tells whether the merge succeeded (otherwise git checks whether the file was saved)")}
             </label>
           )}
         </CustomCommand>
