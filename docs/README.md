@@ -43,6 +43,7 @@
 | [T-081](tasks/stage-0-foundation/T-081-packaging.md) | Пакеты: deb/rpm, Flatpak, AUR, Homebrew, winget — отложено | draft |
 | [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) — отложено | draft |
 | [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI — отложено | draft |
+| [T-085](tasks/stage-0-foundation/T-085-prebuilt-native-modules.md) | Готовые сборки nodegit и нативных модулей для CI (идея владельца) | draft |
 
 ### Этап 1 — Процессы и внешние программы
 
