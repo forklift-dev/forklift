@@ -68,6 +68,11 @@ export function runProcess(
 
   const collect = (stream: 'stdout' | 'stderr') => (chunk: Buffer) => {
     if (truncated) return;
+    // Passed on only, neither kept nor counted against the cap.
+    if (stream === 'stdout' && request.streamOnly && onOutput) {
+      if (chunk.length > 0) onOutput(stream, chunk);
+      return;
+    }
     const limit = request.maxOutputBytes;
     if (limit !== undefined && outputBytes + chunk.length > limit) {
       chunk = chunk.subarray(0, limit - outputBytes);

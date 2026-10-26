@@ -2,6 +2,8 @@ import type { HistoryFilter, HistoryRow } from '../../shared/history';
 import { invoke } from './api';
 
 export const PAGE_SIZE = 200;
+/** Pages kept; beyond that the ones farthest from where the list is looked at are dropped (and fetched again). */
+const MAX_PAGES = 64;
 
 /**
  * Pages of one repository's history at one version, fetched from main as they come into view.
@@ -13,6 +15,8 @@ export class HistoryPages {
   private readonly listeners = new Set<() => void>();
   private fallback: HistoryPages | null;
   private snapshot = 0;
+  /** The page the list last asked around. */
+  private focus = 0;
   loaded = 0;
   complete = false;
   /** Widest graph row seen, in lanes; the graph column does not jump while scrolling. */
@@ -55,6 +59,7 @@ export class HistoryPages {
 
   /** Makes sure the pages covering rows `first…last` are loaded or on their way. */
   request(first: number, last: number): void {
+    this.focus = Math.floor((Math.max(0, first) + Math.max(0, last)) / 2 / PAGE_SIZE);
     for (let page = Math.floor(Math.max(0, first) / PAGE_SIZE); page <= Math.floor(last / PAGE_SIZE); page++) {
       if (this.pages.has(page) || this.pending.has(page)) continue;
       if (this.complete && page * PAGE_SIZE >= this.loaded) continue;
@@ -63,6 +68,7 @@ export class HistoryPages {
         (result) => {
           this.pending.delete(page);
           this.pages.set(page, result.rows);
+          this.evict();
           this.loaded = Math.max(result.loaded, page * PAGE_SIZE + result.rows.length);
           this.complete = result.complete;
           for (const row of result.rows) this.maxWidth = Math.max(this.maxWidth, row.graph.width);
@@ -76,6 +82,15 @@ export class HistoryPages {
           this.emit();
         },
       );
+    }
+  }
+
+  /** A long scroll through a huge history keeps only the pages around the current position. */
+  private evict(): void {
+    while (this.pages.size > MAX_PAGES) {
+      let farthest = -1;
+      for (const page of this.pages.keys()) if (farthest < 0 || Math.abs(page - this.focus) > Math.abs(farthest - this.focus)) farthest = page;
+      this.pages.delete(farthest);
     }
   }
 

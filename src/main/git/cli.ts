@@ -16,6 +16,8 @@ export interface GitCliOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   onStdoutLine?(line: string): void;
+  /** With onStdoutLine: lines are only streamed, the result's stdout stays empty (output too large to hold). */
+  streamOnly?: boolean;
   /** Progress (`--progress`) and most diagnostics arrive here. */
   onStderrLine?(line: string): void;
 }
@@ -99,6 +101,7 @@ export class GitCli {
         signal: options.signal,
         onStdout: stdoutLines?.push,
         onStderr: stderrLines?.push,
+        streamOnly: options.streamOnly,
       });
     } catch (error) {
       if (error instanceof ProcessError) {

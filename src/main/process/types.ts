@@ -14,6 +14,8 @@ export interface RunOptions {
   /** Decoded output chunks as they arrive, e.g. for `git fetch --progress`. */
   onStdout?(text: string): void;
   onStderr?(text: string): void;
+  /** With onStdout: stdout is only streamed, not kept for the result (output too large to hold, e.g. a whole log). */
+  streamOnly?: boolean;
 }
 
 export interface LaunchOptions {

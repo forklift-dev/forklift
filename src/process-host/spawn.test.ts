@@ -47,6 +47,18 @@ describe('runProcess', () => {
     expect(chunks.join('')).toBe('stdout:a\nstdout:b\n');
   });
 
+  it('stream-only stdout is passed on in full but neither kept nor capped', async () => {
+    let streamed = 0;
+    const handle = runProcess(
+      { type: 'run', id: nextId++, command: node, args: ['-e', `for (let i = 0; i < 40; i++) process.stdout.write('x'.repeat(65536))`], env, streamOutput: true, streamOnly: true, maxOutputBytes: 100_000 },
+      (stream, chunk) => stream === 'stdout' && (streamed += chunk.length),
+    );
+    const outcome = await handle.result;
+    expect(streamed).toBe(40 * 65536);
+    expect(outcome.stdout.length).toBe(0);
+    expect(outcome.truncated).toBe(false);
+  });
+
   it('kills the process on timeout', async () => {
     const { result } = run(`setTimeout(() => {}, 60_000)`, { timeoutMs: 200 });
     const outcome = await result;

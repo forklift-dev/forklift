@@ -19,6 +19,8 @@ export interface RunRequest extends SpawnSpec {
   /** Combined stdout + stderr cap; the process tree is killed once exceeded. */
   maxOutputBytes?: number;
   streamOutput: boolean;
+  /** Streamed stdout is not also kept for the result (its stdout is then empty): for output too large to hold. */
+  streamOnly?: boolean;
 }
 
 /** Starts an external program (editor, terminal, diff/merge tool). */

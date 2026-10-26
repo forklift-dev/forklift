@@ -1,14 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { GitCli } from './cli';
+import { directRunner } from '../process/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HistoryService } from '../history/service';
 import { createGitService } from './service';
 
 // Fixtures are built with the git CLI so the test checks nodegit against git's own view of the repo.
-function sh(cwd: string, ...args: string[]) {
-  execFileSync('git', args, {
+function sh(cwd: string, ...args: string[]): string {
+  return execFileSync('git', args, {
     cwd,
     env: {
       ...process.env,
@@ -19,13 +21,13 @@ function sh(cwd: string, ...args: string[]) {
       GIT_COMMITTER_EMAIL: 'ada@example.com',
       GIT_COMMITTER_DATE: '2026-01-02T03:04:05Z',
     },
-  });
+  }).toString();
 }
 
 describe('GitService', () => {
   let root: string;
   const service = createGitService();
-  const history = new HistoryService();
+  const history = new HistoryService(new GitCli(directRunner()));
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-test-')));
@@ -95,6 +97,33 @@ describe('GitService', () => {
     expect(byPath['a.txt']).toMatchObject({ kind: 'modified', staged: false, unstaged: true });
     expect(byPath['new.txt']).toMatchObject({ kind: 'renamed', origPath: 'old.txt', staged: true });
     expect(byPath['untracked.txt']).toMatchObject({ kind: 'untracked', staged: false, unstaged: true });
+  });
+
+  it('leaves out files outside a sparse checkout, as git status does', async () => {
+    mkdirSync(join(root, 'in'));
+    mkdirSync(join(root, 'out'));
+    writeFileSync(join(root, 'in', 'a.txt'), 'a\n');
+    writeFileSync(join(root, 'out', 'b.txt'), 'b\n');
+    sh(root, 'add', '.');
+    sh(root, 'commit', '-m', 'First commit');
+    sh(root, 'sparse-checkout', 'set', 'in');
+    expect(existsSync(join(root, 'out', 'b.txt'))).toBe(false);
+    writeFileSync(join(root, 'in', 'a.txt'), 'changed\n');
+    const changes = (await service.read(root)).changes.map((change) => change.path);
+    expect(changes).toEqual(['in/a.txt']);
+    expect(sh(root, 'status', '--porcelain')).toBe(' M in/a.txt\n');
+  });
+
+  it('leaves out local changes of files marked skip-worktree', async () => {
+    writeFileSync(join(root, 'local.txt'), 'shared\n');
+    writeFileSync(join(root, 'a.txt'), 'a\n');
+    sh(root, 'add', '.');
+    sh(root, 'commit', '-m', 'First commit');
+    sh(root, 'update-index', '--skip-worktree', 'local.txt');
+    writeFileSync(join(root, 'local.txt'), 'my own settings\n');
+    writeFileSync(join(root, 'a.txt'), 'changed\n');
+    expect(sh(root, 'status', '--porcelain')).toBe(' M a.txt\n');
+    expect((await service.read(root)).changes.map((change) => change.path)).toEqual(['a.txt']);
   });
 
   it('reports merge conflicts as unstaged changes', async () => {

@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EdgeKind } from '../../shared/graph';
+import { GitCli } from '../git/cli';
 import { createGitService } from '../git/service';
+import { directRunner } from '../process/testing';
 import { HistoryService, summary } from './service';
 
 let root: string;
@@ -31,7 +33,7 @@ describe('summary', () => {
 
 describe('HistoryService', () => {
   it('serves pages in `git log --all --date-order` order, walking only as far as asked', async () => {
-    const history = new HistoryService();
+    const history = new HistoryService(new GitCli(directRunner()));
     const { historyVersion } = await git.read(root);
     const first = await history.page(root, historyVersion, 0, 100);
     expect(first.rows).toHaveLength(100);
@@ -50,7 +52,7 @@ describe('HistoryService', () => {
   });
 
   it('lays out a consistent graph: every lane at the top of a row was open at the bottom of the row above', async () => {
-    const history = new HistoryService();
+    const history = new HistoryService(new GitCli(directRunner()));
     const { historyVersion } = await git.read(root);
     const { rows } = await history.page(root, historyVersion, 0, 5000);
     for (let i = 1; i < rows.length; i++) {
@@ -64,8 +66,27 @@ describe('HistoryService', () => {
     expect(Math.max(...rows.map((row) => row.graph.width))).toBeLessThan(30);
   });
 
+  it('lays out a page from the middle exactly as the whole history (saved layout states, not stored rows)', async () => {
+    const history = new HistoryService(new GitCli(directRunner()));
+    const { historyVersion } = await git.read(root);
+    const { rows: whole } = await history.page(root, historyVersion, 0, 5000);
+    // Pages that start before, at and after a saved state (every 1024 rows), and one across two of them.
+    for (const [start, count] of [[1000, 30], [1024, 1], [2047, 2], [3000, 1000], [4990, 50]] as const) {
+      const { rows } = await history.page(root, historyVersion, start, count);
+      expect(rows.map((row) => [row.hash, row.graph])).toEqual(whole.slice(start, start + count).map((row) => [row.hash, row.graph]));
+    }
+  });
+
+  it('keeps the authors and dates git reports', async () => {
+    const history = new HistoryService(new GitCli(directRunner()));
+    const { historyVersion } = await git.read(root);
+    const { rows } = await history.page(root, historyVersion, 0, 50);
+    const expected = sh('log', '--all', '--date-order', '-50', '--format=%H %an <%ae> %at %P').split('\n');
+    expect(rows.map((row) => `${row.hash} ${row.authorName} <${row.authorEmail}> ${row.authorTime} ${row.parents.join(' ')}`.trim())).toEqual(expected.map((line) => line.trim()));
+  });
+
   it('rebuilds when the version changes and reports the version it was built for', async () => {
-    const history = new HistoryService();
+    const history = new HistoryService(new GitCli(directRunner()));
     const before = await git.read(root);
     const old = await history.page(root, before.historyVersion, 0, 5);
     sh('commit', '--allow-empty', '-qm', 'Newest');

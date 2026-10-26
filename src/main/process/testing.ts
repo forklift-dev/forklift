@@ -39,6 +39,7 @@ export function directRunner(baseEnv: Env = sanitizeEnv(process.env)): Runner {
           timeoutMs: options.timeoutMs,
           maxOutputBytes: options.maxOutputBytes,
           streamOutput: streaming,
+          streamOnly: streaming && options.streamOnly,
         },
         streaming
           ? (stream, chunk) => {

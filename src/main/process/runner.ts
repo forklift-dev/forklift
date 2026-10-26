@@ -57,6 +57,7 @@ export class ProcessRunner implements Runner {
         timeoutMs: options.timeoutMs,
         maxOutputBytes: options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
         streamOutput: streaming,
+        streamOnly: streaming && options.streamOnly,
       }),
       options.signal,
       streaming

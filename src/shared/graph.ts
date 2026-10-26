@@ -42,9 +42,27 @@ interface Lane {
  * unless a lane to the left already waits for that parent; further parents (merges) join an existing
  * lane or start a new one.
  */
+/** A layout's state between two rows: continuing from it lays out the following rows exactly as before. */
+export interface GraphLayoutState {
+  readonly lanes: readonly (Lane | null)[];
+  readonly nextColor: number;
+}
+
 export class GraphLayout {
   private lanes: (Lane | null)[] = [];
   private nextColor = 0;
+
+  /** Continues from a saved state (lanes are never changed in place, so they are shared). */
+  static from(state: GraphLayoutState): GraphLayout {
+    const layout = new GraphLayout();
+    layout.lanes = [...state.lanes];
+    layout.nextColor = state.nextColor;
+    return layout;
+  }
+
+  state(): GraphLayoutState {
+    return { lanes: [...this.lanes], nextColor: this.nextColor };
+  }
 
   next(sha: string, parents: readonly string[]): GraphRowLayout {
     const edges: GraphEdge[] = [];

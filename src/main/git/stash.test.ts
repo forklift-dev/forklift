@@ -93,7 +93,7 @@ describe('stashes in history and details', () => {
     const sha = await service.push(root, { message: 'wip', includeUntracked: true, stagedOnly: false });
     const data = await git.read(root);
     expect(data.historyVersion).not.toBe(before);
-    const { rows } = await new HistoryService().page(root, data.historyVersion, 0, 10);
+    const { rows } = await new HistoryService(new GitCli(directRunner())).page(root, data.historyVersion, 0, 10);
     expect(rows.map((r) => [r.subject, r.stash?.index ?? null])).toEqual([['On main: wip', 0], ['base', null]]);
     expect(rows[0]!.parents).toEqual([data.stashes[0]!.base]);
     expect(rows[1]!.graph.edges.some((e) => e.kind === EdgeKind.In)).toBe(true);
