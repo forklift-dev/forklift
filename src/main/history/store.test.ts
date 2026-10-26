@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GitCli } from '../git/cli';
 import { createGitService } from '../git/service';
 import { directRunner } from '../process/testing';
+import { CommitTable } from './commits';
 import { HistoryService } from './service';
 import { decode, encode, HistoryStore, type HistorySnapshot } from './store';
 
@@ -36,12 +37,15 @@ describe('saved histories', () => {
       version: 'v1',
       filterKey: '[[],[]]',
       revisions: ['HEAD', '--branches'],
-      hashes: ['a'.repeat(40), 'b'.repeat(40)],
-      parentLists: [`${'b'.repeat(40)} ${'c'.repeat(40)}`, ''],
+      commits: table([['a'.repeat(40), `${'b'.repeat(40)} ${'c'.repeat(40)}`], ['b'.repeat(40), '']]),
       stashes: [[0, { hash: 'a'.repeat(40), base: 'b'.repeat(40), index: 0, authorName: 'Ada', authorEmail: 'a@x', authorTime: 1, subject: 'WIP' }]],
       checkpoints: [{ lanes: [{ sha: 'b'.repeat(40), color: 3 }, null, { sha: 'c'.repeat(40), color: 7 }], nextColor: 8 }],
     };
-    expect(decode(encode(snapshot))).toEqual(snapshot);
+    const { commits, ...rest } = decode(encode(snapshot));
+    const { commits: expected, ...expectedRest } = snapshot;
+    expect(rest).toEqual(expectedRest);
+    expect(rows(commits)).toEqual(rows(expected));
+    expect(commits.find('b'.repeat(40))).toBe(1);
     expect(() => decode(Buffer.from('nonsense'))).toThrow();
   });
 
@@ -71,11 +75,13 @@ describe('saved histories', () => {
 
   it('restores histories of millions of rows', async () => {
     const hashes = Array.from({ length: 2_000_000 }, (_, i) => i.toString(16).padStart(40, '0'));
-    const snapshot: HistorySnapshot = { version: 'big', filterKey: '[[],[]]', revisions: [], hashes, parentLists: hashes.map((_, i) => (i + 1 < hashes.length ? hashes[i + 1]! : '')), stashes: [], checkpoints: [{ lanes: [], nextColor: 0 }] };
+    const commits = table(hashes.map((hash, i) => [hash, hashes[i + 1] ?? '']));
+    const snapshot: HistorySnapshot = { version: 'big', filterKey: '[[],[]]', revisions: [], commits, stashes: [], checkpoints: [{ lanes: [], nextColor: 0 }] };
     const store = new HistoryStore(saved);
     await store.save('/big', snapshot);
     const loaded = await store.load('/big', 'big', '[[],[]]');
-    expect(loaded?.hashes).toHaveLength(2_000_000);
+    expect(loaded?.commits.length).toBe(2_000_000);
+    expect(loaded?.commits.parents(1_000_000)).toEqual([hashes[1_000_001]]);
     const history = new HistoryService(new GitCli(directRunner()), { load: async () => loaded, save: async () => {} });
     // The stand-in store gives this snapshot for the repository: its last row is found without any walk.
     expect(await history.locate(root, (await git.read(root)).historyVersion, { solo: [], hidden: [] }, hashes[1_999_999]!)).toBe(1_999_999);
@@ -90,3 +96,11 @@ describe('saved histories', () => {
     expect(page.rows[0]?.subject).toBe('Newer');
   });
 });
+
+function table(rows: Array<[hash: string, parents: string]>): CommitTable {
+  const commits = new CommitTable();
+  for (const [hash, parents] of rows) commits.add(hash, parents);
+  return commits;
+}
+
+const rows = (commits: CommitTable) => Array.from({ length: commits.length }, (_, row) => [commits.hash(row), commits.parents(row)]);

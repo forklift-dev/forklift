@@ -4,6 +4,7 @@ import { fuzzyFilter } from '../../shared/fuzzy';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
 import type { GitCli } from '../git/cli';
 import { historyVersion, readStashes } from '../git/service';
+import { CommitTable } from './commits';
 import type { HistorySnapshot, HistoryStore } from './store';
 
 export const MAX_PAGE = 1000;
@@ -54,9 +55,8 @@ function parseDetails(line: string): CommitDetails | null {
  * again from the nearest saved state before it.
  */
 class HistoryCache {
-  private hashes: string[] = [];
-  /** Parent hashes joined by spaces ('' for a root commit). */
-  private parentLists: string[] = [];
+  /** Shas and parents of the rows, as bytes (a string per commit would take hundreds of MB in linux). */
+  private commits = new CommitTable();
   /** Stash rows by row index, drawn above the commit they were made on (their details are known up front). */
   private readonly stashAt = new Map<number, StashRow>();
   /** Details of blocks of BLOCK rows, read when shown. */
@@ -64,8 +64,6 @@ class HistoryCache {
   private lastBlock = 0;
   /** Every commit's subject, read once for the finder. */
   private subjectList: Promise<Map<string, string>> | null = null;
-  /** Row index by commit sha. */
-  readonly index = new Map<string, number>();
   private checkpoints: GraphLayoutState[] = [];
   private readonly layout = new GraphLayout();
   complete = false;
@@ -93,12 +91,9 @@ class HistoryCache {
   /** A history saved by an earlier run, complete without reading. */
   static restore(snapshot: HistorySnapshot, details: HistoryCache['details'], readSubjects: HistoryCache['readSubjects']): HistoryCache {
     const cache = new HistoryCache(snapshot.version, snapshot.filterKey, snapshot.revisions, async () => {}, details, readSubjects);
-    // Taken over as they are (spreading millions of rows into push would overflow the call stack).
-    cache.hashes = snapshot.hashes;
-    cache.parentLists = snapshot.parentLists;
+    cache.commits = snapshot.commits;
     for (const [row, stash] of snapshot.stashes) cache.stashAt.set(row, stash);
     cache.checkpoints = snapshot.checkpoints;
-    snapshot.hashes.forEach((hash, row) => cache.index.set(hash, row));
     cache.complete = true;
     return cache;
   }
@@ -109,15 +104,19 @@ class HistoryCache {
       version: this.version,
       filterKey: this.filterKey,
       revisions: this.revisions,
-      hashes: this.hashes,
-      parentLists: this.parentLists,
+      commits: this.commits,
       stashes: [...this.stashAt],
       checkpoints: this.checkpoints,
     };
   }
 
   get length(): number {
-    return this.hashes.length;
+    return this.commits.length;
+  }
+
+  /** The row of a commit read so far, or -1. */
+  find(sha: string): number {
+    return this.commits.find(sha);
   }
 
   /** Resolves once at least `count` rows exist or the history has ended. */
@@ -145,14 +144,14 @@ class HistoryCache {
     const layout = GraphLayout.from(this.checkpoints[from]!);
     const rows: HistoryRow[] = [];
     for (let i = from * CHECKPOINT; i < end; i++) {
-      const graph = layout.next(this.hashes[i]!, this.parents(i));
+      const graph = layout.next(this.commits.hash(i), this.commits.parents(i));
       if (i >= start) rows.push(this.row(i, details[i - start]!, graph));
     }
     return rows;
   }
 
   hash(row: number): string {
-    return this.hashes[row]!;
+    return this.commits.hash(row);
   }
 
   isStash(row: number): boolean {
@@ -179,10 +178,13 @@ class HistoryCache {
       const start = index * BLOCK;
       const end = Math.min(this.length, start + BLOCK);
       const rows = Array.from({ length: end - start }, (_, i) => start + i);
-      const shas = rows.filter((row) => !this.stashAt.has(row)).map((row) => this.hashes[row]!);
+      const shas = rows.filter((row) => !this.stashAt.has(row)).map((row) => this.commits.hash(row));
       block = this.details(shas, this.abort.signal).then((found) => {
         const bySha = new Map(found.map((details) => [details.hash, details]));
-        return rows.map((row) => this.stashAt.get(row) ?? bySha.get(this.hashes[row]!) ?? missing(this.hashes[row]!));
+        return rows.map((row) => {
+          const hash = this.commits.hash(row);
+          return this.stashAt.get(row) ?? bySha.get(hash) ?? missing(hash);
+        });
       });
       // A block of a history still being read may be short: it is read again once more rows exist.
       if (end - start === BLOCK || this.complete) this.blocks.set(index, block);
@@ -203,8 +205,8 @@ class HistoryCache {
   private row(i: number, details: CommitDetails, graph: GraphRowLayout): HistoryRow {
     const stash = this.stashAt.get(i);
     return {
-      hash: this.hashes[i]!,
-      parents: this.parents(i),
+      hash: this.commits.hash(i),
+      parents: this.commits.parents(i),
       authorName: details.authorName,
       authorEmail: details.authorEmail,
       authorTime: details.authorTime,
@@ -214,16 +216,13 @@ class HistoryCache {
     };
   }
 
-  private parents(i: number): string[] {
-    const list = this.parentLists[i]!;
-    return list ? list.split(' ') : [];
-  }
-
   private addLine(line: string): void {
     // "sha parent parent…" as rev-list --parents prints it.
     const space = line.indexOf(' ');
     const hash = space < 0 ? line : line.slice(0, space);
     if (hash.length < 40) return;
+    // A SHA-256 repository: its shas are 32 bytes.
+    if (!this.length && hash.length !== this.commits.width * 2) this.commits = new CommitTable(hash.length / 2);
     for (const stash of this.stashesByBase.get(hash) ?? []) {
       this.stashAt.set(this.length, stash);
       this.append(stash.hash, stash.base);
@@ -237,14 +236,13 @@ class HistoryCache {
     const row = this.length;
     if (row % CHECKPOINT === 0) this.checkpoints.push(this.layout.state());
     this.layout.advance(hash, parents ? parents.split(' ') : []);
-    this.index.set(hash, row);
-    this.hashes.push(hash);
-    this.parentLists.push(parents);
+    this.commits.add(hash, parents);
   }
 
   private finish(error: unknown): void {
     if (error && !this.abort.signal.aborted) this.failure = error;
     this.complete = true;
+    this.commits.trim();
     this.wake();
     if (!error) this.onComplete?.(this);
   }
@@ -286,8 +284,8 @@ export class HistoryService {
   /** Row index of a commit (reading as far as needed), or -1 when it is not in this history. */
   async locate(root: string, version: string, filter: HistoryFilter, sha: string): Promise<number> {
     const cache = await this.cache(root, version, filter);
-    while (!cache.index.has(sha) && !cache.complete) await cache.ensure(cache.length + 5000);
-    return cache.index.get(sha) ?? -1;
+    while (cache.find(sha) < 0 && !cache.complete) await cache.ensure(cache.length + 5000);
+    return cache.find(sha);
   }
 
   /** Commits for the finder: sha prefix, or the subject matched fuzzily; best first. */
@@ -344,8 +342,8 @@ export class HistoryService {
       const { stdout } = await this.git.exec(args, { cwd: root, readOnly: true, input: refs.length ? `${refs.join('\n')}\n` : '', timeoutMs: 120_000 });
       indices = stdout
         .split('\n')
-        .map((sha) => cache.index.get(sha))
-        .filter((index): index is number => index !== undefined)
+        .map((sha) => cache.find(sha))
+        .filter((index) => index >= 0)
         .sort((a, b) => a - b);
     }
     return { indices: indices.slice(0, MAX_MATCHES), truncated: indices.length > MAX_MATCHES };

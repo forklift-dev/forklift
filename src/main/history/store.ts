@@ -2,15 +2,14 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rm, stat, writeFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GraphLayoutState } from '../../shared/graph';
+import { CommitTable } from './commits';
 
 /** What a history needs to be shown again without git: its shape, where stashes sit, and the saved layout states. */
 export interface HistorySnapshot {
   version: string;
   filterKey: string;
   revisions: string[];
-  hashes: string[];
-  /** Parent hashes joined by spaces, as kept in memory. */
-  parentLists: string[];
+  commits: CommitTable;
   stashes: Array<[row: number, stash: StashSnapshot]>;
   checkpoints: GraphLayoutState[];
 }
@@ -25,11 +24,11 @@ export interface StashSnapshot {
   subject: string;
 }
 
-const MAGIC = 'FKHIST1\n';
+const MAGIC = 'FKHIST2\n';
 
 /**
  * Histories saved between runs (userData/history), so opening a large repository again shows its graph without
- * walking it: shas as 20 bytes, parents and lanes as row numbers. One file per repository, the newest few kept.
+ * walking it: shas and parents as bytes, lanes as row numbers. One file per repository, the newest few kept.
  */
 export class HistoryStore {
   constructor(
@@ -76,18 +75,18 @@ export class HistoryStore {
 }
 
 /**
- * Layout: MAGIC, a JSON header (version, filter, revisions, stashes, counts, shas that are not rows), then
- * little-endian binary: 20-byte shas of the rows; per row the parent count (u8) and parents (i32: a row number,
- * or -1-k for the k-th outside sha); per checkpoint nextColor (i32), lane count (i32) and per lane the waited
- * sha (i32 as parents, or MIN_INT for a free lane) and its color (i32).
+ * Layout: MAGIC, a JSON header (version, filter, revisions, stashes, counts, lane shas that are not rows), then
+ * the commit table as it is in memory: shas, parent shas (`width` bytes each) and where each row's parents start
+ * (u32, little-endian, rows + 1 of them); then per checkpoint nextColor (i32), lane count (i32) and per lane the
+ * waited sha (i32: a row, -1-k for the k-th outside sha, MIN_INT for a free lane) and its color (i32).
  */
 export function encode(snapshot: HistorySnapshot): Buffer {
-  const row = new Map(snapshot.hashes.map((hash, i) => [hash, i]));
+  const { commits } = snapshot;
   const outside: string[] = [];
   const outsideIndex = new Map<string, number>();
   const ref = (sha: string) => {
-    const found = row.get(sha);
-    if (found !== undefined) return found;
+    const found = commits.find(sha);
+    if (found >= 0) return found;
     let k = outsideIndex.get(sha);
     if (k === undefined) {
       k = outside.push(sha) - 1;
@@ -95,31 +94,30 @@ export function encode(snapshot: HistorySnapshot): Buffer {
     }
     return -1 - k;
   };
-  const parents = snapshot.parentLists.map((list) => (list ? list.split(' ').map(ref) : []));
   const lanes = snapshot.checkpoints.map((state) => state.lanes.map((lane) => (lane ? [ref(lane.sha), lane.color] : [NULL_LANE, 0])));
+  const parts = commits.parts();
   const header = Buffer.from(
     JSON.stringify({
       version: snapshot.version,
       filterKey: snapshot.filterKey,
       revisions: snapshot.revisions,
       stashes: snapshot.stashes,
-      rows: snapshot.hashes.length,
+      width: parts.width,
+      rows: parts.length,
+      parents: parts.parentShas.length / parts.width,
       checkpoints: snapshot.checkpoints.length,
       outside,
     }),
   );
-  const parentInts = parents.reduce((sum, list) => sum + list.length, 0);
   const laneInts = lanes.reduce((sum, list) => sum + 2 + list.length * 2, 0);
-  const size = MAGIC.length + 4 + header.length + snapshot.hashes.length * 21 + (parentInts + laneInts) * 4;
+  const size = MAGIC.length + 4 + header.length + parts.shas.length + parts.parentShas.length + parts.parentStart.byteLength + laneInts * 4;
   const buffer = Buffer.alloc(size);
   let at = buffer.write(MAGIC, 0, 'latin1');
   at = buffer.writeUInt32LE(header.length, at);
   at += header.copy(buffer, at);
-  for (const hash of snapshot.hashes) at += buffer.write(hash, at, 20, 'hex');
-  for (const list of parents) {
-    at = buffer.writeUInt8(list.length, at);
-    for (const parent of list) at = buffer.writeInt32LE(parent, at);
-  }
+  at += Buffer.from(parts.shas.buffer, parts.shas.byteOffset, parts.shas.length).copy(buffer, at);
+  at += Buffer.from(parts.parentShas.buffer, parts.parentShas.byteOffset, parts.parentShas.length).copy(buffer, at);
+  for (const start of parts.parentStart) at = buffer.writeUInt32LE(start, at);
   snapshot.checkpoints.forEach((state, i) => {
     at = buffer.writeInt32LE(state.nextColor, at);
     at = buffer.writeInt32LE(lanes[i]!.length, at);
@@ -143,21 +141,27 @@ export function decode(buffer: Buffer): HistorySnapshot {
     filterKey: string;
     revisions: string[];
     stashes: HistorySnapshot['stashes'];
+    width: number;
     rows: number;
+    parents: number;
     checkpoints: number;
     outside: string[];
   };
   at += headerLength;
-  const hashes = new Array<string>(header.rows);
-  for (let i = 0; i < header.rows; i++, at += 20) hashes[i] = buffer.toString('hex', at, at + 20);
-  const sha = (ref: number) => (ref >= 0 ? hashes[ref]! : header.outside[-1 - ref]!);
-  const parentLists = new Array<string>(header.rows);
-  for (let i = 0; i < header.rows; i++) {
-    const count = buffer.readUInt8(at++);
-    let list = '';
-    for (let p = 0; p < count; p++, at += 4) list += (p ? ' ' : '') + sha(buffer.readInt32LE(at));
-    parentLists[i] = list;
-  }
+  const take = (length: number) => {
+    if (at + length > buffer.length) throw new Error('Saved history is cut short');
+    const part = buffer.subarray(at, at + length);
+    at += length;
+    return part;
+  };
+  const shas = take(header.rows * header.width);
+  const parentShas = take(header.parents * header.width);
+  const starts = take((header.rows + 1) * 4);
+  const parentStart = new Uint32Array(header.rows + 1);
+  for (let i = 0; i <= header.rows; i++) parentStart[i] = starts.readUInt32LE(i * 4);
+  if (parentStart[header.rows] !== header.parents) throw new Error('Saved history is inconsistent');
+  const commits = CommitTable.restore({ width: header.width, length: header.rows, shas, parentShas, parentStart });
+  const sha = (ref: number) => (ref >= 0 ? commits.hash(ref) : header.outside[-1 - ref]!);
   const checkpoints: GraphLayoutState[] = [];
   // Lanes are shared between states that carry the same one, as in memory (they are never changed in place).
   const laneObjects = new Map<string, { sha: string; color: number }>();
@@ -184,5 +188,5 @@ export function decode(buffer: Buffer): HistorySnapshot {
     checkpoints.push({ lanes, nextColor });
   }
   if (at !== buffer.length) throw new Error('Saved history has trailing data');
-  return { version: header.version, filterKey: header.filterKey, revisions: header.revisions, hashes, parentLists, stashes: header.stashes, checkpoints };
+  return { version: header.version, filterKey: header.filterKey, revisions: header.revisions, commits, stashes: header.stashes, checkpoints };
 }
