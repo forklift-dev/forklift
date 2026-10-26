@@ -5,7 +5,7 @@ import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type Sta
 import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
 import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, RepoOperation, StashInfo, TagInfo } from '../../shared/state';
 import { readCommitDetails, readFileDiff, readStashDetails } from './diff';
-import { INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
+import { INDEX_ENTRY_SKIP_WORKTREE, INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
 export interface GitService {
   /** Resolves any path inside a working tree to the repository root; throws when it is not a repository. */
@@ -274,11 +274,29 @@ async function readChanges(repo: Repository): Promise<FileChange[]> {
       STATUS_OPT.RENAMES_HEAD_TO_INDEX |
       STATUS_OPT.RENAMES_INDEX_TO_WORKDIR,
   });
-  return files.map(toFileChange);
+  const skipped = await skipWorktreePaths(repo);
+  if (!skipped) return files.map((file) => toFileChange(file, file.statusBit()));
+  // git ignores the working tree for these paths; libgit2 does not, and reports every file outside a sparse
+  // checkout as deleted.
+  const changes: FileChange[] = [];
+  for (const file of files) {
+    const bits = skipped.has(file.path()) ? file.statusBit() & ~WORKTREE_MASK : file.statusBit();
+    if (bits) changes.push(toFileChange(file, bits));
+  }
+  return changes;
 }
 
-function toFileChange(file: StatusFile): FileChange {
-  const bits = file.statusBit();
+/** Index entries git leaves the working tree alone for (sparse checkout, `update-index --skip-worktree`), or null. */
+async function skipWorktreePaths(repo: Repository): Promise<Set<string> | null> {
+  const index = await repo.index();
+  // Extended flags only exist from index version 3 on: most repositories need no scan.
+  if (index.version() < 3) return null;
+  const paths = new Set<string>();
+  for (const entry of index.entries()) if (entry.flagsExtended & INDEX_ENTRY_SKIP_WORKTREE) paths.add(entry.path);
+  return paths.size ? paths : null;
+}
+
+function toFileChange(file: StatusFile, bits: number): FileChange {
   const conflicted = (bits & STATUS.CONFLICTED) !== 0;
   // libgit2 reports a conflict with the CONFLICTED bit alone; it needs the user's action, so it is unstaged.
   const staged = !conflicted && (bits & INDEX_MASK) !== 0;

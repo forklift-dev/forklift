@@ -1,4 +1,37 @@
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { ChangeKind, FileChange } from '../../../shared/state';
+
+/** Height of a change row (fixed in CSS, `.change-row`), for drawing only the visible part of long lists. */
+const ROW_HEIGHT = 24;
+/** Lists up to this long are drawn whole; longer ones (a build folder not ignored, a big checkout) by window. */
+const WINDOWED_FROM = 300;
+const OVERSCAN = 30;
+
+/** Rows `[start, end)` of a list inside the scrolling `.changes` panel that are on screen (all of a short list). */
+function useVisibleRows(list: RefObject<HTMLUListElement | null>, count: number): [number, number] {
+  const windowed = count > WINDOWED_FROM;
+  const [range, setRange] = useState<[number, number]>([0, Math.min(count, 100)]);
+  useEffect(() => {
+    const ul = list.current;
+    const scroller = ul?.closest('.changes');
+    if (!windowed || !ul || !scroller) return;
+    const update = () => {
+      const top = scroller.scrollTop - (ul.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop);
+      const start = Math.max(0, Math.floor(top / ROW_HEIGHT) - OVERSCAN);
+      const end = Math.min(count, Math.ceil((top + scroller.clientHeight) / ROW_HEIGHT) + OVERSCAN);
+      setRange((current) => (current[0] === start && current[1] === end ? current : [start, end]));
+    };
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(scroller);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [list, count, windowed]);
+  return windowed ? [Math.min(range[0], count), Math.min(range[1], count)] : [0, count];
+}
 
 const KIND_LABEL: Record<ChangeKind, string> = {
   modified: 'M',
@@ -42,6 +75,8 @@ interface ChangeGroupProps extends FileActions {
 }
 
 function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }: ChangeGroupProps) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const [start, end] = useVisibleRows(listRef, changes.length);
   if (changes.length === 0) return null;
   const paths = changes.map((c) => c.path);
   const discardable = changes.filter((c) => c.kind !== 'conflicted').map((c) => c.path);
@@ -62,8 +97,9 @@ function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }:
           )}
         </span>
       </h3>
-      <ul>
-        {changes.map((change) => {
+      <ul ref={listRef}>
+        {start > 0 && <li className="change-spacer" aria-hidden="true" style={{ height: start * ROW_HEIGHT }} />}
+        {changes.slice(start, end).map((change) => {
           const label = change.origPath ? `${change.origPath} → ${change.path}` : change.path;
           const conflicted = change.kind === 'conflicted';
           const isSelected = selected?.path === change.path && selected.staged === staged;
@@ -100,6 +136,7 @@ function ChangeGroup({ title, staged, changes, selected, lfsPaths, ...actions }:
             </li>
           );
         })}
+        {end < changes.length && <li className="change-spacer" aria-hidden="true" style={{ height: (changes.length - end) * ROW_HEIGHT }} />}
       </ul>
     </div>
   );

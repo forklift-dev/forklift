@@ -100,7 +100,8 @@ function assertSha(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(value)) throw new TypeError('sha must be a full commit hash');
 }
 
-const MAX_PATHS = 10_000;
+/** Paths in one request: a whole working tree of a large repository (they go to git through stdin). */
+const MAX_PATHS = 1_000_000;
 
 function parsePaths(value: unknown): string[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_PATHS) throw new TypeError('paths must be a non-empty array');

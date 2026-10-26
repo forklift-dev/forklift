@@ -1,5 +1,5 @@
 // Index work through the real UI: hunk glyphs, line discard with confirmation, unstage, file rows, commit, amend, hooks.
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRepo, launchApp, sleep } from '../harness.mjs';
 
@@ -92,4 +92,20 @@ export default async function ({ check, artifactsDir }) {
   const banner = await page.waitFor(`document.querySelector('.error-banner')?.textContent`);
   check('hook output shown in the banner', /Commit failed:[\s\S]*lint: missing semicolon in f\.txt:2/.test(banner ?? ''), banner);
   check('message kept after a failed commit', (await page.evaluate(`document.querySelector('.commit-summary').value`)) === 'Blocked by hook');
+
+  // 8. A long list (a build folder nobody ignored): only the visible rows exist, scrolling shows the rest,
+  // and "Stage all" takes every file in one go (paths go to git through stdin).
+  rmSync(join(root, '.git/hooks/pre-commit'));
+  mkdirSync(join(root, 'build'));
+  for (let i = 0; i < 2000; i++) writeFileSync(join(root, 'build', `out-${String(i).padStart(4, '0')}.o`), `${i}\n`);
+  await page.invoke('repo:refresh', root);
+  await page.waitFor(`/Unstaged\\s*20\\d\\d/.test(document.querySelector('.side').textContent)`, 15000);
+  const drawn = await page.evaluate(`document.querySelectorAll('.change-row').length`);
+  check('a list of 2000 changes draws only the visible rows', drawn > 0 && drawn < 300, drawn);
+  await page.evaluate(`document.querySelector('.changes').scrollTop = 1e9`);
+  check('scrolling to the end shows the last file', await page.waitFor(`[...document.querySelectorAll('.change-item')].some(b => b.textContent.includes('out-1999.o'))`));
+  await page.click(`[...document.querySelectorAll('.group-header')].find(h => /Unstaged/.test(h.textContent)).querySelector('[aria-label="Stage all"]')`);
+  const stagedShown = await page.waitFor(`!/Unstaged/.test(document.querySelector('.side').textContent) && /Staged\\s*20\\d\\d/.test(document.querySelector('.side').textContent)`, 20000);
+  const stagedInGit = git('diff', '--cached', '--name-only', '--', 'build').split('\n').filter(Boolean).length;
+  check('"Stage all" stages all of them', stagedShown && stagedInGit === 2000, `${stagedShown} ${stagedInGit}`);
 }

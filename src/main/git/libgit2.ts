@@ -29,6 +29,9 @@ export const STATUS = {
   CONFLICTED: 1 << 15,
 } as const;
 
+/** git_index_entry_extended_flag_t: the entry is outside the sparse checkout (or marked with update-index). */
+export const INDEX_ENTRY_SKIP_WORKTREE = 1 << 14;
+
 /** git_delta_t */
 export const DELTA = {
   ADDED: 1,

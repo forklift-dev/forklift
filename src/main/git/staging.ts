@@ -32,22 +32,22 @@ export class StagingService {
 
   stageFiles(root: string, paths: readonly string[]): Promise<void> {
     // -A also records deletions of the given paths.
-    return this.serial(root, () => this.exec(root, ['add', '-A', '--', ...paths]));
+    return this.serial(root, () => this.withPaths(root, ['add', '-A'], paths));
   }
 
   /** `unborn`: no commit yet, so there is no HEAD to restore the index from. */
   unstageFiles(root: string, paths: readonly string[], unborn: boolean): Promise<void> {
     return this.serial(root, () =>
       unborn
-        ? this.exec(root, ['rm', '--cached', '-r', '-q', '--', ...paths])
-        : this.exec(root, ['restore', '--staged', '--', ...paths]),
+        ? this.withPaths(root, ['rm', '--cached', '-r', '-q'], paths)
+        : this.withPaths(root, ['restore', '--staged'], paths),
     );
   }
 
   /** Reverts tracked files to their index version and deletes untracked ones. */
   discardFiles(root: string, tracked: readonly string[], untracked: readonly string[]): Promise<void> {
     return this.serial(root, async () => {
-      if (tracked.length) await this.exec(root, ['restore', '--worktree', '--', ...tracked]);
+      if (tracked.length) await this.withPaths(root, ['restore', '--worktree'], tracked);
       for (const path of untracked) await rm(join(root, path), { force: true });
     });
   }
@@ -148,6 +148,14 @@ export class StagingService {
 
   private async exec(root: string, args: string[]): Promise<void> {
     await this.git.exec(args, { cwd: root });
+  }
+
+  /**
+   * Runs `git <args>` on many paths: through stdin, NUL-separated, so any number of them fits (a command line
+   * has its limits — on Windows about 32 000 characters).
+   */
+  private async withPaths(root: string, args: string[], paths: readonly string[]): Promise<void> {
+    await this.git.exec([...args, '--pathspec-from-file=-', '--pathspec-file-nul'], { cwd: root, input: `${paths.join('\0')}\0` });
   }
 
   private serial<T>(root: string, task: () => Promise<T>): Promise<T> {

@@ -761,6 +761,8 @@ body.resizing * {
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Fixed: long lists draw only the visible rows (ChangesPanel ROW_HEIGHT). */
+  height: 24px;
 }
 
 
