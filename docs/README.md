@@ -40,9 +40,9 @@
 | [T-004](tasks/stage-0-foundation/T-004-signing-notarization.md) | Подпись и нотаризация дистрибутивов | draft |
 | [T-005](tasks/stage-0-foundation/T-005-e2e-harness.md) | Сквозные проверки в репозитории | review |
 | [T-069](tasks/stage-0-foundation/T-069-github-beta-builds.md) | Бета-сборки на GitHub Actions (Linux, Windows, macOS) | review |
-| [T-081](tasks/stage-0-foundation/T-081-packaging.md) | Пакеты: deb/rpm, Flatpak, AUR, Homebrew, winget | draft |
-| [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) | draft |
-| [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI | draft |
+| [T-081](tasks/stage-0-foundation/T-081-packaging.md) | Пакеты: deb/rpm, Flatpak, AUR, Homebrew, winget — отложено | draft |
+| [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) — отложено | draft |
+| [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI — отложено | draft |
 
 ### Этап 1 — Процессы и внешние программы
 
@@ -101,7 +101,7 @@
 | [T-045](tasks/stage-4-repositories/T-045-lfs.md) | Git LFS | review |
 | [T-046](tasks/stage-4-repositories/T-046-gitflow.md) | Gitflow | review |
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | review |
-| [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | draft |
+| [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | todo |
 
 ### Этап 5 — Настройки и удобство
 
@@ -121,7 +121,7 @@
 | [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | todo |
 | [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | todo |
 | [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
-| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | draft |
+| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | todo |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)
 
@@ -155,6 +155,9 @@
 
 Решение владельца (2026-10-23): облачные функции GitKraken, требующие их сервера, — **исключены**:
 Workspaces, Cloud Patches, Launchpad, AI-функции, Team, онбординг-туториал GitKraken, интеграция с `gk` CLI.
+
+Уточнение владельца (2026-10-26): исключены облачные варианты; локальные группы репозиториев (T-079) и AI
+без нашего сервера — через CLI-агенты, ключ API пользователя или Ollama (T-084) — делаем.
 
 ## Ночная (автономная) работа
 
