@@ -72,7 +72,7 @@
 | [T-026](tasks/stage-2-git-core/T-026-file-watching.md) | Слежение за файлами и автообновление | review |
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | review |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
-| [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | todo |
+| [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | review |
 | [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | todo |
 
 ### Этап 3 — История и операции над коммитами

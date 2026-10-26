@@ -18,6 +18,23 @@ export interface ConflictBlock {
 
 export type ConflictChoice = 'ours' | 'theirs' | 'both' | 'theirs-ours' | 'base';
 
+/** A safe automatic choice for a conflict block, or null when both sides changed differently. */
+export function automaticChoice(block: ConflictBlock): ConflictChoice | null {
+  const equal = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((line, index) => line === b[index]);
+  const sameIgnoringWhitespace = (a: readonly string[], b: readonly string[]) => {
+    const normalize = (lines: readonly string[]) => lines.map((line) => line.replace(/[ \t]+/g, ' ').trim()).join('\n');
+    return normalize(a) === normalize(b);
+  };
+
+  if (equal(block.ours, block.theirs)) return 'ours';
+  if (block.base && equal(block.ours, block.base)) return 'theirs';
+  if (block.base && equal(block.theirs, block.base)) return 'ours';
+  if (block.base && sameIgnoringWhitespace(block.ours, block.base) && !sameIgnoringWhitespace(block.theirs, block.base)) return 'theirs';
+  if (block.base && sameIgnoringWhitespace(block.theirs, block.base) && !sameIgnoringWhitespace(block.ours, block.base)) return 'ours';
+  if (sameIgnoringWhitespace(block.ours, block.theirs)) return 'ours';
+  return null;
+}
+
 const marker = (line: string, char: string) => line.startsWith(char.repeat(7)) && (line.length === 7 || line[7] === ' ' || line[7] === '\r');
 const label = (line: string) => line.slice(8).replace(/\r$/, '');
 

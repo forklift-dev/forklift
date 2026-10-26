@@ -1,4 +1,4 @@
-// Conflict resolution in the app: operation banner, the three-pane editor (take ours/theirs/both, save and mark
+// Conflict resolution in the app: operation banner, the four-pane editor (ours/base/theirs/result, take choices, save and mark
 // resolved, stale file protection), whole-file sides including deletions, committing a merge, aborting a rebase.
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,6 +16,7 @@ export default async function ({ check }) {
   write('gone.txt', 'base\n');
   git('add', '.');
   git('commit', '-qm', 'Base');
+  git('config', 'merge.conflictStyle', 'diff3');
   git('switch', '-qc', 'feature');
   write('app.txt', lines('TWO feature', 'NINE feature'));
   git('rm', '-q', 'gone.txt');
@@ -34,8 +35,20 @@ export default async function ({ check }) {
 
   await page.click(conflictItem('app.txt'));
   check('conflict editor opens with both blocks', (await page.waitFor(`${subtitle}?.endsWith('of 2') && ${subtitle}`)) === 'Conflict 1 of 2', await page.evaluate(subtitle));
-  const sides = await page.evaluate(`[...document.querySelectorAll('.conflict-pane-title')].map(t => t.textContent).join(' | ')`);
-  check('ours and theirs panes labelled', /Ours — HEAD \| Theirs — feature/.test(sides), sides);
+  const sides = await page.evaluate(`[...document.querySelectorAll('.conflict-pane-title > span')].map(t => t.textContent).join(' | ')`);
+  check('ours, base and theirs panes labelled', /Ours — HEAD \| Base \| Theirs — feature/.test(sides), sides);
+  check('each version can apply selected lines', await page.evaluate(`document.querySelectorAll('.conflict-sides .conflict-pane-title button').length === 3`));
+  check('safe auto-resolve action is available', await page.evaluate(`!!${button('.conflict-view', 'Auto-resolve simple (0)')}`));
+  const linePoint = await page.evaluate(`(() => { const line = [...document.querySelectorAll('[data-conflict-side="theirs"] .view-line')].find(item => item.textContent.includes('TWO')); if (!line) return null; const r = line.getBoundingClientRect(); return { x: r.left + 80, y: r.top + r.height / 2 }; })()`);
+  if (!linePoint) throw new Error('the incoming line is not rendered');
+  await page.clickAt(linePoint.x, linePoint.y);
+  await page.press('Home', { keyCode: 36 });
+  await page.press('End', { keyCode: 35, modifiers: 8 });
+  await page.waitFor(`!document.querySelectorAll('.conflict-sides .conflict-pane-title button')[2]?.disabled`);
+  await page.click(`document.querySelectorAll('.conflict-sides .conflict-pane-title button')[2]`);
+  const afterLineChoice = await page.evaluate(`({ subtitle: ${subtitle}, text: document.querySelector('.conflict-pane.result .conflict-editor .view-lines')?.textContent.replace(/\u00a0/g, ' ') })`);
+  const lineApplied = await page.waitFor(`${subtitle} === 'Conflict 1 of 1' && document.querySelector('.conflict-pane.result .conflict-editor .view-lines')?.textContent.replace(/\u00a0/g, ' ').includes('TWO feature')`);
+  check('selected line replaces the current conflict', lineApplied, JSON.stringify(afterLineChoice));
 
   // Stale protection: the file changes on disk before saving.
   await page.click(button('.conflict-view', 'Take theirs'));

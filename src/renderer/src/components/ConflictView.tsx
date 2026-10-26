@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { chosenLines, parseConflicts, type ConflictBlock, type ConflictChoice, type ConflictFile } from '../../../shared/conflicts';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { automaticChoice, chosenLines, parseConflicts, resolveBlock, type ConflictBlock, type ConflictChoice, type ConflictFile } from '../../../shared/conflicts';
 import type { FileVersion } from '../../../shared/diff';
 import { t } from '../../../shared/i18n';
 import { invoke } from '../api';
@@ -17,11 +17,12 @@ interface ConflictViewProps {
   onClose(): void;
 }
 
-type VisibleChoice = 'ours' | 'theirs' | 'both';
-const CHOICES: VisibleChoice[] = ['ours', 'theirs', 'both'];
-const choiceLabel = (choice: VisibleChoice) => ({ ours: t('Take ours'), theirs: t('Take theirs'), both: t('Take both') })[choice];
+type VisibleChoice = 'ours' | 'theirs' | 'both' | 'theirs-ours';
+type ConflictSideName = 'ours' | 'base' | 'theirs';
+const CHOICES: VisibleChoice[] = ['ours', 'theirs', 'both', 'theirs-ours'];
+const choiceLabel = (choice: VisibleChoice) => ({ ours: t('Take ours'), theirs: t('Take theirs'), both: t('Take both'), 'theirs-ours': t('Theirs, then ours') })[choice];
 const choiceTitle = (choice: VisibleChoice) =>
-  ({ ours: t('Keep the current branch’s lines'), theirs: t('Keep the incoming lines'), both: t('Ours, then theirs') })[choice];
+  ({ ours: t('Keep the current branch’s lines'), theirs: t('Keep the incoming lines'), both: t('Ours, then theirs'), 'theirs-ours': t('Incoming lines, then current branch lines') })[choice];
 
 function unusable(version: FileVersion): string | null {
   if (!version.exists) return null;
@@ -32,9 +33,26 @@ function unusable(version: FileVersion): string | null {
 }
 
 /** Read-only view of one side of the conflict. */
-function SidePane({ title, version, path }: { title: string; version: FileVersion; path: string }) {
+function SidePane({
+  side,
+  title,
+  version,
+  path,
+  registerEditor,
+  syncScroll,
+  onUseSelected,
+}: {
+  side: ConflictSideName;
+  title: string;
+  version: FileVersion;
+  path: string;
+  registerEditor(side: ConflictSideName, editor: monaco.editor.IStandaloneCodeEditor | null): void;
+  syncScroll(side: ConflictSideName, scrollTop: number, scrollHeight: number, viewportHeight: number): void;
+  onUseSelected(text: string): void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const values = useAppState((s) => s.settings.values);
+  const [selectedText, setSelectedText] = useState('');
   useEffect(() => {
     if (!version.exists || version.text === null) return;
     const model = monaco.editor.createModel(version.text, languageForPath(path));
@@ -48,15 +66,29 @@ function SidePane({ title, version, path }: { title: string; version: FileVersio
       fontSize: values['editor.fontSize'],
       lineNumbersMinChars: 3,
     });
+    registerEditor(side, editor);
+    const scroll = editor.onDidScrollChange(() => syncScroll(side, editor.getScrollTop(), editor.getScrollHeight(), editor.getLayoutInfo().height));
+    const selection = editor.onDidChangeCursorSelection(() => {
+      const selectedModel = editor.getModel();
+      const range = editor.getSelection();
+      const text = selectedModel && range ? selectedModel.getValueInRange(range).replace(/(?:\r\n|\r|\n)$/, '') : '';
+      setSelectedText(text);
+    });
     return () => {
+      scroll.dispose();
+      selection.dispose();
+      registerEditor(side, null);
       editor.setModel(null);
       editor.dispose();
       model.dispose();
     };
-  }, [version, path, values]);
+  }, [version, path, values, side, registerEditor, syncScroll]);
   return (
-    <div className="conflict-pane">
-      <div className="conflict-pane-title">{title}</div>
+    <div className="conflict-pane" data-conflict-side={side}>
+      <div className="conflict-pane-title">
+        <span>{title}</span>
+        {version.exists && version.text !== null && <button type="button" disabled={!selectedText} title={t('Replace the current conflict with these selected lines')} onClick={() => onUseSelected(selectedText)}>{t('Use selected lines')}</button>}
+      </div>
       {version.exists && version.text !== null ? (
         <div className="conflict-editor" ref={ref} />
       ) : (
@@ -76,15 +108,14 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
   const values = useAppState((s) => s.settings.values);
   const resultRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const sideEditors = useRef(new Map<ConflictSideName, monaco.editor.IStandaloneCodeEditor>());
+  const syncingSides = useRef(false);
   const [blocks, setBlocks] = useState<ConflictBlock[]>([]);
   const [current, setCurrent] = useState(0);
   const [dirty, setDirty] = useState(false);
   // What the file on disk is expected to be at the next save: as loaded, then as last saved.
   const [savedHash, setSavedHash] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
-  const oursActionLabel = t('{action} (this conflict)', { action: choiceLabel('ours') });
-  const theirsActionLabel = t('{action} (this conflict)', { action: choiceLabel('theirs') });
-  const bothActionLabel = t('{action} (this conflict)', { action: choiceLabel('both') });
 
   const file: ConflictFile | undefined = data;
   const expectedHash = savedHash ?? file?.merged.hash ?? null;
@@ -95,6 +126,22 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
   });
   const problem = file ? unusable(file.merged) : null;
   const editable = file?.merged.exists && file.merged.text !== null && !problem;
+  const registerSideEditor = useCallback((side: ConflictSideName, editor: monaco.editor.IStandaloneCodeEditor | null) => {
+    if (editor) sideEditors.current.set(side, editor);
+    else sideEditors.current.delete(side);
+  }, []);
+  const syncSideScroll = useCallback((source: ConflictSideName, scrollTop: number, scrollHeight: number, viewportHeight: number) => {
+    if (syncingSides.current) return;
+    const max = Math.max(0, scrollHeight - viewportHeight);
+    const progress = max ? scrollTop / max : 0;
+    syncingSides.current = true;
+    for (const [side, editor] of sideEditors.current) {
+      if (side === source) continue;
+      const target = editor.getLayoutInfo().height;
+      editor.setScrollTop(progress * Math.max(0, editor.getScrollHeight() - target));
+    }
+    requestAnimationFrame(() => { syncingSides.current = false; });
+  }, []);
 
   // The result editor: created once the file is loaded; conflict blocks are re-read on every edit.
   useEffect(() => {
@@ -151,10 +198,16 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
       ...CHOICES.map((choice, order) =>
         editor.addAction({
           id: `forklift.conflict.${choice}`,
-          label: choice === 'ours' ? oursActionLabel : choice === 'theirs' ? theirsActionLabel : bothActionLabel,
+          label: t('{action} (this conflict)', { action: choiceLabel(choice) }),
           contextMenuGroupId: '0_forklift',
           contextMenuOrder: order,
-          run: () => applyChoice(choice),
+          run: () => {
+            const actionModel = editor.getModel();
+            const found = actionModel ? parseConflicts(actionModel.getLinesContent().join('\n')) : [];
+            const line = editor.getPosition()?.lineNumber ?? 1;
+            const block = found[Math.max(0, found.findIndex((item) => item.endLine >= line))] ?? found.at(-1);
+            if (block) applyLines(chosenLines(block, choice));
+          },
         }),
       ),
     ];
@@ -167,10 +220,10 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
       model.dispose();
       editorRef.current = null;
     };
-  }, [file, editable, path, oursActionLabel, theirsActionLabel, bothActionLabel]);
+  }, [file, editable, path]);
 
   /** Replaces the conflict around (or after) the cursor with the chosen lines, undoably. */
-  function applyChoice(choice: ConflictChoice, index?: number) {
+  function applyLines(lines: string[], index?: number) {
     const editor = editorRef.current;
     const model = editor?.getModel();
     if (!editor || !model) return;
@@ -178,7 +231,6 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
     const line = editor.getPosition()?.lineNumber ?? 1;
     const block = found[index ?? Math.max(0, found.findIndex((b) => b.endLine >= line))] ?? found.at(-1);
     if (!block) return;
-    const lines = chosenLines(block, choice);
     const eol = model.getEOL();
     let range: monaco.Range;
     let text = lines.join(eol);
@@ -199,6 +251,40 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
     }
     editor.focus();
   }
+
+  /** Replaces the current conflict around the cursor with the chosen side or selected lines. */
+  function applyChoice(choice: ConflictChoice, index?: number) {
+    const model = editorRef.current?.getModel();
+    const found = model ? parseConflicts(model.getLinesContent().join('\n')) : [];
+    const line = editorRef.current?.getPosition()?.lineNumber ?? 1;
+    const block = found[index ?? Math.max(0, found.findIndex((item) => item.endLine >= line))] ?? found.at(-1);
+    if (block) applyLines(chosenLines(block, choice), index);
+  }
+
+  const autoCount = blocks.filter((block) => automaticChoice(block) !== null).length;
+  const autoResolve = () => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model || !autoCount) return;
+    let text = model.getValue();
+    for (const block of [...parseConflicts(model.getLinesContent().join('\n'))].reverse()) {
+      const choice = automaticChoice(block);
+      if (choice) text = resolveBlock(text, block, choice);
+    }
+    editor.pushUndoStop();
+    editor.executeEdits('forklift.conflict.auto', [{ range: model.getFullModelRange(), text }]);
+    editor.pushUndoStop();
+    editor.focus();
+  };
+
+  const useSelectedLines = (text: string) => {
+    const model = editorRef.current?.getModel();
+    if (!model || !text) return;
+    const lines = text.split(/\r\n|\r|\n/);
+    if (!lines.at(-1)) lines.pop();
+    applyLines(lines, current);
+    editorRef.current?.focus();
+  };
 
   const goTo = (index: number) => {
     const block = blocks[index];
@@ -287,6 +373,9 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
                   {choiceLabel(choice)}
                 </button>
               ))}
+              <button type="button" disabled={!autoCount} title={t('Apply safe choices based on the common ancestor and whitespace')} onClick={autoResolve}>
+                {t('Auto-resolve simple ({count})', { count: autoCount })}
+              </button>
             </>
           )}
           <button type="button" onClick={() => void take('ours')} title={t('Resolve with the current branch’s whole file')}>
@@ -318,8 +407,9 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
       {file && (
         <div className="conflict-body">
           <div className="conflict-sides">
-            <SidePane title={labels ? t('Ours — {label}', { label: labels.oursLabel }) : t('Ours')} version={file.ours} path={path} />
-            <SidePane title={labels ? t('Theirs — {label}', { label: labels.theirsLabel }) : t('Theirs')} version={file.theirs} path={path} />
+            <SidePane side="ours" title={labels ? t('Ours — {label}', { label: labels.oursLabel }) : t('Ours')} version={file.ours} path={path} registerEditor={registerSideEditor} syncScroll={syncSideScroll} onUseSelected={useSelectedLines} />
+            <SidePane side="base" title={t('Base')} version={file.base} path={path} registerEditor={registerSideEditor} syncScroll={syncSideScroll} onUseSelected={useSelectedLines} />
+            <SidePane side="theirs" title={labels ? t('Theirs — {label}', { label: labels.theirsLabel }) : t('Theirs')} version={file.theirs} path={path} registerEditor={registerSideEditor} syncScroll={syncSideScroll} onUseSelected={useSelectedLines} />
           </div>
           <div className="conflict-pane result">
             <div className="conflict-pane-title">{editable ? t('Result — edit freely; colored blocks are conflicts') : t('Result')}</div>

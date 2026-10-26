@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chosenLines, parseConflicts, resolveBlock } from './conflicts';
+import { automaticChoice, chosenLines, parseConflicts, resolveBlock } from './conflicts';
 
 const merge = ['top', '<<<<<<< HEAD', 'ours 1', 'ours 2', '=======', 'theirs', '>>>>>>> feature', 'middle', '<<<<<<< HEAD', '=======', 'only theirs', '>>>>>>> feature', 'end', ''].join('\n');
 
@@ -39,5 +39,37 @@ describe('resolveBlock', () => {
 
   it('chosen lines for an empty side', () => {
     expect(chosenLines(parseConflicts(merge)[1]!, 'ours')).toEqual([]);
+  });
+});
+
+describe('automaticChoice', () => {
+  const block = (ours: string[], base: string[] | null, theirs: string[]) => ({
+    startLine: 1,
+    endLine: 7,
+    ours,
+    base,
+    theirs,
+    oursLabel: 'HEAD',
+    theirsLabel: 'feature',
+    baseLine: base ? 4 : 0,
+    separatorLine: 6,
+  });
+
+  it('keeps an identical change or the side that differs from base', () => {
+    expect(automaticChoice(block(['same'], ['base'], ['same']))).toBe('ours');
+    expect(automaticChoice(block(['base'], ['base'], ['incoming']))).toBe('theirs');
+    expect(automaticChoice(block(['local'], ['base'], ['base']))).toBe('ours');
+  });
+
+  it('auto-resolves whitespace-only differences when the other side changed content', () => {
+    expect(automaticChoice(block(['  base '], ['base'], ['incoming']))).toBe('theirs');
+    expect(automaticChoice(block(['local'], ['base'], [' base  ']))).toBe('ours');
+    expect(automaticChoice(block(['value '], null, [' value']))).toBe('ours');
+  });
+
+  it('leaves genuinely different changes for the user', () => {
+    expect(automaticChoice(block(['ours'], ['base'], ['theirs']))).toBeNull();
+    expect(automaticChoice(block(['ours'], null, ['theirs']))).toBeNull();
+    expect(automaticChoice(block(['foo bar'], ['foobar'], ['incoming']))).toBeNull();
   });
 });
