@@ -1,5 +1,5 @@
 import { Reference, Repository } from '@axosoft/nodegit';
-import { GraphLayout, type GraphLayoutState, type GraphRowLayout } from '../../shared/graph';
+import { GraphLayout, PassRuns, type GraphLayoutState, type GraphRowLayout } from '../../shared/graph';
 import { fuzzyFilter } from '../../shared/fuzzy';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistoryRow, HistorySearch, SearchResult } from '../../shared/history';
 import type { GitCli } from '../git/cli';
@@ -135,19 +135,22 @@ class HistoryCache {
     this.abort.abort();
   }
 
-  /** Rows `start…end` with their details and graph, laid out again from the nearest saved state. */
-  async rows(start: number, end: number): Promise<HistoryRow[]> {
+  /** Rows `start…end` with their details and graph (passing lanes as runs), laid out again from the nearest saved state. */
+  async rows(start: number, end: number): Promise<{ rows: HistoryRow[]; passes: number[] }> {
     end = Math.min(end, this.length);
-    if (start >= end) return [];
+    if (start >= end) return { rows: [], passes: [] };
     const details = await this.detailsOf(start, end);
     const from = Math.floor(start / CHECKPOINT);
     const layout = GraphLayout.from(this.checkpoints[from]!);
+    // Up to the page only moved past, without drawing.
+    for (let i = from * CHECKPOINT; i < start; i++) layout.advance(this.commits.hash(i), this.commits.parents(i));
+    const runs = new PassRuns();
     const rows: HistoryRow[] = [];
-    for (let i = from * CHECKPOINT; i < end; i++) {
-      const graph = layout.next(this.commits.hash(i), this.commits.parents(i));
-      if (i >= start) rows.push(this.row(i, details[i - start]!, graph));
+    for (let i = start; i < end; i++) {
+      runs.row = i - start;
+      rows.push(this.row(i, details[i - start]!, layout.next(this.commits.hash(i), this.commits.parents(i), runs.pass)));
     }
-    return rows;
+    return { rows, passes: runs.runs };
   }
 
   hash(row: number): string {
@@ -277,8 +280,8 @@ export class HistoryService {
   async page(root: string, version: string, start: number, count: number, filter: HistoryFilter = { solo: [], hidden: [] }): Promise<HistoryPage> {
     const cache = await this.cache(root, version, filter);
     await cache.ensure(start + count);
-    const rows = await cache.rows(start, start + count);
-    return { version: cache.version, start, rows, loaded: cache.length, complete: cache.complete };
+    const { rows, passes } = await cache.rows(start, start + count);
+    return { version: cache.version, start, rows, passes, loaded: cache.length, complete: cache.complete };
   }
 
   /** Row index of a commit (reading as far as needed), or -1 when it is not in this history. */

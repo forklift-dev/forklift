@@ -82,6 +82,55 @@ function GraphCell({ style, layout, width, merge, stash, wipAbove, author, refs 
   );
 }
 
+interface PassingLanesProps {
+  style: GraphStyle;
+  pages: ReturnType<typeof historyPages>;
+  /** History rows drawn (the list's rows minus the WIP row). */
+  first: number;
+  last: number;
+  /** Where row `first` is, in the list's pixels. */
+  top: number;
+  left: number;
+  width: number;
+  /** The graph column scrolled sideways by this much. */
+  scroll: number;
+  dimmed: boolean;
+}
+
+/**
+ * Lanes passing the rows in view, over all of them at once: one line per lane and page, a path per color,
+ * instead of a line per lane in every row (linux keeps hundreds of lanes open for thousands of rows).
+ * Only the columns in view are drawn.
+ */
+function PassingLanes({ style, pages, first, last, top, left, width, scroll, dimmed }: PassingLanesProps) {
+  if (last < first) return null;
+  const h = style.rowHeight;
+  const from = Math.floor(scroll / style.laneWidth) - 1;
+  const to = Math.ceil((scroll + width) / style.laneWidth);
+  const paths = new Map<number, string>();
+  for (const run of pages.passes(first, last)) {
+    if (run.column < from || run.column > to) continue;
+    const color = run.color % 10;
+    const x = laneX(style, run.column);
+    paths.set(color, `${paths.get(color) ?? ''}M${x} ${(run.first - first) * h}V${(run.first - first + run.count) * h}`);
+  }
+  return (
+    <svg
+      className={`graph-passes${dimmed ? ' dimmed' : ''}`}
+      width={width}
+      height={(last - first + 1) * h}
+      aria-hidden="true"
+      style={{ left, transform: `translateY(${top}px)`, strokeWidth: style.lineWidth }}
+    >
+      <g transform={`translate(${-scroll} 0)`}>
+        {[...paths].map(([color, d]) => (
+          <path key={color} d={d} className={`edge lane-${color}`} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 function RefBadges({ labels }: { labels: string[] | undefined }) {
   if (!labels?.length) return null;
   return (
@@ -394,6 +443,17 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
         </div>
         <div className="commit-rows" style={{ height: domHeight }}>
           {rows}
+          <PassingLanes
+            style={style}
+            pages={pages}
+            first={Math.max(first, offset) - offset}
+            last={last - offset}
+            top={Math.max(first, offset) * ROW_HEIGHT - virtualTop + viewport.top}
+            left={layout.columns.refs}
+            width={graphWidth}
+            scroll={graphScroll}
+            dimmed={Boolean(matches?.size)}
+          />
         </div>
       </div>
       {maxGraphScroll > 0 && !empty && (

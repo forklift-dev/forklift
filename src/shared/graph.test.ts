@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EdgeKind, GraphLayout, type GraphRowLayout } from './graph';
+import { EdgeKind, GraphLayout, PassRuns, type GraphRowLayout } from './graph';
 
 /** Lays out [sha, ...parents] rows given top to bottom. */
 function layout(rows: string[][]): GraphRowLayout[] {
@@ -153,5 +153,29 @@ describe('GraphLayout.advance', () => {
     const fromDrawn = GraphLayout.from(drawn.state());
     const fromRead = GraphLayout.from(read.state());
     for (const [sha, ...parents] of tail) expect(fromRead.next(sha!, parents)).toEqual(fromDrawn.next(sha!, parents));
+  });
+});
+
+describe('PassRuns', () => {
+  it('holds the same passing lanes as Pass edges, merged into runs per column and color', () => {
+    const rows = [['a', 'c'], ['b', 'd'], ['x', 'y'], ['y', 'c'], ['c', 'e'], ['d', 'e'], ['e']];
+    const listed = layout(rows);
+    const graph = new GraphLayout();
+    const runs = new PassRuns();
+    const drawn = rows.map(([sha, ...parents], row) => {
+      runs.row = row;
+      return graph.next(sha!, parents, runs.pass);
+    });
+    const expanded = new Set<string>();
+    for (let at = 0; at < runs.runs.length; at += 4) {
+      const [column, color, first, count] = runs.runs.slice(at, at + 4);
+      for (let row = first!; row < first! + count!; row++) expanded.add(`${row}:${column}:${color}`);
+    }
+    const passes = new Set(listed.flatMap((row, i) => row.edges.filter((e) => e.kind === EdgeKind.Pass).map((e) => `${i}:${e.from}:${e.color}`)));
+    expect(passes.size).toBeGreaterThan(2);
+    expect(expanded).toEqual(passes);
+    // Fewer runs than passing rows: a lane passing several rows is one run.
+    expect(runs.runs.length / 4).toBeLessThan(passes.size);
+    expect(drawn.map((row) => row.edges)).toEqual(listed.map((row) => row.edges.filter((e) => e.kind !== EdgeKind.Pass)));
   });
 });

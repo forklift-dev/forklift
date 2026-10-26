@@ -18,7 +18,10 @@ export interface HistoryPage {
   /** History version these rows belong to (RepoData.historyVersion at the time it was walked). */
   version: string;
   start: number;
+  /** Their graph rows hold no Pass edges: lanes passing them are in `passes`. */
   rows: HistoryRow[];
+  /** Lanes passing these rows as runs (PassRuns): `column, color, first row (from 0 = start), row count`, repeated. */
+  passes: number[];
   /** Rows walked so far. */
   loaded: number;
   /** The whole history has been walked: `loaded` is the total. */

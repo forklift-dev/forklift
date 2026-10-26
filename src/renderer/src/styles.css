@@ -564,6 +564,24 @@ body.resizing * {
   stroke-linecap: round;
 }
 
+/* Lanes passing the rows in view, drawn over them in one layer (CommitGraph's PassingLanes). */
+.graph-passes {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.graph-passes .edge {
+  fill: none;
+  stroke: var(--lane);
+  stroke-linecap: round;
+}
+
+.graph-passes.dimmed {
+  opacity: 0.45;
+}
+
 /* Graph styles (src/renderer/src/graphStyles.ts) */
 .graph-cell .streak {
   fill: var(--lane);

@@ -1,4 +1,18 @@
 import type { HistoryFilter, HistoryRow } from '../../shared/history';
+
+interface Page {
+  rows: HistoryRow[];
+  /** Lanes passing the rows, as runs (see HistoryPage.passes). */
+  passes: number[];
+}
+
+/** A lane passing rows `first…first+count-1` (history row indices) in `column`. */
+export interface PassRun {
+  column: number;
+  color: number;
+  first: number;
+  count: number;
+}
 import { invoke } from './api';
 
 export const PAGE_SIZE = 200;
@@ -10,7 +24,7 @@ const MAX_PAGES = 64;
  * While its own pages load, rows of the previous version are shown, so a new commit does not blank the list.
  */
 export class HistoryPages {
-  private readonly pages = new Map<number, HistoryRow[]>();
+  private readonly pages = new Map<number, Page>();
   private readonly pending = new Set<number>();
   private readonly listeners = new Set<() => void>();
   private fallback: HistoryPages | null;
@@ -46,14 +60,32 @@ export class HistoryPages {
   }
 
   row(index: number): HistoryRow | undefined {
-    const page = this.pages.get(Math.floor(index / PAGE_SIZE));
-    if (page) return page[index % PAGE_SIZE];
-    return this.fallback?.row(index);
+    return this.page(Math.floor(index / PAGE_SIZE))?.rows[index % PAGE_SIZE];
+  }
+
+  /** Lanes passing rows `first…last`, cut to them (a run across pages comes as one piece per page). */
+  passes(first: number, last: number): PassRun[] {
+    const runs: PassRun[] = [];
+    for (let index = Math.floor(Math.max(0, first) / PAGE_SIZE); index <= Math.floor(last / PAGE_SIZE); index++) {
+      const page = this.page(index);
+      if (!page) continue;
+      const passes = page.passes;
+      for (let at = 0; at < passes.length; at += 4) {
+        const start = Math.max(first, index * PAGE_SIZE + passes[at + 2]!);
+        const end = Math.min(last + 1, index * PAGE_SIZE + passes[at + 2]! + passes[at + 3]!);
+        if (start < end) runs.push({ column: passes[at]!, color: passes[at + 1]!, first: start, count: end - start });
+      }
+    }
+    return runs;
+  }
+
+  private page(index: number): Page | undefined {
+    return this.pages.get(index) ?? this.fallback?.page(index);
   }
 
   /** Index of a commit among loaded rows, or -1. */
   indexOf(hash: string): number {
-    for (const [page, rows] of this.pages) {
+    for (const [page, { rows }] of this.pages) {
       const index = rows.findIndex((row) => row.hash === hash);
       if (index >= 0) return page * PAGE_SIZE + index;
     }
@@ -70,7 +102,7 @@ export class HistoryPages {
       invoke('history:rows', this.repo, this.version, page * PAGE_SIZE, PAGE_SIZE, this.filter).then(
         (result) => {
           this.pending.delete(page);
-          this.pages.set(page, result.rows);
+          this.pages.set(page, { rows: result.rows, passes: result.passes });
           this.evict();
           this.loaded = Math.max(result.loaded, page * PAGE_SIZE + result.rows.length);
           this.complete = result.complete;

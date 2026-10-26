@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EdgeKind } from '../../shared/graph';
+import type { HistoryPage } from '../../shared/history';
 import { GitCli } from '../git/cli';
 import { createGitService } from '../git/service';
 import { directRunner } from '../process/testing';
@@ -22,6 +23,18 @@ beforeAll(() => {
   });
 });
 afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+/** The page's rows with their passing lanes back as Pass edges (the page sends them as runs). */
+function drawn({ rows, passes }: HistoryPage) {
+  const result = rows.map((row) => ({ ...row, graph: { ...row.graph, edges: [...row.graph.edges] } }));
+  for (let at = 0; at < passes.length; at += 4) {
+    const [column, color, first, count] = passes.slice(at, at + 4) as [number, number, number, number];
+    for (let row = first; row < first + count; row++) result[row]!.graph.edges.push({ kind: EdgeKind.Pass, from: column, to: column, color });
+  }
+  // Order within a row does not matter for drawing.
+  for (const row of result) row.graph.edges.sort((a, b) => a.kind - b.kind || a.from - b.from || a.to - b.to);
+  return result;
+}
 
 describe('summary', () => {
   it('is the first paragraph on one line', () => {
@@ -54,7 +67,8 @@ describe('HistoryService', () => {
   it('lays out a consistent graph: every lane at the top of a row was open at the bottom of the row above', async () => {
     const history = new HistoryService(new GitCli(directRunner()));
     const { historyVersion } = await git.read(root);
-    const { rows } = await history.page(root, historyVersion, 0, 5000);
+    const rows = drawn(await history.page(root, historyVersion, 0, 5000));
+    expect(rows.some((row) => row.graph.edges.some((e) => e.kind === EdgeKind.Pass))).toBe(true);
     for (let i = 1; i < rows.length; i++) {
       const bottom = new Set(rows[i - 1]!.graph.edges.filter((e) => e.kind !== EdgeKind.In).map((e) => e.to));
       const top = new Set(rows[i]!.graph.edges.filter((e) => e.kind !== EdgeKind.Out).map((e) => e.from));
@@ -69,10 +83,10 @@ describe('HistoryService', () => {
   it('lays out a page from the middle exactly as the whole history (saved layout states, not stored rows)', async () => {
     const history = new HistoryService(new GitCli(directRunner()));
     const { historyVersion } = await git.read(root);
-    const { rows: whole } = await history.page(root, historyVersion, 0, 5000);
+    const whole = drawn(await history.page(root, historyVersion, 0, 5000));
     // Pages that start before, at and after a saved state (every 256 rows), and ones across several of them.
     for (const [start, count] of [[250, 30], [256, 1], [511, 2], [1000, 30], [3000, 1000], [4990, 50]] as const) {
-      const { rows } = await history.page(root, historyVersion, start, count);
+      const rows = drawn(await history.page(root, historyVersion, start, count));
       expect(rows.map((row) => [row.hash, row.graph])).toEqual(whole.slice(start, start + count).map((row) => [row.hash, row.graph]));
     }
   });

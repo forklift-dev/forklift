@@ -29,6 +29,28 @@ export interface GraphRowLayout {
   width: number;
 }
 
+/**
+ * Lanes passing rows, as vertical runs: `column, color, first row, row count`, four numbers per run in `runs`.
+ * linux keeps up to ~590 lanes open across thousands of rows; an edge object per lane and row is what made its
+ * pages heavy, while a lane passes a whole page as one run. Rows are counted from 0; set `row` before each.
+ */
+export class PassRuns {
+  readonly runs: number[] = [];
+  row = 0;
+  /** Per column, where its latest run starts in `runs`. */
+  private readonly latest: number[] = [];
+
+  pass = (column: number, color: number): void => {
+    const runs = this.runs;
+    const at = this.latest[column];
+    if (at !== undefined && runs[at + 1] === color && this.row === runs[at + 2]! + runs[at + 3]!) runs[at + 3]! += 1;
+    else {
+      this.latest[column] = runs.length;
+      runs.push(column, color, this.row, 1);
+    }
+  };
+}
+
 interface Lane {
   /** The commit this lane is waiting for (a parent of a row above). */
   sha: string;
@@ -64,7 +86,11 @@ export class GraphLayout {
     return { lanes: [...this.lanes], nextColor: this.nextColor };
   }
 
-  next(sha: string, parents: readonly string[]): GraphRowLayout {
+  /**
+   * Lays out the next row. With `pass`, lanes passing the row are told to it instead of listed as Pass edges
+   * (a huge history keeps hundreds open: see PassRuns).
+   */
+  next(sha: string, parents: readonly string[], pass?: (column: number, color: number) => void): GraphRowLayout {
     this.index = null;
     const edges: GraphEdge[] = [];
     const hits: number[] = [];
@@ -106,7 +132,10 @@ export class GraphLayout {
       edges.push({ kind: EdgeKind.Out, from: column, to: target, color: laneColor });
     });
 
-    for (const index of passing) edges.push({ kind: EdgeKind.Pass, from: index, to: index, color: this.lanes[index]!.color });
+    for (const index of passing) {
+      if (pass) pass(index, this.lanes[index]!.color);
+      else edges.push({ kind: EdgeKind.Pass, from: index, to: index, color: this.lanes[index]!.color });
+    }
     while (this.lanes.length && this.lanes.at(-1) === null) this.lanes.pop();
     width = Math.max(width, this.lanes.length);
     return { column, color, edges, width };
