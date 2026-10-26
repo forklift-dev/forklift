@@ -68,10 +68,16 @@ export function projectState(state: MainState): AppState {
   };
 }
 
-export function createAppStore(appInfo: Pick<AppInfo, 'version' | 'platform'>, extra: ThunkExtra) {
+/**
+ * `checks`: Redux Toolkit's development checks (state is serializable and never mutated). They walk the whole
+ * state on every action, which a large repository makes slow; Toolkit picks its build by NODE_ENV, which is not
+ * set in the packaged app's main process, so they are turned off explicitly there.
+ */
+export function createAppStore(appInfo: Pick<AppInfo, 'version' | 'platform'>, extra: ThunkExtra, { checks = true }: { checks?: boolean } = {}) {
   const store = configureStore({
     reducer: rootReducer,
-    middleware: (getDefault) => getDefault({ thunk: { extraArgument: extra } }),
+    middleware: (getDefault) => getDefault({ thunk: { extraArgument: extra }, serializableCheck: checks, immutableCheck: checks }),
+    devTools: checks,
   });
   store.dispatch(appSlice.actions.appInfoSet(appInfo));
   return store;

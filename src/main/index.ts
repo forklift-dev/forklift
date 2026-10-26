@@ -82,7 +82,7 @@ async function start() {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
 
   const git = createGitService();
-  const store = createAppStore({ version: app.getVersion(), platform: process.platform }, { git });
+  const store = createAppStore({ version: app.getVersion(), platform: process.platform }, { git }, { checks: !app.isPackaged });
   const replication = startReplication(store);
   const runner = new ProcessRunner();
   const themes = new ThemeLibrary(join(app.getPath('userData'), 'themes'), (state) => store.dispatch(userThemesRead(state)));
