@@ -53,6 +53,10 @@ export default async function ({ check }) {
   const names = await page.evaluate(`[...document.querySelectorAll('.ref-item[data-ref]')].map(r => r.dataset.ref).join(',')`);
   check('left panel lists local and remote branches', names === 'feature,main,origin/review', names);
   check('current branch marked', await page.evaluate(`${item('main')}.classList.contains('current')`));
+  check('the header shows an upstream selector beside the local branch', (await page.evaluate(`document.querySelector('.toolbar .crumb-upstream .upstream-value')?.textContent`)) === 'Select upstream…');
+  await page.click(`document.querySelector('.toolbar .crumb-upstream')`);
+  check('the header opens the upstream picker', await page.waitFor(`!!document.querySelector('.upstream-picker')`));
+  await page.press('Escape');
 
   // Clicking a branch selects its commit.
   await page.click(item('feature'));
@@ -160,4 +164,5 @@ export default async function ({ check }) {
   await contextMenu(page, item('origin/main'));
   await page.click(menuItem('Set origin/main as upstream for review'));
   check('a remote branch can become the current branch upstream directly', await upstreamBecomes(git, 'review', 'origin/main'));
+  check('the header shows the newly selected upstream', await page.waitFor(`document.querySelector('.toolbar .crumb-upstream .upstream-value')?.textContent === 'origin/main'`));
 }

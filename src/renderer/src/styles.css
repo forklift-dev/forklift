@@ -134,6 +134,10 @@ button:disabled {
   color: var(--fg-dimmed);
 }
 
+.crumb-upstream { max-width: 180px; }
+.crumb-upstream .crumb-value { min-width: 0; }
+.upstream-value { overflow: hidden; text-overflow: ellipsis; }
+
 .branch {
   color: var(--fg-bright);
 }

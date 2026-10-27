@@ -8,6 +8,8 @@ export const toolbar = {
     repository: 'репозиторий',
     'Switch branch': 'Переключить ветку',
     branch: 'ветка',
+    'remote branch': 'удалённая ветка',
+    'Select upstream…': 'Выбрать upstream…',
     'detached at {sha}': 'отсоединён на {sha}',
     '{ahead} ahead, {behind} behind {upstream}': 'впереди на {ahead}, позади на {behind} относительно {upstream}',
     Loading: 'Загрузка',

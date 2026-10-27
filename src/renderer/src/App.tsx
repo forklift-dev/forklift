@@ -295,6 +295,7 @@ export function App() {
           ])
         }
         onSwitchBranch={() => runCommand('branch.switch')}
+        onSetUpstream={() => runCommand('branch.setUpstream')}
         onActions={() => setPalette('')}
         onSearch={() => runCommand('palette.find')}
       />

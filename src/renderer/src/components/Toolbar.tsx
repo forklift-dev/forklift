@@ -23,6 +23,8 @@ interface ToolbarProps {
   onRepoMenu(event: MouseEvent): void;
   /** The branch ▾ switcher. */
   onSwitchBranch(): void;
+  /** Selects the remote branch tracked by the current local branch. */
+  onSetUpstream(): void;
   onActions(): void;
   onSearch(): void;
 }
@@ -89,6 +91,18 @@ export function Toolbar(props: ToolbarProps) {
                 <span className="codicon codicon-chevron-down" aria-hidden="true" />
               </span>
             </button>
+            {branch.head && (
+              <>
+                <span className="crumb-separator codicon codicon-chevron-right" aria-hidden="true" />
+                <button type="button" className="crumb crumb-upstream" onClick={props.onSetUpstream} title={branch.upstream ? t('Change upstream (now {upstream})…', { upstream: branch.upstream }) : t('Set upstream…')} aria-label={branch.upstream ? t('Change upstream (now {upstream})…', { upstream: branch.upstream }) : t('Set upstream…')}>
+                  <span className="crumb-label">{t('remote branch')}</span>
+                  <span className="crumb-value">
+                    <span className="upstream-value">{branch.upstream ?? t('Select upstream…')}</span>
+                    <span className="codicon codicon-chevron-down" aria-hidden="true" />
+                  </span>
+                </button>
+              </>
+            )}
           </>
         )}
         {busy && <span className="spinner toolbar-busy" aria-label={t('Loading')} />}
