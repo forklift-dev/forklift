@@ -25,6 +25,10 @@ files:
 extraResources:
   - from: build/window.png
     to: icon.png
+  - from: LICENSE
+    to: LICENSE
+  - from: NOTICE
+    to: NOTICE
   - from: THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
 

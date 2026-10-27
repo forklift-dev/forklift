@@ -1,82 +1,126 @@
+<div align="center">
+
+<img src="build/icon.png" alt="Forklift logo" width="112" />
+
 # Forklift
 
-Desktop Git client built with Electron 45, React 19, TypeScript 7 and Vite 8 (via electron-vite).
-Architecture borrows the proven parts of GitKraken Desktop and its open-source Git stack.
+**A desktop Git workspace for the whole journey from first diff to final release.**
 
-Project documentation (architecture, decisions, staged task list) lives in [docs/](docs/README.md).
+Visual history · precise staging · safe operations · your choice of colors
 
-## Architecture
+[![Build](https://github.com/forklift-dev/forklift/actions/workflows/build.yml/badge.svg)](https://github.com/forklift-dev/forklift/actions/workflows/build.yml)
+[![Version](https://img.shields.io/badge/version-0.4.1-4169a9)](https://github.com/forklift-dev/forklift/releases)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-6b5acd)](LICENSE)
 
-```
-main process (src/main)
-  Redux Toolkit store ── source of truth for app state
-  git/service.ts ─────── @axosoft/nodegit (GitKraken's libgit2 fork)
-  replication.ts ─────── mirrors the store into renderers over a MessagePort
-  ipc/registry.ts ────── typed command table → ipcMain.handle, replies after the replica acks
-        │  MessagePort: STATE snapshot, then UPDATE {changed slices, updateIndex} → ack
-        ▼
-preload (src/preload) ── contextBridge: window.forklift { invoke, onReplicaMessage, ackReplicaUpdate }
-        ▼
-renderer (src/renderer) ─ React 19, read-only replica via useSyncExternalStore, commands via invoke()
-```
+[Download a build](https://github.com/forklift-dev/forklift/releases) · [Explore the documentation](docs/README.md) · [Build from source](#build-from-source)
 
-- **State** lives only in the main process. Renderers hold a read-only replica and change it
-  only by calling commands (`src/shared/ipc.ts`). A command's promise resolves after the
-  renderer has applied the resulting state, so UI code can rely on fresh state after `await`.
-- **Security**: `contextIsolation`, `sandbox`, no `nodeIntegration`; renderer served from
-  `app://forklift/` (not `file://`); IPC senders are checked against the app origin;
-  Electron fuses are locked down at packaging time (`electron-builder.yml`).
-- **Git stack** (open-source parts of GitKraken's): `@axosoft/nodegit` (MIT), `nsfw` (MIT,
-  file watching), `find-git-repositories` (MIT). GitKraken's own spawn server and socket bridge are
-  proprietary and not used.
+</div>
 
-## Requirements
+![Forklift commit graph, branches and commit details in the dark theme](docs/images/overview-dark.png)
 
-nodegit has no prebuilt binaries for current Electron, so it is compiled from source on
-`npm install` (`scripts/rebuild-native.mjs`). OpenSSL 3 is linked statically: built from source
-on Linux, downloaded prebuilt (SHA-256 verified) from the nodegit fork's bucket on macOS/Windows.
+Forklift brings the Git work you do every day into one window. Inspect a commit, stage a single line,
+resolve a conflict, search history or track down a regression without losing your place in the graph.
+Local repositories work without an account; remote and hosting features are there when you need them.
 
-| OS | Toolchain |
+## See it in your colors
+
+The same repository in three more built-in themes. Forklift has **20 built-in themes**, custom theme files,
+accent colors, **seven graph styles** and adjustable panel and column widths.
+
+| Dawn · light | Fjord · cool dark |
+|:---:|:---:|
+| ![Forklift commit graph in the Dawn theme](docs/images/overview-dawn.png) | ![Forklift commit graph in the Fjord theme](docs/images/overview-fjord.png) |
+
+![Line-level diff in the Neon Night theme](docs/images/diff-neon-night.png)
+
+*Neon Night: a built-in split diff with syntax highlighting and line-level actions.*
+
+## Why Forklift
+
+- **See the whole story.** A virtualized commit graph shows branches, tags, authors and the working tree together. Search by message, author, hash, file or content, then jump straight to the match.
+- **Choose exactly what goes into a commit.** Review side-by-side, inline, hunk or whole-file diffs; stage and discard individual files, hunks and lines. Amend when the last commit needs another pass.
+- **Handle the hard parts in the same workspace.** Merge, rebase, cherry-pick, revert, reset, interactive rebase and bisect are available alongside a visual three-way conflict editor. Bisect can step manually or run your test command and show its output.
+- **Stay in control.** Supported operations have Undo/Redo, destructive actions ask for confirmation, and switching branches can stash and restore local changes. The operation log shows what Git ran and why it failed.
+- **Work the way you prefer.** Use the command palette and configurable shortcuts, the built-in terminal, external editors and diff tools, or several repositories and worktrees in separate tabs. File watching keeps the view current while another program edits the repository.
+- **Keep the basics local.** Opening, searching and editing a local repository needs no sign-in. Optional hosting connections add pull requests, issues and remote operations; credentials use the operating system's secure storage when available.
+
+## Get Forklift
+
+Pre-release packages are published on the [Releases page](https://github.com/forklift-dev/forklift/releases) after the Linux, Windows and macOS builds succeed.
+
+| Platform | Current package |
 |---|---|
-| Linux | `build-essential`, `python3`, `perl`, `libkrb5-dev` |
+| Linux x64 | AppImage |
+| Windows x64 | Installer and ZIP |
+| macOS Apple silicon | DMG and ZIP |
+
+These beta packages are not yet signed or notarized. Your operating system may ask for confirmation on first launch.
+
+## Build from source
+
+You need **Node.js 22.12 or newer** and a local toolchain for the native Git modules. The modules are built for the
+same operating system and CPU architecture on which you run Forklift.
+
+| Platform | Build tools |
+|---|---|
+| Linux | `build-essential`, `python3`, `perl`, `libkrb5-dev`; on Ubuntu 22.04, `clang-15` |
 | macOS | Xcode Command Line Tools, `python3` |
 | Windows | Visual Studio 2022 Build Tools (Desktop C++), `python3` |
 
-Node.js ≥ 22.12. Build every OS/CPU architecture (x64, arm64) on a matching machine or CI
-runner; cross-compiling nodegit is not supported.
+```bash
+npm ci
+npm run dev
+```
 
-**Windows packages in one command** (installs missing tools with winget, then builds; artifacts in `dist\`):
+`npm ci` rebuilds the native modules for Electron 45. On Linux, OpenSSL 3 is built from source; on macOS and Windows,
+the build script downloads a SHA-256-verified OpenSSL package. For installers, use `npm run dist` on the target machine.
+On Ubuntu 22.04, run `npm ci` with `CC=clang-15 CXX=clang++-15` for Electron 45's V8 headers.
+
+The repository also provides platform setup scripts:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1            # NSIS installer + ZIP
-powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -SkipSetup # tools already installed
+# Windows: install missing tools and build the installer and ZIP
+powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
 ```
-
-Options: `-Arch arm64`, `-Clean` (rebuild native modules and OpenSSL), `-Test` (typecheck, lint, unit tests).
-
-**macOS packages in one command** (bootstraps Node 22 if the machine has none, rebuilds the native
-modules, signs the app ad-hoc and packages it; artifacts in `dist/`):
 
 ```bash
-bash scripts/build-macos.sh            # works on a clean Mac: bootstraps Node itself
-npm run build:mac                      # same, when Node/npm are already installed
-bash scripts/build-macos.sh --check    # also typecheck and lint
+# macOS: bootstrap Node if needed, rebuild modules and package DMG + ZIP
+bash scripts/build-macos.sh
 ```
 
-Xcode Command Line Tools are the only prerequisite; the script opens their installer if they are
-missing. Downloads and caches stay in `~/.forklift-build` (`FORKLIFT_BUILD_HOME` overrides the
-location), Electron headers in `~/.electron-gyp`; the repository itself only gets `node_modules/`,
-`out/` and `dist/`. Builds are ad-hoc signed, not notarized (T-004): they launch on the machine that
-built them, elsewhere macOS asks to open the app with right-click → Open.
+## Development
 
-## Scripts
-
-| Command | Purpose |
+| Command | What it does |
 |---|---|
-| `npm run dev` | Run with hot reload |
-| `npm run build` | Build to `out/` |
-| `npm test` | Vitest, run inside Electron's Node (native modules use Electron's ABI) |
-| `npm run typecheck` / `npm run lint` | TypeScript / oxlint |
-| `npm run rebuild:native` | Force rebuild native modules (after changing Electron version) |
-| `npm run dist` | Package for the current OS into `dist/` |
-| `npm run build:mac` | macOS: bootstrap Node, rebuild native modules, sign ad-hoc, package dmg + zip |
+| `npm run dev` | Launch the app with hot reload |
+| `npm run build` | Build the Electron app into `out/` |
+| `npm run typecheck` | Check main and renderer TypeScript |
+| `npm run lint` | Check source and tests with oxlint |
+| `npm test` | Run unit and integration tests in Electron's Node runtime |
+| `npm run test:e2e` | Run the desktop end-to-end suites |
+| `npm run dist` | Package for the current platform |
+| `npm run rebuild:native` | Rebuild native modules after an Electron upgrade |
+
+The README screenshots come from a disposable Git repository and an isolated app profile. Regenerate them after
+building with `node scripts/capture-readme.mjs` (on headless Linux, use `xvfb-run -a node scripts/capture-readme.mjs`).
+
+### Architecture at a glance
+
+```text
+main process       Git services + the authoritative Redux store
+       ↓           typed commands and state updates over IPC
+preload            a narrow contextBridge API
+       ↓
+renderer           React UI with a read-only state replica
+```
+
+The renderer runs with context isolation, sandboxing and no Node integration. Git operations are serialized per
+repository; native Git services and CLI commands run outside the renderer. The [architecture notes](docs/architecture.md)
+explain the boundaries and trade-offs, and the [task index](docs/README.md) tracks what is implemented and what is planned.
+
+## License and attribution
+
+Forklift is licensed under [Apache License 2.0](LICENSE). You may use, modify and distribute the code and the app,
+including in commercial projects, under its terms. Distributed derivatives must preserve the attribution in
+[NOTICE](NOTICE), which names the original author and [source repository](https://github.com/forklift-dev/forklift).
+Third-party material retains its own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

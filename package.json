@@ -2,6 +2,12 @@
   "name": "forklift",
   "productName": "Forklift",
   "version": "0.4.1",
+  "author": "Anton Krylov (@akryll)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/forklift-dev/forklift.git"
+  },
   "private": true,
   "description": "Desktop Git client",
   "main": "./out/main/index.js",
