@@ -39,10 +39,12 @@ export default async function ({ check }) {
   // Open and close.
   await page.click(`document.querySelector('[aria-label="Preferences"]')`);
   check('gear button opens Preferences', await page.waitFor(`!!document.querySelector('.preferences')`));
+  check('Preferences opens on General by default', await page.waitFor(`document.querySelector('.preferences-content h2')?.textContent === 'General'`));
   await page.press('Escape');
   check('Esc closes Preferences', await page.waitFor(`!document.querySelector('.preferences') && !!document.querySelector('.change-row')`));
   await page.press(',', { code: 'Comma', keyCode: 188, modifiers: 2 });
   check('Ctrl+, opens Preferences', await page.waitFor(`!!document.querySelector('.preferences')`));
+  check('shortcut also opens General by default', await page.waitFor(`document.querySelector('.preferences-content h2')?.textContent === 'General'`));
 
   // Diff layout set in Preferences is used by the diff view, and the toolbar toggle writes back.
   await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'Diff')`);

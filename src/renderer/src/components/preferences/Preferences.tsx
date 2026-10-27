@@ -62,7 +62,7 @@ interface PreferencesProps {
 }
 
 /** Preferences screen: sections on the left, search, and a scope switch for repository overrides. */
-export function Preferences({ repo, section: initialSection = 'tools', onClose }: PreferencesProps) {
+export function Preferences({ repo, section: initialSection = 'general', onClose }: PreferencesProps) {
   const problems = useAppState((s) => s.settings.problems);
   const aiProvider = useAppState((s) => s.settings.values['ai.provider']);
   const [scope, setScope] = useState<'global' | 'repository'>('global');
