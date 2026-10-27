@@ -58,6 +58,10 @@
 | [T-076a](tasks/stage-1-processes/T-076a-git-setup.md) | CLI и безопасная настройка Git для Forklift tools | review |
 | [T-076b](tasks/stage-1-processes/T-076b-standalone-diff.md) | Отдельное окно Forklift для git difftool | review |
 | [T-076c](tasks/stage-1-processes/T-076c-standalone-merge.md) | Отдельное окно Forklift для git mergetool | review |
+| [T-091](tasks/stage-1-processes/T-091-tool-merge-encoding.md) | Сохранение кодировки в отдельном окне merge | review |
+| [T-092](tasks/stage-1-processes/T-092-tool-merge-close.md) | Предупреждение о несохранённом merge | review |
+| [T-093](tasks/stage-1-processes/T-093-git-tool-uninstall.md) | Сохранение новых Git-настроек при удалении интеграции | review |
+| [T-094](tasks/stage-1-processes/T-094-tool-window-consistency.md) | Локализация и ограничение текста в отдельных окнах Git tools | review |
 
 ### Этап 2 — Основная работа внутри приложения
 

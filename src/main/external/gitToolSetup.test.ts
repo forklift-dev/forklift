@@ -54,4 +54,16 @@ describe('GitToolSetup', () => {
     await expect(setup.setup(cwd, 'local', ['/opt/other'])).rejects.toThrow('already configured');
     expect(git('--get', 'difftool.forklift.cmd')).toContain('/opt/forklift');
   });
+
+  it('keeps Git values changed after setup while restoring untouched values', async () => {
+    const { setup, git, cwd } = create();
+    git('--add', 'diff.tool', 'meld');
+    await setup.setup(cwd, 'local', ['/opt/forklift']);
+    git('--replace-all', 'diff.tool', 'another-tool');
+    const plan = await setup.uninstall(cwd, 'local', true);
+    expect(plan.find((change) => change.key === 'diff.tool')?.skipped).toBe(true);
+    await setup.uninstall(cwd, 'local');
+    expect(git('--get', 'diff.tool')).toBe('another-tool');
+    expect(() => git('--get', 'difftool.forklift.cmd')).toThrow();
+  });
 });

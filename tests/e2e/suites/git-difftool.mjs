@@ -45,6 +45,7 @@ export default async function ({ check }) {
   let exitCode = null;
   child.once('exit', (code) => { exitCode = code; });
   const toolPage = await connectToPage(port);
+  await toolPage.waitFor(`!!document.querySelector('.tool-diff-window .monaco-diff-editor .view-lines')`, 15000);
   const title = await toolPage.evaluate('document.querySelector(".tool-diff-window header")?.innerText ?? ""');
   const content = await toolPage.evaluate('[...document.querySelectorAll(".view-lines")].map((el) => el.innerText).join("\\n")');
   check('git difftool opens its dedicated diff window', title.includes('compare file.txt'), `${title}; ${toolLogs}`);

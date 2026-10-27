@@ -60,6 +60,9 @@ const bridge: ForkliftBridge = {
   toolMerge() {
     return ipcRenderer.invoke('tool-merge:get');
   },
+  toolMergeDirty() {
+    ipcRenderer.send('tool-merge:dirty');
+  },
   saveToolMerge(text) {
     return ipcRenderer.invoke('tool-merge:save', text);
   },

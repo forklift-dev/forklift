@@ -2,6 +2,7 @@ import type { CommandArgs, CommandName, CommandResult, IpcResult } from './ipc';
 import type { ReplicaMessage } from './state';
 import type { TerminalEvent } from './terminal';
 import type { FileDiff, FileVersion } from './diff';
+import type { Language } from './i18n';
 
 /** API the preload script exposes to the renderer as `window.forklift`. */
 export interface ForkliftBridge {
@@ -13,9 +14,11 @@ export interface ForkliftBridge {
   /** Filesystem path of a file or folder dropped on the window ('' when it has none). */
   pathForFile(file: File): string;
   /** Data for the isolated `git difftool` window; paths remain in the main process. */
-  toolDiff(): Promise<{ path: string; diff: FileDiff }>;
+  toolDiff(): Promise<{ path: string; diff: FileDiff; language: Language }>;
   /** Merge sides for the isolated `git mergetool` window. */
-  toolMerge(): Promise<{ path: string; base: FileVersion; local: FileVersion; remote: FileVersion; merged: FileVersion }>;
+  toolMerge(): Promise<{ path: string; base: FileVersion; local: FileVersion; remote: FileVersion; merged: FileVersion; language: Language }>;
+  /** Reports that the merge result was edited, so the main window can guard closing. */
+  toolMergeDirty(): void;
   /** Writes the explicitly saved result to Git's MERGED path. */
   saveToolMerge(text: string): Promise<void>;
   /** Embedded terminals: output and exits from main, keystrokes to it (fire and forget). */

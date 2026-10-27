@@ -6,10 +6,24 @@ export type GitToolScope = 'global' | 'local';
 const OWNED_KEYS = ['diff.tool', 'difftool.forklift.cmd', 'merge.tool', 'mergetool.forklift.cmd', 'mergetool.forklift.trustExitCode'] as const;
 const BACKUP_KEY = 'forklift.setup.backup';
 type Backup = Partial<Record<(typeof OWNED_KEYS)[number], string[]>>;
+interface BackupRecord { original: Backup; installed: Backup }
 
 export interface GitConfigChange {
   key: string;
   values: string[];
+  skipped?: boolean;
+}
+
+function validBackup(value: unknown): value is Backup {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(([key, values]) =>
+    OWNED_KEYS.includes(key as (typeof OWNED_KEYS)[number]) && Array.isArray(values) && values.every((entry) => typeof entry === 'string'));
+}
+
+function legacyInstalled(key: (typeof OWNED_KEYS)[number], values: string[]): boolean {
+  if (key === 'diff.tool' || key === 'merge.tool') return values.length === 1 && values[0] === 'forklift';
+  if (key === 'mergetool.forklift.trustExitCode') return values.length === 1 && values[0] === 'true';
+  return values.length === 1 && values[0]!.includes(key.startsWith('difftool.') ? '"difftool" "--local" "$LOCAL"' : '"mergetool" "--base" "$BASE"');
 }
 
 /** Registers Forklift as the selected Git diff and merge tool, preserving values for uninstall. */
@@ -43,7 +57,8 @@ export class GitToolSetup {
       if (values.length) backup[key as keyof Backup] = values;
     }
     // Write the recovery record first. A failed write can then be undone by uninstall.
-    await this.replace(cwd, scopeArgs, BACKUP_KEY, [JSON.stringify(backup)]);
+    const record: BackupRecord = { original: backup, installed: Object.fromEntries(changes.map(({ key, values }) => [key, values])) };
+    await this.replace(cwd, scopeArgs, BACKUP_KEY, [JSON.stringify(record)]);
     try {
       for (const change of changes) await this.replace(cwd, scopeArgs, change.key, change.values);
     } catch (error) {
@@ -58,18 +73,26 @@ export class GitToolSetup {
     const scopeArgs = scope === 'global' ? ['--global'] : ['--local'];
     const stored = await this.get(cwd, scopeArgs, BACKUP_KEY);
     if (!stored.length) throw new Error(`Forklift is not configured in ${scope} Git config`);
-    let backup: Backup;
+    let parsed: unknown;
     try {
-      backup = JSON.parse(stored[0]!) as Backup;
+      parsed = JSON.parse(stored[0]!);
     } catch {
       throw new Error('Forklift Git config backup is invalid; no settings were changed');
     }
-    if (!backup || typeof backup !== 'object' || Array.isArray(backup) || Object.entries(backup).some(([key, values]) =>
-      !OWNED_KEYS.includes(key as (typeof OWNED_KEYS)[number]) || !Array.isArray(values) || !values.every((value) => typeof value === 'string'),
-    )) throw new Error('Forklift Git config backup is invalid; no settings were changed');
-    const changes = OWNED_KEYS.map((key) => ({ key, values: backup[key] ?? [] }));
+    const record = parsed as Partial<BackupRecord> | null;
+    const modern = record !== null && typeof record === 'object' && 'original' in record;
+    const backup = modern ? record.original : parsed;
+    const installed = modern ? record.installed : null;
+    if (!validBackup(backup) || (modern && !validBackup(installed))) throw new Error('Forklift Git config backup is invalid; no settings were changed');
+    const changes = await Promise.all(OWNED_KEYS.map(async (key) => {
+      const current = await this.get(cwd, scopeArgs, key);
+      const expected = installed?.[key];
+      const owned = expected ? current.length === expected.length && current.every((value, index) => value === expected[index]) : legacyInstalled(key, current);
+      return { key, values: backup[key] ?? [], skipped: !owned };
+    }));
     if (dryRun) return changes;
     for (const change of changes) {
+      if (change.skipped) continue;
       if (change.values.length) await this.replace(cwd, scopeArgs, change.key, change.values);
       else await this.unset(cwd, scopeArgs, change.key);
     }

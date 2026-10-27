@@ -55,7 +55,7 @@ export default async function ({ check }) {
   await save.page.clickAt(point.x, point.y);
   await save.page.press('A', { code: 'KeyA', keyCode: 65, modifiers: 2 });
   await save.page.insertText('resolved by Forklift\n');
-  await save.page.click(` [...document.querySelectorAll('.tool-merge-window button')].find(button => button.textContent.trim() === 'Save and close')`);
+  await save.page.click(`document.querySelector('.tool-merge-window > header > div > button:first-child')`);
   const saved = await new Promise((resolve) => save.child.once('exit', resolve));
   check('Save returns success to Git', saved === 0, String(saved));
   check('Save writes only the requested MERGED result', readFileSync(join(root, 'conflict file.txt'), 'utf8') === 'resolved by Forklift\n');

@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { lstat, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { app, BrowserWindow, ipcMain, net, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { GitToolSetup, type GitToolScope } from './external/gitToolSetup';
 import { ExternalTools } from './external/tools';
@@ -61,9 +61,11 @@ import { GitflowService } from './git/gitflow';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
-import { resolveLanguage, setLanguage } from '../shared/i18n';
+import { resolveLanguage, setLanguage, t } from '../shared/i18n';
+import { decodeSettings } from './settings/file';
 import { parseToolMode, type ToolMode } from './external/toolMode';
 import { MAX_DIFF_FILE_BYTES, type FileDiff, type FileVersion } from '../shared/diff';
+import { readToolVersion } from './external/toolFile';
 
 // Started by git or ssh to ask for credentials (see AskpassServer): no window, no single-instance lock.
 const askpassMode = process.argv.includes(ASKPASS_FLAG);
@@ -317,7 +319,7 @@ async function runGitToolConfigCommand(command: 'setup' | 'uninstall', args: str
       ? await setup.setup(process.cwd(), scope, executable, dryRun)
       : await setup.uninstall(process.cwd(), scope, dryRun);
     const verb = command === 'setup' ? 'Set' : 'Restore';
-    const lines = changes.map(({ key, values }) => values.length ? `${verb} ${key} = ${values.join(', ')}` : `Remove ${key}`);
+    const lines = changes.map(({ key, values, skipped }) => skipped ? `Keep ${key} (changed after Forklift setup)` : values.length ? `${verb} ${key} = ${values.join(', ')}` : `Remove ${key}`);
     process.stdout.write(`${dryRun ? 'Dry run — no changes written.\n' : ''}${lines.join('\n')}\n`, () => app.exit(0));
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`, () => app.exit(1));
@@ -326,22 +328,10 @@ async function runGitToolConfigCommand(command: 'setup' | 'uninstall', args: str
   }
 }
 
-async function readToolVersion(path: string): Promise<FileVersion> {
-  const missing = { path, exists: false, binary: false, tooLarge: false, size: 0, text: null, lossy: false, hash: null } satisfies FileVersion;
-  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
-  if (!info) return missing;
-  if (!info.isFile()) throw new Error('Git diff side is not a regular file');
-  if (info.size > MAX_DIFF_FILE_BYTES) return { ...missing, exists: true, tooLarge: true, size: info.size };
-  const bytes = await readFile(path);
-  if (bytes.byteLength > MAX_DIFF_FILE_BYTES) return { ...missing, exists: true, tooLarge: true, size: bytes.byteLength };
-  const binary = bytes.subarray(0, 8000).includes(0);
-  let text: string | null = null;
-  let lossy = false;
-  if (!binary) {
-    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
-    catch { text = new TextDecoder('utf-8').decode(bytes); lossy = true; }
-  }
-  return { path, exists: true, binary, tooLarge: false, size: bytes.byteLength, text, lossy, hash: null };
+async function toolWindowLanguage() {
+  const settingsPath = join(app.getPath('userData'), 'settings.json');
+  const saved = await readFile(settingsPath, 'utf8').then((text) => decodeSettings(text).values['ui.language']).catch(() => 'system');
+  return resolveLanguage(saved, [app.getLocale()]);
 }
 
 async function runGitDiffTool(): Promise<void> {
@@ -354,6 +344,7 @@ async function runGitDiffTool(): Promise<void> {
     return;
   }
   await app.whenReady();
+  const language = await toolWindowLanguage();
   handleAppProtocol(join(__dirname, '../renderer'));
   const window = new BrowserWindow({
     title: mode.path ?? 'Forklift Diff', width: 1100, height: 760, minWidth: 640, minHeight: 420,
@@ -368,7 +359,7 @@ async function runGitDiffTool(): Promise<void> {
     if (!isTrustedSender(event.senderFrame)) throw new Error('Untrusted diff window');
     const [original, modified] = await Promise.all([readToolVersion(mode.local), readToolVersion(mode.remote)]);
     const diff: FileDiff = { original, modified };
-    return { path: mode.path ?? mode.remote, diff };
+    return { path: mode.path ?? mode.remote, diff, language };
   });
   window.once('ready-to-show', () => window.show());
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -392,7 +383,10 @@ async function runGitMergeTool(): Promise<void> {
   let originalHash: string | null = null;
   let baselineLoaded = false;
   let saved = false;
+  let dirty = false;
   await app.whenReady();
+  const language = await toolWindowLanguage();
+  setLanguage(language);
   handleAppProtocol(join(__dirname, '../renderer'));
   const window = new BrowserWindow({
     title: mode.merged, width: 1280, height: 900, minWidth: 760, minHeight: 600, show: false,
@@ -416,7 +410,10 @@ async function runGitMergeTool(): Promise<void> {
     }).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
     originalHash = current ? createHash('sha256').update(current).digest('hex') : null;
     baselineLoaded = true;
-    return { path: mode.merged, base, local, remote, merged };
+    return { path: mode.merged, base, local, remote, merged, language };
+  });
+  ipcMain.on('tool-merge:dirty', (event) => {
+    if (event.sender === window.webContents && isTrustedSender(event.senderFrame)) dirty = true;
   });
   ipcMain.handle('tool-merge:save', async (event, value: unknown) => {
     if (!isTrustedSender(event.senderFrame)) throw new Error('Untrusted merge window');
@@ -435,6 +432,17 @@ async function runGitMergeTool(): Promise<void> {
   window.once('ready-to-show', () => window.show());
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
+  window.on('close', (event) => {
+    if (saved || !dirty) return;
+    const choice = dialog.showMessageBoxSync(window, {
+      type: 'warning',
+      buttons: [t('tool|Keep editing'), t('tool|Discard changes')],
+      defaultId: 0,
+      cancelId: 0,
+      message: t('tool|Discard the unsaved merge result?'),
+    });
+    if (choice !== 1) event.preventDefault();
+  });
   window.on('closed', () => app.exit(saved ? 0 : 1));
   void window.loadURL(`${devServerUrl ?? 'app://forklift/index.html'}?tool-merge`).catch((error: unknown) => {
     console.error('Could not open git merge window', error);
