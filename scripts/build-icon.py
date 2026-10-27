@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the app icon from its layers (assets/icon/compose.json) into build/icon.png and build/icons/*.png.
 
-Each layer is a 1024x1024 RGBA picture with a transparent background. compose.json has variants (the
+Each layer is an RGBA picture with a transparent background. compose.json has variants (the
 "small" one, up to its `maxSize`, is for taskbars and small icons; "large" for the rest); each places its
 layers in order (first at the bottom): `scale` around the layer's top-left corner, `x`/`y` move it; `solidify`
 makes nearly opaque pixels fully opaque (generated pictures are often 95% opaque inside) and drops a faint

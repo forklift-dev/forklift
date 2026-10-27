@@ -2,7 +2,7 @@
   "size": 1024,
   "variants": {
     "large": {
-      "comment": "128 px and up: the alternative forklift logo on the tile",
+      "comment": "128 px and up: the new forklift logo on the tile",
       "layers": [
         {
           "name": "background",
@@ -13,24 +13,24 @@
           "clip": true
         },
         {
-          "name": "forklift-alt",
-          "file": "layers/forklift_alt.png",
-          "scale": 3.35,
-          "x": 82,
-          "y": 79
+          "name": "forklift-new",
+          "file": "layers/forklift-new.png",
+          "scale": 0.73,
+          "x": 38,
+          "y": 70
         }
       ]
     },
     "small": {
-      "comment": "64 px and below, and the window icon: the alternative forklift logo without the tile",
+      "comment": "64 px and below, and the window icon: the new forklift logo without the tile",
       "maxSize": 64,
       "layers": [
         {
-          "name": "forklift-alt",
-          "file": "layers/forklift_alt.png",
-          "scale": 4.75,
-          "x": -82,
-          "y": -127
+          "name": "forklift-new",
+          "file": "layers/forklift-new.png",
+          "scale": 0.8,
+          "x": -8,
+          "y": 28
         }
       ]
     }
