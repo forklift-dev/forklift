@@ -34,6 +34,44 @@ interface RepositoriesScreenProps {
   onCreating(kind: NewRepoKind | null): void;
 }
 
+function GroupColorPicker({ group, onChange }: { group: RepoGroup; onChange(color: number): void }) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, [open]);
+
+  return <div className="repo-group-color-picker" ref={pickerRef} onKeyDown={(event) => {
+    if (event.key !== 'Escape' || !open) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setOpen(false);
+    triggerRef.current?.focus();
+  }}>
+    <button ref={triggerRef} type="button" className="repo-group-color-trigger" aria-label={t('Group color')} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <span className="repo-group-color" aria-hidden="true" />
+      <span className="codicon codicon-chevron-down" aria-hidden="true" />
+    </button>
+    {open && <div className="repo-group-color-options" role="dialog" aria-label={t('Group color')}>
+      {Array.from({ length: 10 }, (_, color) => <button
+        key={color}
+        type="button"
+        className={`repo-group-color-option lane-${color}`}
+        aria-label={t('Color {number}', { number: color + 1 })}
+        aria-pressed={group.color === color}
+        onClick={() => { onChange(color); setOpen(false); triggerRef.current?.focus(); }}
+      ><span aria-hidden="true" /></button>)}
+    </div>}
+  </div>;
+}
+
 /** Opening repositories: by folder, from favorites and recent ones, or found by searching a folder. */
 export function RepositoriesScreen({ run, onOpened, onClose, creating, onCreating: setCreating }: RepositoriesScreenProps) {
   const { recent, favorites, groups } = useAppState((s) => s.library);
@@ -196,11 +234,8 @@ export function RepositoriesScreen({ run, onOpened, onClose, creating, onCreatin
                 }}
               >
                 <header className="repo-group-header">
-                  <span className="repo-group-color" aria-hidden="true" />
                   <input aria-label={t('Group name')} defaultValue={group.name} maxLength={100} onBlur={(event) => event.target.value.trim() !== group.name && event.target.value.trim() && updateGroup(group, { name: event.target.value.trim() })} />
-                  <select aria-label={t('Group color')} value={group.color} onChange={(event) => updateGroup(group, { color: Number(event.target.value) })}>
-                    {Array.from({ length: 10 }, (_, color) => <option key={color} value={color}>{t('Color {number}', { number: color + 1 })}</option>)}
-                  </select>
+                  <GroupColorPicker group={group} onChange={(color) => updateGroup(group, { color })} />
                   <button type="button" onClick={() => void (allOpen ? closeGroup(group) : openGroup(group))} disabled={!group.repos.length}>{allOpen ? t('Close group') : t('Open group')}</button>
                   <button type="button" onClick={() => void run(() => invoke('repos:groupSync', group.id, 'fetch'))} disabled={!group.repos.length || Boolean(groupSync && !groupSync.done)}>{t('Fetch all')}</button>
                   <button type="button" onClick={() => void run(() => invoke('repos:groupSync', group.id, 'pull'))} disabled={!group.repos.length || Boolean(groupSync && !groupSync.done)}>{t('Pull all (fast-forward)')}</button>

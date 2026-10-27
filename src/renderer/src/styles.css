@@ -1948,7 +1948,27 @@ select {
   padding: 4px;
 }
 .repo-group-header input { flex: 1 1 150px; min-width: 100px; }
-.repo-group-color { width: 9px; height: 9px; border-radius: 50%; background: var(--lane); }
+.repo-group-color-picker { position: relative; }
+.repo-group-color-trigger { display: flex; align-items: center; gap: 5px; min-width: 42px; justify-content: center; }
+.repo-group-color-trigger .codicon { font-size: 10px; }
+.repo-group-color { display: block; width: 15px; height: 15px; border-radius: 50%; background: var(--lane); }
+.repo-group-color-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, 30px);
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+}
+.repo-group-color-option { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.repo-group-color-option span { width: 18px; height: 18px; border-radius: 50%; background: var(--lane); }
+.repo-group-color-option[aria-pressed='true'] { outline: 2px solid var(--lane); outline-offset: -2px; }
 .repo-group-status { flex: 0 1 260px; color: var(--fg-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repo-group-drop { margin: 8px 4px; padding: 18px; border: 1px dashed var(--border); color: var(--fg-muted); text-align: center; }
 .repo-group-activity { padding: 8px 8px 2px; border-top: 1px solid var(--border); font-size: 12px; }
