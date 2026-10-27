@@ -2,9 +2,9 @@
 id: T-076
 title: "Forklift как git difftool и mergetool"
 stage: 1 — Процессы и внешние программы
-status: todo
+status: in-progress
 depends_on: [T-014, T-072]
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # T-076. Forklift как git difftool и mergetool
@@ -19,10 +19,8 @@ updated: 2026-10-26
 
 ## Этапы
 
-- [ ] Режимы `forklift difftool --local A --remote B [--path P]` и `forklift mergetool --base --local --remote --merged`
-- [ ] Окно только с diff/слиянием, код выхода для git (`trustExitCode`)
-- [ ] `forklift setup [--local] [--dry-run]` и `forklift uninstall` с сохранением прежних настроек git
-- [ ] Совместимость с аргументами KDiff3/Meld
+- [ ] Выполнить подзадачи T-076a, T-076b и T-076c
+- [ ] Проверить полный сценарий через `git difftool` и `git mergetool`
 
 ## Критерии готовности
 
@@ -33,6 +31,7 @@ updated: 2026-10-26
 
 - 2026-10-26: код GitComet (AGPL) не переносить — только интерфейс вызова git.
 - 2026-10-26: решение владельца: делаем; порядок владельца (2026-10-26): T-080 → T-078 → T-076 → T-077, затем T-079 и T-084. Mergetool сначала на текущем редакторе конфликтов (T-025), панель BASE придёт с T-072.
+- 2026-10-27: объём разделён по правилу бэклога на CLI-настройку/аргументы (T-076a), самостоятельный diff (T-076b) и самостоятельное разрешение конфликтов (T-076c). Завершение подзадач само по себе не заменяет сквозную проверку родительской задачи.
 
 ## Промт
 
