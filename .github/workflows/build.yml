@@ -4,8 +4,8 @@
 # be further matrix entries (ubuntu-22.04-arm, windows-11-arm, macos-15-intel). Packages are not signed yet (T-004): macOS asks to open the app with right-click → Open, Windows
 # SmartScreen shows "More info → Run anyway".
 #
-# Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.1.0-beta.1): then the packages are
-# also attached to a draft pre-release.
+# Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.4.1): after all packages
+# succeed, a pre-release is published with the installers from every platform.
 name: Build
 
 on:
@@ -174,19 +174,41 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # A tag v* gets a draft pre-release with every package (published by hand after a look).
+  # Publish one pre-release only after every platform has packaged successfully.
   release:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: packages
-          merge-multiple: true
-      - name: Draft pre-release
+          pattern: forklift-*
+
+      - name: Publish pre-release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft --prerelease --title "Forklift $GITHUB_REF_NAME" --generate-notes
+        run: |
+          for platform in linux-x64 windows-x64 macos-arm64; do
+            test -d "packages/forklift-$platform"
+          done
+          shopt -s nullglob
+          assets=(packages/forklift-*/*)
+          if (( ${#assets[@]} != 5 )); then
+            echo "Expected 5 packages from Linux, Windows and macOS; found ${#assets[@]}" >&2
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            version="$(node -p "require('./package.json').version")"
+            tag="v${version}-build.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          fi
+
+          gh release create "$tag" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false --title "Forklift $tag" --generate-notes
