@@ -130,7 +130,7 @@
 | [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | review |
 | [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | review |
 | [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
-| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | in-progress |
+| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта | review |
 | [T-086](tasks/stage-5-settings/T-086-translation-catalogs.md) | Каталоги переводов и автоматическая проверка | todo |
 | [T-087](tasks/stage-5-settings/T-087-more-languages.md) | Подключение новых языков интерфейса | todo |
 | [T-088](tasks/stage-5-settings/T-088-community-translations.md) | Процесс переводов от сообщества | todo |
@@ -197,7 +197,7 @@ Workspaces, Cloud Patches, Launchpad, AI-функции, Team, онбордин�
 Текущий порядок владельца (2026-10-26): сначала его список — **T-074 i18n** (первой: иначе строки остальных задач
 пришлось бы выносить повторно) → T-070 темы → T-071 строка статуса → T-072 3-way merge → T-073 bisect; затем
 T-078 сравнение коммитов → T-076 difftool/mergetool → T-077 diff изображений → T-079 группы репозиториев →
-T-084 локальный AI. T-075 — после обсуждения; T-081…T-083 отложены.
+T-084 AI через выбранного пользователем провайдера. T-075 — после обсуждения; T-081…T-083 отложены.
 
 Исходный порядок ночной работы (2026-10-23, выполнен):
 

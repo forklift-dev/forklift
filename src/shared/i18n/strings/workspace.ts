@@ -49,6 +49,10 @@ export const workspace = {
       'Разрешить локальной Ollama обработать выбранные данные репозитория для этого запроса? Локальная Ollama не расходует платные API-токены. Другие провайдеры могут брать плату за токены и запросят отдельное согласие.',
     'Send to Ollama': 'Отправить в Ollama',
     'Asking Ollama…': 'Запрос к Ollama…',
+    'Allow {provider} to process selected repository content? This may send code to an external service and consume paid tokens. Check your provider plan and limits before continuing.':
+      'Разрешить {provider} обработать выбранные данные репозитория? Код может быть отправлен внешнему сервису и расходовать платные токены. Перед продолжением проверьте тариф и лимиты провайдера.',
+    'Send to {provider}': 'Отправить в {provider}',
+    'Asking {provider}…': 'Запрос к {provider}…',
     'Use suggestion': 'Применить предложение',
     'Change it with a profile: Preferences → Profiles and keys, or “Switch profile…” in the command palette':
       'Сменить можно профилем: Настройки → Профили и ключи или «Сменить профиль…» в палитре команд',

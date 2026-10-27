@@ -14,12 +14,31 @@ export const settings = {
     'AI assistant': 'AI-помощник',
     'Off': 'Выключено',
     'Ollama (local)': 'Ollama (локально)',
+    'OpenAI API (own key)': 'OpenAI API (свой ключ)',
+    'Codex CLI': 'Codex CLI',
+    'Claude Code CLI': 'Claude Code CLI',
+    'OpenCode CLI': 'OpenCode CLI',
+    'Qwen Code CLI': 'Qwen Code CLI',
+    'Choose a local model, your own API key, or an installed CLI agent. Each request needs confirmation; remote providers may charge for tokens.':
+      'Выберите локальную модель, свой API-ключ или установленного CLI-агента. Каждый запрос требует подтверждения; внешние провайдеры могут взимать плату за токены.',
     'Uses your local Ollama server only after you confirm each request. Repository content stays on this computer.':
       'Использует локальный сервер Ollama только после подтверждения каждого запроса. Данные репозитория остаются на этом компьютере.',
     'Ollama model': 'Модель Ollama',
     'Installed Ollama model': 'Установленная модель Ollama',
     'Name of a model already installed in Ollama, for example qwen2.5-coder.':
       'Имя уже установленной модели Ollama, например qwen2.5-coder.',
+    'OpenAI model': 'Модель OpenAI',
+    'OpenAI model ID': 'ID модели OpenAI',
+    'Model ID for requests billed to your API key. No request is sent without confirmation.':
+      'ID модели для запросов, оплачиваемых вашим API-ключом. Без подтверждения запросы не отправляются.',
+    'OpenAI API key': 'API-ключ OpenAI',
+    'Encrypted with the system keychain. Used only after confirming a request; OpenAI may charge for tokens.':
+      'Шифруется системным хранилищем ключей. Используется только после подтверждения запроса; OpenAI может взимать плату за токены.',
+    'System keychain unavailable: API key cannot be saved': 'Системное хранилище ключей недоступно: API-ключ нельзя сохранить',
+    'Key saved': 'Ключ сохранён',
+    'Paste API key': 'Вставьте API-ключ',
+    'Save key': 'Сохранить ключ',
+    'Remove key': 'Удалить ключ',
     'Reopen repositories at startup': 'Открывать репозитории при запуске',
     'Open the tabs that were open when Forklift was last closed.': 'Открывать вкладки, которые были открыты при последнем закрытии Forklift.',
     'Fetch automatically': 'Выполнять Fetch автоматически',

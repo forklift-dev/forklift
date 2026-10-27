@@ -14,6 +14,7 @@ import { useAppState } from '../../state';
 import { useCommand } from '../../useCommand';
 import { useConfirm } from '../ConfirmDialog';
 import { AccountsEditor } from './Accounts';
+import { AiKeyEditor } from './AiKey';
 import { GitIdentityEditor } from './GitIdentity';
 import { BooleanControl, EnumControl, SettingRow, TextControl, type ControlProps } from './SettingRow';
 import { KeybindingsEditor } from './KeybindingsEditor';
@@ -197,6 +198,7 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
           {repoRoot && <p className="scope-note">{t('Settings below apply only to {path}; anything not set here follows the settings for all repositories.', { path: repo?.root ?? '' })}</p>}
           {shownSection === 'tools' && !searching && detected.error && <p className="setting-error">{t('Could not detect installed tools: {error}', { error: detected.error })}</p>}
           {rows(keys)}
+          {shownSection === 'integrations' && !repoRoot && !searching && <AiKeyEditor />}
           {showIdentity && <GitIdentityEditor key={repoRoot ?? 'global'} repo={repoRoot} />}
           {searching && keys.length === 0 && !showIdentity && <p className="empty-note">{t('No settings match “{query}”', { query })}</p>}
         </div>

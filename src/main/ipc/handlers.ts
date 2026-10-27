@@ -56,7 +56,8 @@ import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 import { MAX_GROUPS, MAX_GROUP_REPOS } from '../../shared/state';
 import { GroupSyncRunner, readGroupStatus } from '../repos/groupSync';
-import { askOllama } from '../ai/ollama';
+import { askAi } from '../ai/assist';
+import type { TokenStore } from '../hosting/tokens';
 
 export interface HandlerDeps {
   store: AppStore;
@@ -99,6 +100,8 @@ export interface HandlerDeps {
   answerPrompt(id: number, answer: string | null, remember: boolean): void;
   credentials: Pick<CredentialStore, 'list' | 'remove'>;
   hosting: HostingService;
+  aiTokens: Pick<TokenStore, 'available' | 'get' | 'set' | 'remove'>;
+  aiFetch: typeof fetch;
   /** External processes running through the shared process host. */
   processes: Pick<ProcessRunner, 'running' | 'cancel' | 'run'>;
 }
@@ -251,7 +254,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, aiTokens, aiFetch, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const aiRequests = new Map<string, { sender: number; controller: AbortController }>();
@@ -801,20 +804,24 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       );
     },
 
-    async 'ai:assist'(ctx, repo, task, requestId, target) {
+    async 'ai:assist'(ctx, repo, task, requestId, confirmedProvider, target) {
       const root = tab(repo);
       if (task !== 'message' && task !== 'review' && task !== 'conflict' && task !== 'commit') throw new TypeError('Unknown AI task');
       if (typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/.test(requestId) || aiRequests.has(requestId)) throw new TypeError('Invalid AI request ID');
       if (task === 'conflict' && typeof target !== 'string') throw new TypeError('Conflict path is required');
       if (task === 'commit') assertSha(target);
       const setting = effective(root);
-      if (setting['ai.provider'] !== 'ollama') throw new Error('Enable Ollama in Preferences first');
+      const provider = setting['ai.provider'];
+      if (provider !== 'ollama' && provider !== 'openai' && provider !== 'codex' && provider !== 'claude' && provider !== 'opencode' && provider !== 'qwen') throw new Error('Choose an AI provider in Preferences first');
+      if (confirmedProvider !== provider) throw new Error('AI provider changed since confirmation; confirm the request again');
+      const key = provider === 'openai' ? await aiTokens.get('openai', 'https://api.openai.com') : undefined;
+      if (provider === 'openai' && !key) throw new Error('Add your OpenAI API key in Preferences first');
       const controller = new AbortController();
       const onClosed = () => controller.abort();
       ctx.sender.once('destroyed', onClosed);
       aiRequests.set(requestId, { sender: ctx.sender.id, controller });
       try {
-        return await askOllama(processes, gitCli.executable, { repo: root, task, model: setting['ai.model'], ...(task === 'conflict' && { path: normalizeRepoRelative(target!) }), ...(task === 'commit' && { sha: target }), signal: controller.signal });
+        return await askAi(processes, gitCli.executable, { repo: root, task, provider, model: provider === 'ollama' ? setting['ai.model'] : setting['ai.openaiModel'], ...(key && { apiKey: key }), ...(task === 'conflict' && { path: normalizeRepoRelative(target!) }), ...(task === 'commit' && { sha: target }), signal: controller.signal }, aiFetch);
       } finally {
         ctx.sender.removeListener('destroyed', onClosed);
         aiRequests.delete(requestId);
@@ -824,6 +831,15 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       const request = aiRequests.get(requestId);
       if (request?.sender === ctx.sender.id) request.controller.abort();
     },
+    async 'ai:keyStatus'() {
+      const available = await aiTokens.available();
+      return { available, saved: available && Boolean(await aiTokens.get('openai', 'https://api.openai.com')) };
+    },
+    async 'ai:keySet'(_ctx, key) {
+      if (typeof key !== 'string' || key.trim().length < 10 || key.length > 512 || /[\r\n]/.test(key)) throw new TypeError('Invalid API key');
+      await aiTokens.set('openai', 'https://api.openai.com', key.trim());
+    },
+    async 'ai:keyRemove'() { await aiTokens.remove('openai'); },
 
     async 'hooks:list'(_ctx, repo) {
       return listHooks(gitCli, tab(repo));

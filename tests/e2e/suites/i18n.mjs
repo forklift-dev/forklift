@@ -11,7 +11,7 @@ const ALLOWED = new Set(
    git Git HEAD WIP SHA URL LFS Gitflow feature release hotfix develop production upstream origin main detached worktree diff
    pull request requests merge issue issues Issues draft Forklift GitHub GitLab Forgejo Gitea GitVerse Gravatar Kraken Classic Compact Metro Polar Sand
    Ctrl Cmd Shift Alt Esc Enter Tab Meta Mod PATH TERMINAL UTF CLI SSH HTTPS http https ssh JSON KB MB ms API OK
-   Meld KDiff Beyond Compare VS Code Vim Neovim Emacs Sublime Text Zed kitty Alacritty WezTerm foot XTerm Windows Terminal GNOME Konsole Ollama
+   Meld KDiff Beyond Compare VS Code Vim Neovim Emacs Sublime Text Zed kitty Alacritty WezTerm foot XTerm Windows Terminal GNOME Konsole Ollama OpenAI Open Codex Claude OpenCode Qwen
    English Ada gitignore gitmodules commit-graph no-verify stderr stdout id email Email Worktree Diff
    blame config CSS JetBrains Mono monospace PowerShell cmd difftool mergetool ssh-agent`.split(/\s+/),
 );

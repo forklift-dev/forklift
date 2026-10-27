@@ -298,9 +298,9 @@ export const SETTING_FIELDS = {
     section: 'integrations',
     type: 'enum',
     default: 'off',
-    options: [{ value: 'off', label: 'Off' }, { value: 'ollama', label: 'Ollama (local)' }],
+    options: [{ value: 'off', label: 'Off' }, { value: 'ollama', label: 'Ollama (local)' }, { value: 'openai', label: 'OpenAI API (own key)' }, { value: 'codex', label: 'Codex CLI' }, { value: 'claude', label: 'Claude Code CLI' }, { value: 'opencode', label: 'OpenCode CLI' }, { value: 'qwen', label: 'Qwen Code CLI' }],
     label: 'AI assistant',
-    description: 'Uses your local Ollama server only after you confirm each request. Repository content stays on this computer.',
+    description: 'Choose a local model, your own API key, or an installed CLI agent. Each request needs confirmation; remote providers may charge for tokens.',
   },
   'ai.model': {
     section: 'integrations',
@@ -310,6 +310,15 @@ export const SETTING_FIELDS = {
     placeholder: 'Installed Ollama model',
     label: 'Ollama model',
     description: 'Name of a model already installed in Ollama, for example qwen2.5-coder.',
+  },
+  'ai.openaiModel': {
+    section: 'integrations',
+    type: 'string',
+    default: '',
+    maxLength: 120,
+    placeholder: 'OpenAI model ID',
+    label: 'OpenAI model',
+    description: 'Model ID for requests billed to your API key. No request is sent without confirmation.',
   },
   'keys.bindings': {
     section: 'keys',

@@ -1458,6 +1458,8 @@ button.danger {
 .ai-assist .ai-result pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font: inherit; }
 .ai-assist .setting-error { flex: 1 0 100%; margin: 0; }
 .conflict-view > .ai-assist { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.ai-key-editor form { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-key-editor input { min-width: 180px; flex: 1; }
 
 .commit-actions label {
   display: flex;

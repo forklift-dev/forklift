@@ -45,6 +45,7 @@ accent colors, **seven graph styles** and adjustable panel and column widths.
 - **Stay in control.** Supported operations have Undo/Redo, destructive actions ask for confirmation, and switching branches can stash and restore local changes. The operation log shows what Git ran and why it failed.
 - **Work the way you prefer.** Use the command palette and configurable shortcuts, the built-in terminal, external editors and diff tools, or several repositories and worktrees in separate tabs. File watching keeps the view current while another program edits the repository.
 - **Keep the basics local.** Opening, searching and editing a local repository needs no sign-in. Optional hosting connections add pull requests, issues and remote operations; credentials use the operating system's secure storage when available.
+- **Ask for AI help when you want it.** In Preferences → Integrations, choose a downloaded Ollama model, your own OpenAI API key, or an installed Codex, Claude Code, OpenCode or Qwen Code CLI. Forklift asks before every request and warns when the provider may charge for tokens; suggestions never change files automatically.
 
 ## Get Forklift
 
