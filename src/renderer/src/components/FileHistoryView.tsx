@@ -12,6 +12,7 @@ const STATUS_LABEL: Record<FileHistoryEntry['status'], string> = { added: 'A', m
 interface FileHistoryViewProps {
   repo: string;
   path: string;
+  range?: { base: string; head: string };
   mode: 'history' | 'blame';
   onMode(mode: 'history' | 'blame'): void;
   /** Shows a commit in the graph (and closes this view). */
@@ -20,7 +21,7 @@ interface FileHistoryViewProps {
 }
 
 /** One file's story: the commits that changed it (with its diff in each), or who wrote each line (blame). */
-export function FileHistoryView({ repo, path, mode, onMode, onShowCommit, onClose }: FileHistoryViewProps) {
+export function FileHistoryView({ repo, path, range, mode, onMode, onShowCommit, onClose }: FileHistoryViewProps) {
   // A past revision is blamed under the name the file had then (it may have been renamed since).
   const [blameAt, setBlameAt] = useState<{ rev: string; path: string } | null>(null);
   const blameRev = blameAt?.rev ?? null;
@@ -55,7 +56,7 @@ export function FileHistoryView({ repo, path, mode, onMode, onShowCommit, onClos
         </div>
       </header>
       {mode === 'history' ? (
-        <HistoryList repo={repo} path={path} onBlameAt={(entry) => (setBlameAt({ rev: entry.sha, path: entry.path }), onMode('blame'))} onShowCommit={onShowCommit} />
+        <HistoryList repo={repo} path={path} range={range} onBlameAt={(entry) => (setBlameAt({ rev: entry.sha, path: entry.path }), onMode('blame'))} onShowCommit={onShowCommit} />
       ) : (
         <BlameView key={`${blameRev ?? 'worktree'}:${language}`} repo={repo} path={blameAt?.path ?? path} rev={blameRev} onShowCommit={onShowCommit} onWorkingTree={blameAt ? () => setBlameAt(null) : undefined} />
       )}
@@ -63,8 +64,8 @@ export function FileHistoryView({ repo, path, mode, onMode, onShowCommit, onClos
   );
 }
 
-function HistoryList({ repo, path, onBlameAt, onShowCommit }: { repo: string; path: string; onBlameAt(entry: FileHistoryEntry): void; onShowCommit(sha: string): void }) {
-  const { data, error } = useCommand('file:history', [repo, path]);
+function HistoryList({ repo, path, range, onBlameAt, onShowCommit }: { repo: string; path: string; range?: { base: string; head: string }; onBlameAt(entry: FileHistoryEntry): void; onShowCommit(sha: string): void }) {
+  const { data, error } = useCommand('file:history', [repo, path, range]);
   const [selected, setSelected] = useState<FileHistoryEntry | null>(null);
   const shown = selected ?? data?.[0] ?? null;
   if (error) return <div className="diff-message error">{error}</div>;

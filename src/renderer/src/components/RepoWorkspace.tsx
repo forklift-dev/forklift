@@ -5,7 +5,7 @@ import { Splitter } from './Splitter';
 import { NO_FILTER, type HistoryFilter } from '../../../shared/history';
 import { useCommand } from '../useCommand';
 import { HistoryBar, type SearchState } from './HistoryBar';
-import type { DiffTarget } from '../../../shared/diff';
+import type { ComparisonMode, DiffTarget } from '../../../shared/diff';
 import type { FileChange, RepoData } from '../../../shared/state';
 import { useCommandHandlers } from '../commands';
 import { FinderPalette } from './FinderPalette';
@@ -17,6 +17,7 @@ import { invoke } from '../api';
 import type { RunAction } from '../App';
 import { ChangesPanel } from './ChangesPanel';
 import { CommitDetailsPanel } from './CommitDetailsPanel';
+import { ComparisonPanel } from './ComparisonPanel';
 import { CommitGraph } from './CommitGraph';
 import { ConflictView } from './ConflictView';
 import { FileHistoryView } from './FileHistoryView';
@@ -46,10 +47,11 @@ interface RepoWorkspaceProps {
 export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps) {
   const repo = data.root;
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<{ left: string; right: string; mode: ComparisonMode } | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const [conflictPath, setConflictPath] = useState<string | null>(null);
   const [rebaseBase, setRebaseBase] = useState<string | null>(null);
-  const [fileHistory, setFileHistory] = useState<{ path: string; mode: 'history' | 'blame' } | null>(null);
+  const [fileHistory, setFileHistory] = useState<{ path: string; mode: 'history' | 'blame'; range?: { base: string; head: string } } | null>(null);
   const [hostingItem, setHostingItem] = useState<HostingItem | null>(null);
   const [hostingReload, setHostingReload] = useState(0);
   const accountIds = useAppState((s) => s.settings.values['integrations.accounts'].map((account) => account.id).join(','));
@@ -91,6 +93,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   };
   /** Selects a commit and scrolls to it, wherever it is in the history. */
   const showCommit = (sha: string) => {
+    setComparison(null);
     setSelectedCommit(sha);
     void invoke('history:locate', repo, data.historyVersion, filter, sha).then((index) => index >= 0 && revealIndex(index));
   };
@@ -99,6 +102,22 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const refActions = useRefActions(repo, data, run);
   const gitflow = useGitflow(repo, data);
   const { open: openMenu, menu } = useContextMenu();
+  const compareWith = (sha: string, mode: ComparisonMode = 'direct') => {
+    if (!selectedCommit || selectedCommit === sha) {
+      setComparison(null);
+      setSelectedCommit(sha);
+      return;
+    }
+    setDiffTarget(null);
+    setFileHistory(null);
+    setHostingItem(null);
+    setComparison({ left: selectedCommit, right: sha, mode });
+  };
+  const selectCommit = (sha: string | null, additive = false) => {
+    if (sha && additive) return compareWith(sha);
+    setComparison(null);
+    setSelectedCommit(sha);
+  };
   const closeDiff = useCallback(() => setDiffTarget(null), []);
   const worktreeDiff = diffTarget?.kind === 'worktree' ? diffTarget : null;
 
@@ -148,6 +167,35 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   const lfsPaths = useMemo(() => new Set(lfsInfo.data?.paths ?? []), [lfsInfo.data]);
   const lfsMissing = Boolean(lfsInfo.data && lfsInfo.data.patterns.length > 0 && !lfsInfo.data.installed);
   const head = data.branch.oid;
+  const compareChoices = [
+    ...(selectedCommit ? [{ value: selectedCommit, label: `${t('Selected commit')} · ${selectedCommit.slice(0, 10)}` }] : []),
+    ...(head ? [{ value: head, label: `HEAD · ${head.slice(0, 10)}` }] : []),
+    ...data.branches.map((ref) => ({ value: ref.sha, label: ref.name })),
+    ...data.remoteBranches.map((ref) => ({ value: ref.sha, label: ref.name })),
+    ...data.tags.map((ref) => ({ value: ref.sha, label: ref.name })),
+  ].filter((choice, index, all) => all.findIndex((item) => item.value === choice.value) === index);
+  const openCompareDialog = () => {
+    if (compareChoices.length < 2) return;
+    void openForm({
+      title: t('Compare revisions'),
+      detail: t('Choose two branches, tags or commits to compare.'),
+      fields: [
+        { name: 'left', label: t('comparison|From'), type: 'select', options: compareChoices, initial: selectedCommit && compareChoices.some((choice) => choice.value === selectedCommit) ? selectedCommit : compareChoices[0]!.value },
+        { name: 'right', label: t('To'), type: 'select', options: compareChoices, initial: compareChoices.find((choice) => choice.value !== (selectedCommit ?? compareChoices[0]!.value))?.value },
+        { name: 'mode', label: t('Comparison mode'), type: 'select', options: [{ value: 'direct', label: 'A..B' }, { value: 'merge-base', label: 'A...B' }], initial: 'direct' },
+      ],
+      confirmLabel: t('Compare'),
+      validate: async (values) => values['left'] === values['right'] ? t('Choose two different revisions') : null,
+      submit: async (values) => {
+        setSelectedCommit(String(values['left']));
+        setComparison({ left: String(values['left']), right: String(values['right']), mode: values['mode'] as ComparisonMode });
+        setDiffTarget(null);
+        setFileHistory(null);
+        setHostingItem(null);
+        return null;
+      },
+    });
+  };
   const centerFree = !fileHistory && !rebaseBase && !conflictPath && !diffTarget && !hostingItem;
   const openHosting = useCallback((item: HostingItem) => {
     setFileHistory(null);
@@ -243,6 +291,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       enabled: () => centerFree && !document.activeElement?.closest('.monaco-editor'),
     },
     'history.goToHead': { run: () => head && showCommit(head), enabled: () => Boolean(head) },
+    'history.compare': { run: openCompareDialog, enabled: () => compareChoices.length > 1 },
     'history.showAll': { run: () => setFilter(NO_FILTER), enabled: () => filter.solo.length > 0 || filter.hidden.length > 0 },
     'gitflow.init': { run: gitflow.init },
     'gitflow.feature': { run: () => gitflow.start('feature'), enabled: () => Boolean(gitflow.config) },
@@ -280,6 +329,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           gitflow={gitflow}
           openMenu={openMenu}
           onSelectCommit={showCommit}
+          onCompare={compareWith}
+          selectedCommit={selectedCommit}
           graphFilter={filter}
           onFilter={setFilter}
           hosting={hosting && { context: hosting, reloadKey: hostingReload, selected: hostingItem, onOpen: openHosting, onRefresh: () => setHostingReload((n) => n + 1), onCreatePull: createPull, onCreateIssue: createIssue }}
@@ -314,9 +365,10 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         />
       ) : fileHistory ? (
         <FileHistoryView
-          key={fileHistory.path}
+          key={`${fileHistory.path}:${fileHistory.range?.base ?? ''}:${fileHistory.range?.head ?? ''}`}
           repo={repo}
           path={fileHistory.path}
+          range={fileHistory.range}
           mode={fileHistory.mode}
           onMode={(mode) => setFileHistory({ ...fileHistory, mode })}
           onShowCommit={(sha) => {
@@ -335,7 +387,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           repo={repo}
           target={diffTarget}
           title={diffTarget.oldPath ? `${diffTarget.oldPath} → ${diffTarget.path}` : diffTarget.path}
-          subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.staged ? t('Staged') : t('Unstaged')}
+          subtitle={diffTarget.kind === 'commit' ? diffTarget.sha.slice(0, 7) : diffTarget.kind === 'comparison' ? `${diffTarget.base.slice(0, 7)} → ${diffTarget.head.slice(0, 7)}` : diffTarget.staged ? t('Staged') : t('Unstaged')}
           // Working-tree diffs follow refreshes; commit diffs never change.
           reloadKey={diffTarget.kind === 'worktree' ? data.loadedAt : undefined}
           editing={editing}
@@ -377,9 +429,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           matches={searching && found.data ? matches : undefined}
           reveal={reveal}
           selectedHash={selectedCommit}
-          onSelect={setSelectedCommit}
+          compareHash={comparison?.right}
+          onSelect={selectCommit}
           onContextMenu={(event, row) => {
-            setSelectedCommit(row.hash);
+            const compareFrom = selectedCommit && selectedCommit !== row.hash ? selectedCommit : null;
+            if (!compareFrom) selectCommit(row.hash);
             const short = row.hash.slice(0, 7);
             if (row.stash) {
               const label = `stash@{${row.stash.index}}`;
@@ -394,6 +448,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             const gitBusy = data.operation !== null;
             const busy = gitBusy || Boolean(bisect.data);
             openMenu(event, [
+              ...(compareFrom ? [
+                { label: t('Compare with selected commit (A..B)'), onSelect: () => setComparison({ left: compareFrom, right: row.hash, mode: 'direct' as const }) },
+                { label: t('Compare from common ancestor (A...B)'), onSelect: () => setComparison({ left: compareFrom, right: row.hash, mode: 'merge-base' as const }) },
+                'separator' as const,
+              ] : []),
               { label: t('Mark good for bisect'), disabled: gitBusy || bisectRunning || Boolean(bisect.data?.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'good', row.hash)) },
               { label: t('Mark bad for bisect'), disabled: gitBusy || bisectRunning || Boolean(bisect.data?.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'bad', row.hash)) },
               ...(bisect.data ? [{ label: t('Skip for bisect'), disabled: bisectRunning || Boolean(bisect.data.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'skip', row.hash)) }] : []),
@@ -423,7 +482,19 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       </div>
       <Splitter label={t('Resize the right panel')} className="right" value={layout.rightHidden ? 0 : layout.right} min={LIMITS.right[0]} max={LIMITS.right[1]} direction={-1} onChange={(width) => setPanelWidth('right', width)} onReset={() => resetPanelWidth('right')} />
       <aside className="side" hidden={layout.rightHidden}>
-        {selectedCommit ? (
+        {comparison ? (
+          <ComparisonPanel
+            repo={repo}
+            left={comparison.left}
+            right={comparison.right}
+            mode={comparison.mode}
+            selectedPath={diffTarget?.kind === 'comparison' ? diffTarget.path : null}
+            onMode={(mode) => { setComparison({ ...comparison, mode }); setDiffTarget(null); }}
+            onOpenFile={(file, base) => setDiffTarget({ kind: 'comparison', base, head: comparison.right, path: file.path, ...(file.oldPath && { oldPath: file.oldPath }) })}
+            onFileHistory={(file, base) => setFileHistory({ path: file.path, mode: 'history', range: { base, head: comparison.right } })}
+            onClose={() => { setComparison(null); setDiffTarget(null); }}
+          />
+        ) : selectedCommit ? (
           <CommitDetailsPanel
             key={selectedCommit}
             repo={repo}

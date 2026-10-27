@@ -155,7 +155,8 @@ interface CommitGraphProps {
   bisect?: BisectStatus | null;
   /** null: the working tree (WIP row) is selected. */
   selectedHash: string | null;
-  onSelect(hash: string | null): void;
+  compareHash?: string | null;
+  onSelect(hash: string | null, additive?: boolean): void;
   onContextMenu?(event: MouseEvent, row: HistoryRow): void;
   filter: HistoryFilter;
   /** Rows matching the search, highlighted. */
@@ -171,7 +172,7 @@ const MAX_SCROLL_HEIGHT = 30_000_000;
  * The history list with its graph, virtualized: only rows in view are rendered and history pages are
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
-export function CommitGraph({ repo, data, bisect, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
+export function CommitGraph({ repo, data, bisect, selectedHash, compareHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
   const bisectCandidates = useMemo(() => new Set(bisect?.candidates ?? []), [bisect]);
   const baseStyle = graphStyle(useAppState((s) => s.settings.values['ui.graphStyle']));
   // Reserve a second label line throughout the graph when refs share a commit. Keeping one row height
@@ -356,11 +357,11 @@ export function CommitGraph({ repo, data, bisect, selectedHash, onSelect, onCont
       <div
         key={row.hash}
         role="row"
-        aria-selected={selected}
-        className={`commit-row lane-${row.graph.color % 10}${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}${bisect?.remaining !== null && bisect?.remaining !== undefined && !bisectCandidates.has(row.hash) && row.hash !== bisect.bad && !bisect.good.includes(row.hash) && !bisect.skipped.includes(row.hash) ? ' bisect-excluded' : ''}`}
+        aria-selected={selected || row.hash === compareHash}
+        className={`commit-row lane-${row.graph.color % 10}${selected ? ' selected' : ''}${row.hash === compareHash ? ' comparison-selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}${bisect?.remaining !== null && bisect?.remaining !== undefined && !bisectCandidates.has(row.hash) && row.hash !== bisect.bad && !bisect.good.includes(row.hash) && !bisect.skipped.includes(row.hash) ? ' bisect-excluded' : ''}`}
         style={position}
         data-hash={row.hash}
-        onClick={() => onSelect(row.hash)}
+        onClick={(event) => onSelect(row.hash, event.ctrlKey || event.metaKey)}
         onContextMenu={onContextMenu && ((event) => onContextMenu(event, row))}
       >
         <div className={`cell refs${row.stash || data.refs[row.hash]?.length ? ' has-refs' : ''}`}>

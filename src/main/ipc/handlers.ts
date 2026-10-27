@@ -163,6 +163,11 @@ function parseDiffTarget(value: unknown): DiffTarget {
     assertSha(raw['sha']);
     return { kind: 'commit', sha: raw['sha'], ...paths };
   }
+  if (raw['kind'] === 'comparison') {
+    assertSha(raw['base']);
+    assertSha(raw['head']);
+    return { kind: 'comparison', base: raw['base'], head: raw['head'], ...paths };
+  }
   if (raw['kind'] === 'worktree') {
     if (typeof raw['staged'] !== 'boolean') throw new TypeError('target.staged must be a boolean');
     return { kind: 'worktree', staged: raw['staged'], ...paths };
@@ -831,6 +836,21 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       return git.commitDetails(root, sha);
     },
 
+    async 'comparison:details'(_ctx, repo, left, right, mode) {
+      const root = tab(repo);
+      assertSha(left);
+      assertSha(right);
+      if (mode !== 'direct' && mode !== 'merge-base') throw new TypeError('unknown comparison mode');
+      let base = left;
+      if (mode === 'merge-base') {
+        const result = await gitCli.exec(['merge-base', left, right], { cwd: root, readOnly: true, allowedExitCodes: [1] });
+        if (result.exitCode !== 0) throw new Error(t('The commits have no common ancestor'));
+        base = result.stdout.trim();
+        assertSha(base);
+      }
+      return git.comparisonDetails(root, left, right, base, mode);
+    },
+
     async 'diff:file'(_ctx, repo, target) {
       return git.fileDiff(tab(repo), parseDiffTarget(target));
     },
@@ -968,10 +988,14 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
       await tools.openInEditor(await resolveInsideRepo(root, path), line, root, effective(root)['tools.editor']);
     },
 
-    async 'file:history'(_ctx, repo, path) {
+    async 'file:history'(_ctx, repo, path, range) {
       const root = tab(repo);
       assertString(path, 'path');
-      return fileHistory.log(root, normalizeRepoRelative(path));
+      if (range) {
+        assertSha(range.base);
+        assertSha(range.head);
+      }
+      return fileHistory.log(root, normalizeRepoRelative(path), range);
     },
 
     async 'file:blame'(_ctx, repo, path, rev) {

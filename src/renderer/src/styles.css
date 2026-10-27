@@ -717,6 +717,11 @@ body.resizing * {
   background: var(--selection);
 }
 
+.commit-row.comparison-selected {
+  background: var(--selection);
+  box-shadow: inset 3px 0 var(--accent);
+}
+
 .commit-scroll:focus-visible .commit-row.selected {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
@@ -1178,6 +1183,34 @@ body.resizing * {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.comparison-endpoints {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.comparison-endpoints code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comparison-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.comparison-modes button[aria-pressed='true'] {
+  background: var(--selection);
+  outline: 1px solid var(--accent);
+}
+
+.comparison-note,
+.comparison-base {
+  color: var(--fg-muted);
 }
 
 .close-details {

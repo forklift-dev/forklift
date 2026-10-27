@@ -2,7 +2,7 @@
 import type { CheckoutTarget } from './branches';
 import type { BisectMark, BisectStatus } from './bisect';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
-import type { CommitDetails, DiffTarget, FileDiff } from './diff';
+import type { CommitDetails, ComparisonDetails, ComparisonMode, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
 import type { FlowFinishOptions, FlowKind, GitflowConfig } from './gitflow';
 import type { HooksInfo } from './hooks';
@@ -45,6 +45,7 @@ export interface Commands {
   'repo:files': { args: [repo: string]; result: { paths: string[]; truncated: boolean } };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
+  'comparison:details': { args: [repo: string, left: string, right: string, mode: ComparisonMode]; result: ComparisonDetails };
   /** Both versions of one file for the built-in diff view. */
   'diff:file': { args: [repo: string, target: DiffTarget]; result: FileDiff };
   /** Why `name` cannot be a new branch/tag, or null when it can. */
@@ -171,7 +172,7 @@ export interface Commands {
   /** Opens a file of the repository (path relative to its root) in the external editor. */
   'file:openInEditor': { args: [repo: string, path: string, line?: number]; result: void };
   /** Commits that changed a file (following renames), newest first. */
-  'file:history': { args: [repo: string, path: string]; result: FileHistoryEntry[] };
+  'file:history': { args: [repo: string, path: string, range?: { base: string; head: string }]; result: FileHistoryEntry[] };
   /** Line authorship at a commit, or of the working tree file (`rev` null). */
   'file:blame': { args: [repo: string, path: string, rev: string | null]; result: BlameResult };
   /** Shows a file's changes in the external diff tool; resolves when its window closes. */
@@ -274,6 +275,7 @@ const commandChannelSet = {
   'commit:create': true,
   'hooks:list': true,
   'commit:details': true,
+  'comparison:details': true,
   'history:rows': true,
   'history:locate': true,
   'history:search': true,

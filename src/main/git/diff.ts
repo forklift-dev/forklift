@@ -5,6 +5,8 @@ import { Diff, Repository, type Blob, type Commit, type IndexEntry, type Tree } 
 import {
   MAX_DIFF_FILE_BYTES,
   type CommitDetails,
+  type ComparisonDetails,
+  type ComparisonMode,
   type CommitFile,
   type DiffTarget,
   type FileChangeStatus,
@@ -40,7 +42,26 @@ async function firstParentTree(commit: Commit): Promise<Tree | undefined> {
 export async function readCommitDetails(repo: Repository, sha: string): Promise<CommitDetails> {
   const commit = await repo.getCommit(sha);
   // Merge commits are shown against their first parent, like `git show --first-parent`.
-  const diff = await Diff.treeToTree(repo, await firstParentTree(commit), await commit.getTree());
+  const { files, statsOmitted } = await treeFiles(repo, await firstParentTree(commit), await commit.getTree());
+  return {
+    hash: commit.sha(),
+    parents: commit.parents().map((oid) => oid.tostrS()),
+    author: signature(commit.author()),
+    committer: signature(commit.committer()),
+    message: commit.message(),
+    files,
+    statsOmitted,
+  };
+}
+
+export async function readComparisonDetails(repo: Repository, left: string, right: string, base: string, mode: ComparisonMode): Promise<ComparisonDetails> {
+  const [before, after] = await Promise.all([repo.getCommit(base), repo.getCommit(right)]);
+  const { files, statsOmitted } = await treeFiles(repo, await before.getTree(), await after.getTree());
+  return { left, right, base, mode, files, statsOmitted };
+}
+
+async function treeFiles(repo: Repository, before: Tree | undefined, after: Tree): Promise<Pick<ComparisonDetails, 'files' | 'statsOmitted'>> {
+  const diff = await Diff.treeToTree(repo, before, after);
   await diff.findSimilar({ flags: DIFF_FIND_RENAMES });
 
   const count = diff.numDeltas();
@@ -66,15 +87,7 @@ export async function readCommitDetails(repo: Repository, sha: string): Promise<
     });
   }
 
-  return {
-    hash: commit.sha(),
-    parents: commit.parents().map((oid) => oid.tostrS()),
-    author: signature(commit.author()),
-    committer: signature(commit.committer()),
-    message: commit.message(),
-    files,
-    statsOmitted,
-  };
+  return { files, statsOmitted };
 }
 
 /**
@@ -226,6 +239,14 @@ async function readVersions(repo: Repository, root: string, target: DiffTarget):
     const [original, modified] = await Promise.all([
       fromTree(repo, await firstParentTree(commit), originalPath),
       fromTree(repo, await commit.getTree(), target.path),
+    ]);
+    return { original, modified };
+  }
+  if (target.kind === 'comparison') {
+    const [base, head] = await Promise.all([repo.getCommit(target.base), repo.getCommit(target.head)]);
+    const [original, modified] = await Promise.all([
+      fromTree(repo, await base.getTree(), originalPath),
+      fromTree(repo, await head.getTree(), target.path),
     ]);
     return { original, modified };
   }

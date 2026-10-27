@@ -1,5 +1,6 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import type { HistoryFilter } from '../../../shared/history';
+import type { ComparisonMode } from '../../../shared/diff';
 import type { RepoData } from '../../../shared/state';
 import { useCommand } from '../useCommand';
 import { copyText, type MenuItem } from './ContextMenu';
@@ -29,6 +30,8 @@ interface LeftPanelProps {
   openMenu(event: MouseEvent, items: MenuItem[]): void;
   /** Shows a commit in the graph. */
   onSelectCommit(sha: string): void;
+  selectedCommit?: string | null;
+  onCompare?(sha: string, mode?: ComparisonMode): void;
   graphFilter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
   hosting?: LeftPanelHosting | null;
@@ -63,7 +66,13 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
 }
 
 /** Left panel as in GitKraken: local branches, remote branches by remote, tags; filter and context actions. */
-export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, graphFilter, onFilter, hosting }: LeftPanelProps) {
+export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, selectedCommit, onCompare, graphFilter, onFilter, hosting }: LeftPanelProps) {
+  const compareItem = (sha: string): MenuItem[] => selectedCommit && selectedCommit !== sha && onCompare
+    ? [
+        { label: t('Compare with selected commit (A..B)'), onSelect: () => onCompare(sha, 'direct') },
+        { label: t('Compare from common ancestor (A...B)'), onSelect: () => onCompare(sha, 'merge-base') },
+        'separator',
+      ] : [];
   /** Graph filter entries for a ref (full name). */
   const filterItems = (ref: string): MenuItem[] => {
     const hidden = graphFilter.hidden.includes(ref);
@@ -146,7 +155,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               className={`ref-item${branch.current ? ' current' : ''}${graphFilter.hidden.includes(`refs/heads/${branch.name}`) ? ' hidden-in-graph' : ''}${graphFilter.solo.includes(`refs/heads/${branch.name}`) ? ' solo' : ''}`}
               data-ref={branch.name}
               title={branch.upstream ? `${branch.name} → ${branch.upstream}` : branch.name}
-              onClick={() => onSelectCommit(branch.sha)}
+              onClick={(event) => event.ctrlKey || event.metaKey ? onCompare?.(branch.sha) : onSelectCommit(branch.sha)}
               onDoubleClick={() => !branch.current && actions.checkout({ kind: 'branch', name: branch.name })}
               draggable
               onDragStart={(event) => event.dataTransfer.setData(REF_MIME, branch.name)}
@@ -159,6 +168,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               }}
               onContextMenu={(event) =>
                 openMenu(event, [
+                  ...compareItem(branch.sha),
                   { label: t('Check out {branch}', { branch: branch.name }), disabled: branch.current, onSelect: () => actions.checkout({ kind: 'branch', name: branch.name }) },
                   { label: t('Check out in a new working tree…'), disabled: branch.current || (worktreeList.data ?? []).some((tree) => tree.branch === branch.name), onSelect: () => actions.addWorktree(branch.name) },
                   'separator',
@@ -242,12 +252,13 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
                         className="ref-item"
                         data-ref={branch.name}
                         title={branch.name}
-                        onClick={() => onSelectCommit(branch.sha)}
+                        onClick={(event) => event.ctrlKey || event.metaKey ? onCompare?.(branch.sha) : onSelectCommit(branch.sha)}
                         onDoubleClick={() => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote })}
                         draggable
                         onDragStart={(event) => event.dataTransfer.setData(REF_MIME, branch.name)}
                         onContextMenu={(event) =>
                           openMenu(event, [
+                            ...compareItem(branch.sha),
                             { label: t('Check out {branch}', { branch: branch.name }), onSelect: () => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote }) },
                             'separator',
                             { label: t('Merge {source} into {target}…', { source: branch.name, target: current }), disabled: busy, onSelect: () => actions.merge(branch.name, branch.name) },
@@ -287,9 +298,10 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, gr
               className="ref-item"
               data-ref={tag.name}
               title={tag.annotated ? t('{tag} (annotated)', { tag: tag.name }) : tag.name}
-              onClick={() => onSelectCommit(tag.sha)}
+              onClick={(event) => event.ctrlKey || event.metaKey ? onCompare?.(tag.sha) : onSelectCommit(tag.sha)}
               onContextMenu={(event) =>
                 openMenu(event, [
+                  ...compareItem(tag.sha),
                   { label: t('Check out {tag} (detached)', { tag: tag.name }), onSelect: () => actions.checkout({ kind: 'commit', sha: tag.sha }) },
                   { label: t('Create branch here…'), onSelect: () => actions.createBranch(tag.sha, tag.name) },
                   'separator',

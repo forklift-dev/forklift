@@ -98,6 +98,36 @@ describe('commit details and file diffs', () => {
     expect(details.files.map((f) => f.path)).toEqual(['side.txt']);
   });
 
+  it('compares divergent trees directly and from their common ancestor', async () => {
+    write('shared.txt', 'base\n');
+    git('add', '.');
+    git('commit', '-m', 'base');
+    const base = git('rev-parse', 'HEAD');
+    git('checkout', '-b', 'side');
+    write('shared.txt', 'side\n');
+    write('side.txt', 'side only\n');
+    git('add', '.');
+    git('commit', '-m', 'side');
+    const side = git('rev-parse', 'HEAD');
+    git('checkout', 'main');
+    write('shared.txt', 'main\n');
+    write('main.txt', 'main only\n');
+    git('add', '.');
+    git('commit', '-m', 'main');
+    const main = git('rev-parse', 'HEAD');
+
+    const direct = await service.comparisonDetails(root, main, side, main, 'direct');
+    expect(direct.files.map((file) => [file.path, file.status])).toEqual([
+      ['main.txt', 'deleted'], ['shared.txt', 'modified'], ['side.txt', 'added'],
+    ]);
+    const fromBase = await service.comparisonDetails(root, main, side, base, 'merge-base');
+    expect(fromBase.files.map((file) => [file.path, file.status])).toEqual([
+      ['shared.txt', 'modified'], ['side.txt', 'added'],
+    ]);
+    const file = await service.fileDiff(root, { kind: 'comparison', base, head: side, path: 'shared.txt' });
+    expect([file.original.text, file.modified.text]).toEqual(['base\n', 'side\n']);
+  });
+
   it('flags binary files and does not send their content', async () => {
     write('img.bin', Buffer.from([0x89, 0x50, 0x00, 0x01, 0x02]));
     git('add', '.');

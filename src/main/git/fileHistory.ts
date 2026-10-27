@@ -69,9 +69,9 @@ export class FileHistory {
   constructor(private readonly git: GitCli) {}
 
   /** Commits that changed the file, newest first, following renames. */
-  async log(root: string, path: string): Promise<FileHistoryEntry[]> {
+  async log(root: string, path: string, range?: { base: string; head: string }): Promise<FileHistoryEntry[]> {
     const { stdout } = await this.git.exec(
-      ['log', '--follow', '-M', `-n${MAX_ENTRIES}`, '--name-status', '--format=%x01%H%x00%an%x00%ae%x00%at%x00%s', '--', path],
+      ['log', '--follow', '-M', `-n${MAX_ENTRIES}`, '--name-status', '--format=%x01%H%x00%an%x00%ae%x00%at%x00%s', ...(range ? [range.head, `^${range.base}`] : []), '--', path],
       { cwd: root, readOnly: true, env: { GIT_LITERAL_PATHSPECS: '1' } },
     );
     return parseFileLog(stdout);

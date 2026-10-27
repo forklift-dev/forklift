@@ -34,9 +34,22 @@ export interface CommitDetails {
   statsOmitted: boolean;
 }
 
+export type ComparisonMode = 'direct' | 'merge-base';
+
+export interface ComparisonDetails {
+  left: string;
+  right: string;
+  /** The actual left tree: left for A..B, common ancestor for A...B. */
+  base: string;
+  mode: ComparisonMode;
+  files: CommitFile[];
+  statsOmitted: boolean;
+}
+
 /** Which two versions of a file to compare. */
 export type DiffTarget =
   | { kind: 'commit'; sha: string; path: string; oldPath?: string }
+  | { kind: 'comparison'; base: string; head: string; path: string; oldPath?: string }
   /** staged: HEAD ↔ index; unstaged: index ↔ working tree. */
   | { kind: 'worktree'; path: string; oldPath?: string; staged: boolean };
 

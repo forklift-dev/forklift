@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Branch, Graph, Reference, Remote, Repository, Stash, type Oid, type StatusFile } from '@axosoft/nodegit';
-import type { CommitDetails, DiffTarget, FileDiff } from '../../shared/diff';
+import type { CommitDetails, ComparisonDetails, ComparisonMode, DiffTarget, FileDiff } from '../../shared/diff';
 import { t } from '../../shared/i18n';
 import type { BranchInfo, ChangeKind, FileChange, LocalBranch, RemoteBranch, RepoData, RepoOperation, StashInfo, TagInfo } from '../../shared/state';
-import { readCommitDetails, readFileDiff, readStashDetails } from './diff';
+import { readCommitDetails, readComparisonDetails, readFileDiff, readStashDetails } from './diff';
 import { INDEX_ENTRY_SKIP_WORKTREE, INDEX_MASK, OBJECT_TYPE_COMMIT, STATUS, STATUS_OPT, WORKTREE_MASK } from './libgit2';
 
 export interface GitService {
@@ -13,6 +13,7 @@ export interface GitService {
   resolveRoot(path: string): Promise<string>;
   read(root: string): Promise<RepoData>;
   commitDetails(root: string, sha: string): Promise<CommitDetails>;
+  comparisonDetails(root: string, left: string, right: string, base: string, mode: ComparisonMode): Promise<ComparisonDetails>;
   /** A stash's changes against its base, with the untracked files it saved. */
   stashDetails(root: string, sha: string): Promise<CommitDetails>;
   fileDiff(root: string, target: DiffTarget): Promise<FileDiff>;
@@ -90,6 +91,10 @@ export function createGitService(): GitService {
 
     async commitDetails(root, sha) {
       return readCommitDetails(await Repository.open(root), sha);
+    },
+
+    async comparisonDetails(root, left, right, base, mode) {
+      return readComparisonDetails(await Repository.open(root), left, right, base, mode);
     },
 
     async stashDetails(root, sha) {

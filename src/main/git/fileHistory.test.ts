@@ -45,6 +45,13 @@ describe('FileHistory', () => {
     expect(entries[0]).toMatchObject({ authorName: 'Linus', authorEmail: 'linus@x' });
   });
 
+  it('limits file history to the compared revision range', async () => {
+    const base = sh('Ada', 'rev-parse', 'HEAD~4');
+    const head = sh('Ada', 'rev-parse', 'HEAD~1');
+    const entries = await history.log(root, 'dir/new*name.txt', { base, head });
+    expect(entries.map((entry) => entry.subject)).toEqual(['Add four', 'Move', 'Shout two']);
+  });
+
   it('blames each line, with uncommitted lines in the working tree', async () => {
     writeFileSync(join(root, 'dir/new*name.txt'), 'one\nTWO\nthree\nfour\nfive (not committed)\n');
     const blame = await history.blame(root, 'dir/new*name.txt', null);

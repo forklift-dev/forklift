@@ -18,6 +18,7 @@ export const QUIET_COMMANDS = new Set([
   'history:search',
   'history:find',
   'commit:details',
+  'comparison:details',
   'commit:signature',
   'diff:file',
   'conflict:file',

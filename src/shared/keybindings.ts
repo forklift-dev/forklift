@@ -64,6 +64,7 @@ export const COMMANDS: readonly CommandInfo[] = [
   { id: 'repo.createTag', title: 'Create a tag at HEAD…', category: 'Branches' },
   { id: 'history.search', title: 'Search commits', category: 'History', keys: ['Mod+F'] },
   { id: 'history.goToHead', title: 'Go to HEAD', category: 'History' },
+  { id: 'history.compare', title: 'Compare branches, tags or commits…', category: 'History' },
   { id: 'history.showAll', title: 'Show all branches in the graph', category: 'History' },
   { id: 'theme.choose', title: 'Choose a theme…', category: 'View' },
   { id: 'view.toggleStatusBar', title: 'Show or hide the status bar', category: 'View' },
