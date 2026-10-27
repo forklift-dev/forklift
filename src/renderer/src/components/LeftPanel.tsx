@@ -260,6 +260,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
                           openMenu(event, [
                             ...compareItem(branch.sha),
                             { label: t('Check out {branch}', { branch: branch.name }), onSelect: () => actions.checkout({ kind: 'remote', name: branch.name, remote: branch.remote }) },
+                            ...(data.branch.head ? [{ label: t('Set {remoteBranch} as upstream for {localBranch}', { remoteBranch: branch.name, localBranch: data.branch.head }), disabled: data.branch.upstream === branch.name, onSelect: () => actions.trackCurrentWith(branch.name) }] : []),
                             'separator',
                             { label: t('Merge {source} into {target}…', { source: branch.name, target: current }), disabled: busy, onSelect: () => actions.merge(branch.name, branch.name) },
                             { label: t('Rebase {source} onto {target}…', { source: current, target: branch.name }), disabled: busy, onSelect: () => actions.rebase(branch.name, branch.name) },

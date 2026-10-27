@@ -110,6 +110,7 @@
 | [T-046](tasks/stage-4-repositories/T-046-gitflow.md) | Gitflow | review |
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | review |
 | [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | review |
+| [T-095](tasks/stage-4-repositories/T-095-upstream-selector.md) | Удобный выбор upstream для ветки | review |
 
 ### Этап 5 — Настройки и удобство
 

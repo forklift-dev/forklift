@@ -40,6 +40,8 @@ export interface RefActions {
   renameBranch(name: string): void;
   /** Chooses the remote branch `name` tracks (or none). */
   setUpstream(name: string): void;
+  /** Makes a known remote branch the upstream of the checked-out local branch. */
+  trackCurrentWith(upstream: string): void;
   unsetUpstream(name: string): void;
   deleteBranch(name: string): void;
   deleteTag(name: string): void;
@@ -145,6 +147,10 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
       }),
 
     setUpstream: (name) => setUpstreamFor(name),
+    trackCurrentWith: (upstream) => {
+      const branch = data.branch.head;
+      if (branch) void run(() => invoke('branch:setUpstream', repo, branch, upstream));
+    },
     unsetUpstream: (name) => void run(() => invoke('branch:setUpstream', repo, name, null)),
 
     deleteBranch: (name) =>

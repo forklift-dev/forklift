@@ -137,15 +137,27 @@ export default async function ({ check }) {
   await page.invoke('repo:refresh', root);
   await contextMenu(page, item('main'));
   await page.click(menuItem('Set upstream…'));
-  await page.waitFor(`!!document.querySelector('.palette')`);
-  check('the picker lists remote branches, the same name first', (await page.evaluate(`document.querySelector('.palette-item')?.textContent`))?.includes('origin/main'));
-  await page.fill(`document.querySelector('.palette-input')`, 'review');
-  await page.waitFor(`document.querySelector('.palette-item')?.textContent.includes('origin/review')`);
-  await page.press('Enter');
-  check('upstream set from the menu', await page.waitFor(`!document.querySelector('.palette')`) && (await upstreamBecomes(git, 'main', 'origin/review')));
+  await page.waitFor(`!!document.querySelector('.upstream-picker')`);
+  check('the picker suggests the same-named remote branch', (await page.evaluate(`document.querySelector('.upstream-option')?.textContent`))?.includes('main'));
+  check('the picker shows the current relationship', (await page.evaluate(`document.querySelector('.upstream-current')?.textContent`))?.includes('No upstream'));
+  await page.fill(`document.querySelector('.upstream-picker input[type=search]')`, 'review');
+  await page.waitFor(`document.querySelector('.upstream-option')?.textContent.includes('review')`);
+  await page.click(`document.querySelector('.upstream-option')`);
+  await page.click(`document.querySelector('.upstream-footer .primary')`);
+  check('upstream set from the picker', await page.waitFor(`!document.querySelector('.upstream-picker')`) && (await upstreamBecomes(git, 'main', 'origin/review')));
   await page.waitFor(`${item('main')}?.title === 'main → origin/review'`);
   await contextMenu(page, item('main'));
   check('the menu shows the current upstream', await page.evaluate(`!!${menuItem('Change upstream (now origin/review)…')}`));
   await page.click(menuItem('Stop tracking origin/review'));
   check('Stop tracking removes the upstream', await upstreamBecomes(git, 'main', null));
+
+  await contextMenu(page, item('main'));
+  await page.click(menuItem('Set upstream…'));
+  await page.fill(`document.querySelector('.upstream-picker input[type=search]')`, 'origin/main');
+  await page.press('Enter');
+  check('search and Enter set the highlighted upstream', await upstreamBecomes(git, 'main', 'origin/main'));
+
+  await contextMenu(page, item('origin/main'));
+  await page.click(menuItem('Set origin/main as upstream for review'));
+  check('a remote branch can become the current branch upstream directly', await upstreamBecomes(git, 'review', 'origin/main'));
 }

@@ -1486,6 +1486,21 @@ button.danger {
   word-break: break-word;
 }
 
+.upstream-picker { display: flex; flex-direction: column; gap: 10px; width: min(520px, 92vw); max-height: min(620px, 86vh); }
+.upstream-picker .upstream-current { margin: 0; color: var(--fg-muted); font-size: 12px; }
+.upstream-picker > input { width: 100%; }
+.upstream-options { min-height: 100px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+.upstream-group { padding: 7px 10px 3px; color: var(--fg-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.upstream-option { display: flex; align-items: center; width: 100%; gap: 10px; padding: 7px 10px; border: 0; border-radius: 0; text-align: left; background: transparent; }
+.upstream-option:hover, .upstream-option[data-active='true'] { background: var(--selection); }
+.upstream-option[aria-checked='true'] > .codicon { color: var(--accent); }
+.upstream-option-name { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; overflow: hidden; }
+.upstream-option-name strong, .upstream-option-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upstream-option-name small, .upstream-badge { color: var(--fg-muted); font-size: 11px; }
+.upstream-picker .upstream-empty { margin: 0; padding: 12px; color: var(--fg-muted); }
+.upstream-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.upstream-footer-spacer { flex: 1; }
+
 .modal p {
   margin: 0 0 16px;
   color: var(--fg-muted);

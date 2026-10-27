@@ -129,6 +129,13 @@ export const history = {
     'Remote branch for {branch} to track': 'Удалённая ветка, которую будет отслеживать {branch}',
     'No matching remote branches': 'Подходящих удалённых веток нет',
     'No remote branches: push the branch to a remote first (it is tracked from then on)': 'Удалённых веток нет: сначала выполните push ветки в удалённый репозиторий (после этого она начнёт отслеживаться)',
+    'Currently tracking: {upstream}': 'Сейчас отслеживается: {upstream}',
+    'No upstream': 'Upstream не задан',
+    'Search remote branches': 'Искать удалённые ветки',
+    'Remote branches': 'Удалённые ветки',
+    Suggested: 'Рекомендуемые',
+    'Set upstream': 'Задать upstream',
+    'Set {remoteBranch} as upstream for {localBranch}': 'Сделать {remoteBranch} upstream для {localBranch}',
   },
   en: {
     '{count} staged': { one: '{count} staged', other: '{count} staged' },
