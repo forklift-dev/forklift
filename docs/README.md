@@ -123,6 +123,11 @@
 | [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | review |
 | [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
 | [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | todo |
+| [T-086](tasks/stage-5-settings/T-086-translation-catalogs.md) | Каталоги переводов и автоматическая проверка | todo |
+| [T-087](tasks/stage-5-settings/T-087-more-languages.md) | Подключение новых языков интерфейса | todo |
+| [T-088](tasks/stage-5-settings/T-088-community-translations.md) | Процесс переводов от сообщества | todo |
+| [T-089](tasks/stage-5-settings/T-089-stable-message-ids.md) | Устойчивые идентификаторы строк интерфейса | todo |
+| [T-090](tasks/stage-5-settings/T-090-translation-platform.md) | Платформа совместного перевода (при появлении потребности) | draft |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)
 
