@@ -10,6 +10,7 @@
           "scale": 1,
           "x": 0,
           "y": 0,
+          "gradient": { "top": "#f7f9fc", "bottom": "#d9e5f0" },
           "clip": true
         },
         {

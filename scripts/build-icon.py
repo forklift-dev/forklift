@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON = ROOT / 'assets' / 'icon'
@@ -49,6 +49,10 @@ def compose(size: int, layers: list) -> Image.Image:
     clip = None
     for spec in layers:
         layer = Image.open(ICON / spec['file']).convert('RGBA')
+        if gradient := spec.get('gradient'):
+            colors = ImageOps.colorize(Image.linear_gradient('L').resize(layer.size), gradient['top'], gradient['bottom'])
+            colors.putalpha(layer.getchannel('A'))
+            layer = colors
         if spec.get('solidify'):
             layer = solidify(layer)
         scale = spec.get('scale', 1)

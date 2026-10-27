@@ -4,18 +4,19 @@ The icon is composed by `scripts/build-icon.py` (Pillow) into `build/icon.png`, 
 `build/icons/<size>x<size>.png` (electron-builder) and `build/window.png` (the Linux window).
 
 Two variants (`compose.json` → `variants`) use `layers/forklift-new.png`: **large** (128 px and up) places it
-on the blue-slate tile; **small** (64 px and below, and the window icon) uses the same artwork without the tile
+on a light tile; **small** (64 px and below, and the window icon) uses the same artwork without the tile
 and fills the taskbar height. The `.ico` takes each size from the right variant. The current artwork is a
 1300×1210 PNG with a transparent background.
 
 | Layer | File | What |
 |---|---|---|
-| background | `layers/background.png` | Plain rounded-square tile, blue-slate gradient (drawn with Pillow, no details: they made the icon unreadable when small); outside it transparent; `clip` keeps the other layers inside it |
+| background | `layers/background.png` | Rounded-square transparency mask; the light gradient is set in `compose.json`, and `clip` keeps the artwork inside the tile |
 | logo | `layers/forklift-new.png` | The current complete logo: a forklift with a gorilla driver carrying the Git badge |
 
 Each variant places its layers, first at the bottom: `scale` (around the layer's top-left corner), `x`, `y`;
 `solidify` makes the nearly opaque inside of generated pictures fully opaque and drops faint halos; `shadow`
-adds a soft contact shadow under the layer; `clip` cuts everything to that layer's shape.
+adds a soft contact shadow under the layer; `gradient` recolors a layer while preserving its transparency;
+`clip` cuts everything to that layer's shape.
 
 ## Previous artwork
 
