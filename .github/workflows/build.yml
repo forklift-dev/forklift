@@ -67,6 +67,7 @@ jobs:
           node scripts/rebuild-native.mjs
 
       - run: npm run typecheck
+      - run: npm run i18n:check
       - run: npm run lint
       - run: npm test
       # tests/e2e/run.mjs starts its own xvfb.

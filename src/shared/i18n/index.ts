@@ -1,7 +1,5 @@
-// Interface languages. A UI string is written in English where it is used and passed through `t`; the English
-// text is its key, and the Russian dictionary (./strings, one file per part of the app) lists a translation for
-// every one of them, so a string without a translation does not compile. Git's own messages are never
-// translated: code reads them.
+// Interface languages. English source and Russian translations live in editable JSON catalogs. A UI string's
+// English text remains its key; a missing Russian translation does not compile. Git output is never translated.
 import { EN, RU } from './strings';
 
 export const LANGUAGES = ['en', 'ru'] as const;
@@ -54,7 +52,7 @@ export function t(message: Message, params?: Params): string {
 
 /** For text known only at run time (setting labels, command titles): translated when a dictionary has it. */
 export function translate(message: string, params?: Params): string {
-  const entry = DICTIONARIES[current][message] ?? EN[message];
+  const entry = DICTIONARIES[current][message] ?? (EN as Dictionary)[message];
   const text = entry === undefined ? english(message) : typeof entry === 'string' ? entry : pluralForm(entry, params?.count);
   return params ? fill(text, params) : text;
 }

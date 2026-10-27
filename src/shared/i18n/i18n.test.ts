@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { english, fill, formatDate, LANGUAGES, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
-import { PARTS } from './strings';
+import { EN, RU } from './strings';
 
 afterEach(() => setLanguage('en'));
 
@@ -8,42 +8,30 @@ const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((mat
 const forms = (entry: string | PluralForms) => (typeof entry === 'string' ? [entry] : Object.values(entry));
 
 describe('dictionaries', () => {
-  const parts = Object.entries(PARTS) as Array<[string, { ru: Record<string, string | PluralForms>; en: Record<string, string | PluralForms> }]>;
+  const en = EN as Record<string, string | PluralForms>;
+  const ru = RU as Record<string, string | PluralForms>;
 
   it('translate every message with the same placeholders as its English text', () => {
-    for (const [part, { ru, en }] of parts) {
-      for (const [message, entry] of Object.entries(ru)) {
-        const source = en[message] ?? english(message);
-        for (const form of [...forms(entry), ...forms(source)]) expect(placeholders(form), `${part}: ${message}`).toEqual(placeholders(english(message)));
-      }
+    for (const [message, entry] of Object.entries(ru)) {
+      const source = en[message]!;
+      for (const form of [...forms(entry), ...forms(source)]) expect(placeholders(form), message).toEqual(placeholders(english(message)));
     }
   });
 
   it('give plural messages Russian one/few/many and English one/other forms, and count among the placeholders', () => {
-    for (const [part, { ru, en }] of parts) {
-      for (const [message, entry] of Object.entries(ru)) {
-        if (typeof entry === 'string') {
-          expect(en[message], `${part}: ${message} has English plural forms but no Russian ones`).toBeUndefined();
-          continue;
-        }
-        expect(Object.keys(entry).sort(), `${part}: ${message}`).toEqual(expect.arrayContaining(['few', 'many', 'one']));
-        expect(en[message], `${part}: ${message} needs English forms`).toMatchObject({ one: expect.any(String), other: expect.any(String) });
-        expect(placeholders(message), `${part}: ${message}`).toContain('count');
+    for (const [message, entry] of Object.entries(ru)) {
+      if (typeof entry === 'string') {
+        expect(typeof en[message], `${message} has English plural forms but no Russian ones`).toBe('string');
+        continue;
       }
-      for (const message of Object.keys(en)) expect(ru[message], `${part}: English forms of ${message} without a translation`).toBeDefined();
+      expect(Object.keys(entry).sort(), message).toEqual(expect.arrayContaining(['few', 'many', 'one']));
+      expect(en[message], `${message} needs English forms`).toMatchObject({ one: expect.any(String), other: expect.any(String) });
+      expect(placeholders(message), message).toContain('count');
     }
   });
 
-  it('do not translate one message differently in two parts', () => {
-    const seen = new Map<string, [string, string]>();
-    for (const [part, { ru }] of parts) {
-      for (const [message, entry] of Object.entries(ru)) {
-        const value = JSON.stringify(entry);
-        const earlier = seen.get(message);
-        if (earlier) expect(value, `${message}: ${earlier[0]} and ${part} differ`).toBe(earlier[1]);
-        else seen.set(message, [part, value]);
-      }
-    }
+  it('have matching source and translation keys', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(ru).sort());
   });
 });
 
