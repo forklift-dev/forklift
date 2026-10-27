@@ -54,6 +54,12 @@ const formatSize = (bytes: number) =>
 /** Why the text diff cannot be shown, or null when it can. */
 function unavailableReason({ original, modified }: FileDiff): string | null {
   const describe = (v: FileVersion) => (v.exists ? formatSize(v.size) : t('none'));
+  if (original.image || modified.image) {
+    if ((original.exists && !original.image) || (modified.exists && !modified.image)) return t('Cannot compare an image with a non-image file');
+    if (original.unsupportedImage || modified.unsupportedImage) return t('Image preview is unavailable for this format or size');
+    return null;
+  }
+  if (original.unsupportedImage || modified.unsupportedImage) return t('Image preview is unavailable for this format or size');
   if (original.binary || modified.binary) return t('Binary file ({original} → {modified})', { original: describe(original), modified: describe(modified) });
   if (original.tooLarge || modified.tooLarge) return t('File is too large to show ({original} → {modified})', { original: describe(original), modified: describe(modified) });
   return null;
@@ -116,6 +122,7 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
     if (reason) blocked = t('Use the whole-file actions for this file');
     else if (data.original.lfs || data.modified.lfs) blocked = t('Stored in Git LFS: use the whole-file actions');
     else if (data.original.lossy || data.modified.lossy) blocked = t('The file is not valid UTF-8; use the whole-file actions');
+    else if (data.original.truncated || data.modified.truncated) blocked = t('The file is truncated; use the whole-file actions');
     else if (!data.modified.exists) blocked = t('The file is deleted; use the whole-file actions');
     else if (prefs.ignoreWhitespace) blocked = t('Turn off "Ignore whitespace" to work with lines');
   }
@@ -235,7 +242,9 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
         </div>
       )}
       {data && reason && <div className="diff-message">{reason}</div>}
-      {data && !reason && (
+      {data && !reason && (data.original.image || data.modified.image) && <ImageDiff original={data.original} modified={data.modified} />}
+      {data && !reason && (data.original.truncated || data.modified.truncated) && <div className="diff-hint" role="note">{t('Showing the first {size} characters of this large file; line actions are disabled.', { size: '2,097,152' })}</div>}
+      {data && !reason && !data.original.image && !data.modified.image && (
         // Monaco's diff is the engine for every layout, so all of them show the same changes; for Hunks and
         // File it stays mounted but hidden.
         <div className={prefs.layout === 'hunk' || prefs.layout === 'file' ? 'diff-engine hidden' : 'diff-engine'}>
@@ -249,7 +258,7 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
           />
         </div>
       )}
-      {data && !reason && prefs.layout === 'hunk' && changes && (
+      {data && !reason && !data.original.image && !data.modified.image && prefs.layout === 'hunk' && changes && (
         <HunkView
           data={data}
           changes={changes}
@@ -259,7 +268,7 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
           onSelection={setHunkSelection}
         />
       )}
-      {data && !reason && prefs.layout === 'file' && changes && (
+      {data && !reason && !data.original.image && !data.modified.image && prefs.layout === 'file' && changes && (
         <FileView
           data={data}
           path={target.path}
@@ -272,6 +281,30 @@ export function DiffView({ repo, target, title, subtitle, reloadKey, actions, ed
         />
       )}
     </section>
+  );
+}
+
+type ImageMode = 'side-by-side' | 'overlay' | 'difference';
+
+function ImageDiff({ original, modified }: { original: FileVersion; modified: FileVersion }) {
+  const [mode, setMode] = useState<ImageMode>('side-by-side');
+  const [position, setPosition] = useState(50);
+  const image = (version: FileVersion, label: string) => version.image ? <img src={version.image.dataUrl} alt={label} /> : <div className="image-diff-missing">{t('No image on this side')}</div>;
+  return (
+    <div className="image-diff">
+      <div className="image-diff-toolbar" role="group" aria-label={t('Image comparison mode')}>
+        {(['side-by-side', 'overlay', 'difference'] as const).map((value) => (
+          <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)}>{t(value)}</button>
+        ))}
+        {mode === 'overlay' && <label>{t('Overlay position')} <input type="range" min="0" max="100" value={position} onChange={(event) => setPosition(Number(event.target.value))} /></label>}
+      </div>
+      <div className={`image-diff-canvas ${mode}`}>
+        {mode === 'side-by-side' ? <>{image(original, t('Original image'))}{image(modified, t('Modified image'))}</> : <>
+          {original.image ? <img className="image-base" src={original.image.dataUrl} alt={t('Original image')} /> : <div className="image-diff-missing">{t('No image on this side')}</div>}
+          {modified.image && <img className="image-top" src={modified.image.dataUrl} alt={t('Modified image')} style={mode === 'overlay' ? { clipPath: `inset(0 ${100 - position}% 0 0)` } : undefined} />}
+        </>}
+      </div>
+    </div>
   );
 }
 

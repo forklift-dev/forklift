@@ -60,12 +60,18 @@ export interface FileVersion {
   binary: boolean;
   /** Over the size limit; `text` is not loaded. */
   tooLarge: boolean;
+  /** Text was capped to a safe display size; the diff covers the visible prefixes only. */
+  truncated?: boolean;
   size: number;
   text: string | null;
   /** The bytes are not valid UTF-8, so `text` has replacement characters and must not be written back. */
   lossy: boolean;
   /** SHA-256 of `text`; lets main check that a view's line changes refer to the current content. */
   hash: string | null;
+  /** Supported raster/SVG image payload, loaded by the main process. */
+  image?: { dataUrl: string; mime: string };
+  /** A binary file with an image extension that is not safe/possible to preview. */
+  unsupportedImage?: boolean;
   /** Stored in Git LFS: `text` is the content when the object is in .git/lfs, else the pointer. */
   lfs?: { oid: string; size: number; downloaded: boolean };
 }
@@ -76,4 +82,9 @@ export interface FileDiff {
 }
 
 /** Larger versions are not sent to the window: the editor would freeze on them. */
-export const MAX_DIFF_FILE_BYTES = 10 * 1024 * 1024;
+/** Maximum text file size read for a diff. */
+export const MAX_DIFF_FILE_BYTES = 50 * 1024 * 1024;
+/** Maximum characters sent to Monaco from either version. */
+export const MAX_DIFF_DISPLAY_CHARS = 2 * 1024 * 1024;
+/** Image payloads travel through IPC as data URLs, so keep their limit lower. */
+export const MAX_DIFF_IMAGE_BYTES = 10 * 1024 * 1024;

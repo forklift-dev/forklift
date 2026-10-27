@@ -8,6 +8,7 @@ export default async function ({ check, artifactsDir }) {
   write('notes.md', '# Notes\n\nfirst\n');
   git('add', '.');
   git('commit', '-qm', 'Initial import');
+  write('logo.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=', 'base64'));
   write('app.ts', 'export function greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n');
   git('mv', 'notes.md', 'README.md');
   write('logo.bin', Buffer.from([0, 1, 2, 3]));
@@ -46,6 +47,16 @@ export default async function ({ check, artifactsDir }) {
   await page.evaluate(`[...document.querySelectorAll('.commit-details .change-item')].find(b => b.textContent.includes('logo.bin')).click()`);
   const binaryMessage = await page.waitFor(`document.querySelector('.diff-message')?.textContent.startsWith('Binary') && document.querySelector('.diff-message').textContent`);
   check('binary file explained, not rendered', binaryMessage?.startsWith('Binary file'), binaryMessage);
+
+  await page.evaluate(`[...document.querySelectorAll('.commit-details .change-item')].find(b => b.textContent.includes('logo.png')).click()`);
+  await page.waitFor(`!!document.querySelector('.image-diff img[src^="data:image/png;base64,"]')`);
+  check('image diff uses a main-provided data URL', await page.evaluate(`document.querySelector('.image-diff img')?.getAttribute('src').startsWith('data:image/png;base64,')`));
+  await page.click(`document.querySelectorAll('.image-diff-toolbar button')[1]`);
+  check('overlay mode exposes its position slider', await page.waitFor(`!!document.querySelector('.image-diff-toolbar input[type="range"]`) && await page.evaluate(`document.querySelector('.image-diff-canvas').classList.contains('overlay')`));
+  await page.click(`document.querySelectorAll('.image-diff-toolbar button')[2]`);
+  check('difference mode is selectable', await page.evaluate(`document.querySelector('.image-diff-canvas').classList.contains('difference')`));
+  await page.evaluate(`document.querySelector('.close-details').click()`);
+  await page.waitFor(`!!document.querySelector('.commit-details')`);
 
   await page.evaluate(`document.querySelector('.close-details').click()`);
   await page.waitFor(`!!document.querySelector('.changes .change-item')`);

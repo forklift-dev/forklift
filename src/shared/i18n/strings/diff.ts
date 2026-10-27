@@ -2,6 +2,18 @@
 export const diff = {
   ru: {
     none: 'нет',
+    'Cannot compare an image with a non-image file': 'Нельзя сравнить изображение с файлом другого типа',
+    'Image preview is unavailable for this format or size': 'Предпросмотр изображения недоступен для этого формата или размера',
+    'No image on this side': 'С этой стороны изображения нет',
+    'Image comparison mode': 'Режим сравнения изображений',
+    'Original image': 'Исходное изображение',
+    'Modified image': 'Изменённое изображение',
+    'Overlay position': 'Положение наложения',
+    'side-by-side': 'Рядом',
+    overlay: 'Наложение',
+    difference: 'Разница',
+    'The file is truncated; use the whole-file actions': 'Файл отображается частично; используйте действия с целым файлом',
+    'Showing the first {size} characters of this large file; line actions are disabled.': 'Показаны первые {size} символов большого файла; действия со строками отключены.',
     'Binary file ({original} → {modified})': 'Двоичный файл ({original} → {modified})',
     'File is too large to show ({original} → {modified})': 'Файл слишком велик для отображения ({original} → {modified})',
     'Stage lines': 'Добавить строки в индекс',

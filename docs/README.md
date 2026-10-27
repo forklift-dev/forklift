@@ -76,7 +76,7 @@
 | [T-027](tasks/stage-2-git-core/T-027-embedded-terminal.md) | Встроенный терминал | review |
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
 | [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | review |
-| [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | todo |
+| [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | review |
 
 ### Этап 3 — История и операции над коммитами
 

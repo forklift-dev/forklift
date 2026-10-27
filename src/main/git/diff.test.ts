@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MAX_DIFF_FILE_BYTES } from '../../shared/diff';
+import { MAX_DIFF_DISPLAY_CHARS, MAX_DIFF_FILE_BYTES } from '../../shared/diff';
 import { createGitService } from './service';
 
 const env = {
@@ -136,6 +136,28 @@ describe('commit details and file diffs', () => {
     expect((await service.commitDetails(root, sha)).files[0]).toMatchObject({ path: 'img.bin', binary: true });
     const diff = await service.fileDiff(root, { kind: 'commit', sha, path: 'img.bin' });
     expect(diff.modified).toMatchObject({ exists: true, binary: true, text: null, size: 5 });
+  });
+
+  it('returns supported image data for the image viewer and keeps SVG as an inert image payload', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=', 'base64');
+    write('pixel.png', png);
+    const pngDiff = await service.fileDiff(root, { kind: 'worktree', path: 'pixel.png', staged: false });
+    expect(pngDiff.modified.image).toMatchObject({ mime: 'image/png' });
+    expect(pngDiff.modified.image?.dataUrl).toBe(`data:image/png;base64,${png.toString('base64')}`);
+
+    write('active.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>window.pwned=true</script></svg>');
+    const svgDiff = await service.fileDiff(root, { kind: 'worktree', path: 'active.svg', staged: false });
+    expect(svgDiff.modified.image?.mime).toBe('image/svg+xml');
+    expect(svgDiff.modified.image?.dataUrl).toContain('data:image/svg+xml;base64,');
+  });
+
+  it('shows the bounded prefix of a large text file instead of refusing it', async () => {
+    write('large.txt', `start\n${'x'.repeat(MAX_DIFF_DISPLAY_CHARS + 100)}\nend\n`);
+    const diff = await service.fileDiff(root, { kind: 'worktree', path: 'large.txt', staged: false });
+    expect(diff.modified).toMatchObject({ exists: true, tooLarge: false, truncated: true });
+    expect(diff.modified.text?.length).toBeLessThanOrEqual(MAX_DIFF_DISPLAY_CHARS);
+    expect(diff.modified.text).toMatch(/^start\n/);
+    expect(diff.modified.text).not.toContain('end');
   });
 
   it('compares index with working tree, and HEAD with index', async () => {

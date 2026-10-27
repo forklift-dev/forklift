@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { Diff, Repository, type Blob, type Commit, type IndexEntry, type Tree } from '@axosoft/nodegit';
 import {
   MAX_DIFF_FILE_BYTES,
+  MAX_DIFF_DISPLAY_CHARS,
+  MAX_DIFF_IMAGE_BYTES,
   type CommitDetails,
   type ComparisonDetails,
   type ComparisonMode,
@@ -21,6 +23,46 @@ import { DELTA, DIFF_FIND_RENAMES, DIFF_FLAG_BINARY, STATUS_OPT } from './libgit
 const STATS_FILE_LIMIT = 2000;
 /** git's own heuristic: a NUL byte in the first 8000 bytes means binary. */
 const BINARY_SNIFF_BYTES = 8000;
+const MAX_IMAGE_DIMENSION = 20_000;
+const MAX_IMAGE_PIXELS = 50_000_000;
+const IMAGE_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+
+function dimensionsAllowed(width: number, height: number): boolean {
+  return width > 0 && height > 0 && width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION && width * height <= MAX_IMAGE_PIXELS;
+}
+
+function validImagePayload(mime: string, bytes: Buffer): boolean {
+  if (mime === 'image/png') return bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && dimensionsAllowed(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
+  if (mime === 'image/jpeg') {
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return false;
+    let offset = 2;
+    while (offset + 9 < bytes.length) {
+      if (bytes[offset] !== 0xff) return false;
+      const marker = bytes[offset + 1]!;
+      const length = bytes.readUInt16BE(offset + 2);
+      if (length < 2 || offset + 2 + length > bytes.length) return false;
+      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+        return dimensionsAllowed(bytes.readUInt16BE(offset + 7), bytes.readUInt16BE(offset + 5));
+      }
+      offset += 2 + length;
+    }
+    return false;
+  }
+  if (mime === 'image/gif') return bytes.length >= 10 && bytes.subarray(0, 6).toString('ascii').startsWith('GIF8') && dimensionsAllowed(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
+  if (mime === 'image/webp') {
+    if (bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') return false;
+    const chunk = bytes.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8X' && bytes.length >= 30) return dimensionsAllowed(1 + bytes.readUIntLE(24, 3), 1 + bytes.readUIntLE(27, 3));
+    if (chunk === 'VP8 ' && bytes.length >= 30) return dimensionsAllowed(bytes.readUInt16LE(26) & 0x3fff, bytes.readUInt16LE(28) & 0x3fff);
+    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
+      const bits = bytes.readUInt32LE(21);
+      return dimensionsAllowed((bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1);
+    }
+    return false;
+  }
+  if (mime === 'image/svg+xml') return /^\s*(?:<\?xml[^>]*>\s*)?<svg(?:\s|>)/i.test(bytes.subarray(0, 4096).toString('utf8'));
+  return false;
+}
 
 const STATUS_BY_DELTA: Record<number, FileChangeStatus> = {
   [DELTA.ADDED]: 'added',
@@ -119,7 +161,7 @@ const missing = (path: string): FileVersion => ({
   hash: null,
 });
 
-const tooLarge = (path: string, size: number): FileVersion => ({ ...missing(path), exists: true, tooLarge: true, size });
+const tooLarge = (path: string, size: number): FileVersion => ({ ...missing(path), exists: true, tooLarge: true, size, unsupportedImage: Boolean(IMAGE_MIME[path.split('.').at(-1)?.toLowerCase() ?? '']) });
 
 // ignoreBOM keeps a byte-order mark in the text, so writing the text back reproduces it.
 const strictUtf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -135,15 +177,22 @@ function decode(bytes: Buffer): { text: string; lossy: boolean } {
 }
 
 function fromBytes(path: string, bytes: Buffer, binary: boolean): FileVersion {
-  if (binary) return { ...missing(path), exists: true, binary: true, size: bytes.length };
+  const mime = IMAGE_MIME[path.split('.').at(-1)?.toLowerCase() ?? ''];
+  if (mime && bytes.length <= MAX_DIFF_IMAGE_BYTES && validImagePayload(mime, bytes)) {
+    return { ...missing(path), exists: true, binary: true, size: bytes.length, image: { dataUrl: `data:${mime};base64,${bytes.toString('base64')}`, mime } };
+  }
+  if (mime) return { ...missing(path), exists: true, binary: true, size: bytes.length, unsupportedImage: true };
+  if (binary) return { ...missing(path), exists: true, binary: true, size: bytes.length, unsupportedImage: Boolean(mime) };
   const { text, lossy } = decode(bytes);
+  const visibleText = text.slice(0, MAX_DIFF_DISPLAY_CHARS);
   return {
     path,
     exists: true,
     binary: false,
     tooLarge: false,
     size: bytes.length,
-    text,
+    text: visibleText,
+    truncated: visibleText.length < text.length,
     lossy,
     hash: createHash('sha256').update(text).digest('hex'),
   };

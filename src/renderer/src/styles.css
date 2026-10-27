@@ -1324,6 +1324,36 @@ body.resizing * {
   color: var(--danger-fg);
 }
 
+.image-diff {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.image-diff-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.image-diff-toolbar [aria-pressed='true'] { border-color: var(--accent); }
+.image-diff-toolbar label { display: flex; align-items: center; gap: 8px; }
+.image-diff-canvas {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  align-items: center;
+  justify-content: center;
+  background: repeating-conic-gradient(var(--bg-panel) 0% 25%, var(--bg-raised) 0% 50%) 50% / 20px 20px;
+}
+.image-diff-canvas.side-by-side { gap: 12px; }
+.image-diff-canvas img { max-width: 50%; max-height: 100%; object-fit: contain; }
+.image-diff-canvas.overlay img, .image-diff-canvas.difference img { position: absolute; max-width: 100%; max-height: 100%; }
+.image-diff-canvas.difference .image-top { mix-blend-mode: difference; }
+.image-diff-missing { display: grid; flex: 1; min-height: 160px; place-items: center; color: var(--fg-muted); }
+
 /* Buttons */
 button.primary {
   background: var(--primary-bg);
