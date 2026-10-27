@@ -7,6 +7,7 @@ import { useAppState } from '../state';
 import { elapsedTime, formatMemory, relativeTime } from '../statusFormat';
 import { AboutDialog } from './AboutDialog';
 import { GraphStylePreview } from './preferences/GraphStylePicker';
+import { SyncCounts } from './SyncCounts';
 
 type Menu = 'graph' | 'system' | null;
 
@@ -134,7 +135,7 @@ export function StatusBar(props: StatusBarProps) {
         <button type="button" className="status-item" title={t('Switch branch')} onClick={props.onBranch}>
           <Icon name="git-branch" />
           <span className="status-ellipsis">{branchText}</span>
-          {(branch!.ahead > 0 || branch!.behind > 0) && <span className="status-muted">{branch!.ahead > 0 && `↑${branch!.ahead}`}{branch!.behind > 0 && ` ↓${branch!.behind}`}</span>}
+          {branch!.upstream && <SyncCounts ahead={branch!.ahead} behind={branch!.behind} upstream={branch!.upstream} />}
         </button>
       )}
       {props.repo && (

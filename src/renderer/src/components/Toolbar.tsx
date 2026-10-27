@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import { t } from '../../../shared/i18n';
 import type { RemoteActivity, RepoData } from '../../../shared/state';
+import { SyncCounts } from './SyncCounts';
 
 interface ToolbarProps {
   repo: RepoData | null;
@@ -81,13 +82,8 @@ export function Toolbar(props: ToolbarProps) {
               <span className="crumb-value">
                 <span className="branch">
                   {branch.head ?? t('detached at {sha}', { sha: branch.oid?.slice(0, 7) ?? '?' })}
-                  {branch.upstream && (branch.ahead > 0 || branch.behind > 0) && (
-                    <span className="ahead-behind" title={t('{ahead} ahead, {behind} behind {upstream}', { ahead: branch.ahead, behind: branch.behind, upstream: branch.upstream })}>
-                      {branch.ahead > 0 && ` ↑${branch.ahead}`}
-                      {branch.behind > 0 && ` ↓${branch.behind}`}
-                    </span>
-                  )}
                 </span>
+                {branch.upstream && <SyncCounts ahead={branch.ahead} behind={branch.behind} upstream={branch.upstream} />}
                 <span className="codicon codicon-chevron-down" aria-hidden="true" />
               </span>
             </button>

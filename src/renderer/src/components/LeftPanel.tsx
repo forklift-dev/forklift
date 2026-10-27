@@ -10,6 +10,7 @@ import { flowBranch } from '../../../shared/gitflow';
 import { pullTerm, refLabel, type RepoHosting } from '../../../shared/hosting';
 import type { HostingItem } from './HostingView';
 import { t, translate } from '../../../shared/i18n';
+import { SyncCounts } from './SyncCounts';
 
 /** The repository's server (when an account matches its remotes): pull requests and issues sections. */
 export interface LeftPanelHosting {
@@ -194,12 +195,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
             >
               <span className={`codicon ${branch.current ? 'codicon-check' : 'codicon-git-branch'}`} aria-hidden="true" />
               <span className="ref-name">{branch.name}</span>
-              {(branch.ahead > 0 || branch.behind > 0) && (
-                <span className="ahead-behind-badge" title={t('{ahead} ahead, {behind} behind {upstream}', { ahead: branch.ahead, behind: branch.behind, upstream: branch.upstream ?? '' })}>
-                  {branch.ahead > 0 && `↑${branch.ahead}`}
-                  {branch.behind > 0 && `↓${branch.behind}`}
-                </span>
-              )}
+              {branch.upstream && <SyncCounts ahead={branch.ahead} behind={branch.behind} upstream={branch.upstream} />}
             </li>
           ))}
         </Section>

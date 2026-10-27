@@ -142,10 +142,23 @@ button:disabled {
   color: var(--fg-bright);
 }
 
-.ahead-behind {
-  color: var(--fg-muted);
+.sync-counts { display: inline-flex; flex: none; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+.sync-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--fg-bright);
   font-size: 12px;
+  line-height: 16px;
 }
+.sync-count .codicon { color: var(--accent); font-size: 15px; }
+.sync-count strong { font-weight: 700; }
+.sync-count-behind { border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: color-mix(in srgb, var(--warning) 18%, transparent); }
+.sync-count-behind .codicon { color: var(--warning); }
 
 .toolbar-busy {
   align-self: center;
@@ -2152,12 +2165,6 @@ select {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.ahead-behind-badge {
-  flex: none;
-  font-size: 11px;
-  color: var(--fg-muted);
 }
 
 .ref.head {
