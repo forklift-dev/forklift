@@ -64,6 +64,7 @@ interface PreferencesProps {
 /** Preferences screen: sections on the left, search, and a scope switch for repository overrides. */
 export function Preferences({ repo, section: initialSection = 'tools', onClose }: PreferencesProps) {
   const problems = useAppState((s) => s.settings.problems);
+  const aiProvider = useAppState((s) => s.settings.values['ai.provider']);
   const [scope, setScope] = useState<'global' | 'repository'>('global');
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState('');
@@ -82,7 +83,15 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
   );
   const shownSection = sections.includes(section) ? section : sections[0]!;
   const searching = query.trim() !== '';
-  const keys = available.filter((key) => (searching ? matches(key, query) : settingField(key).section === shownSection));
+  const keys = available.filter((key) => {
+    if (key === 'ai.model' && aiProvider !== 'ollama') return false;
+    if (key === 'ai.openaiModel' && aiProvider !== 'openai') return false;
+    return searching ? matches(key, query) : settingField(key).section === shownSection;
+  });
+  const aiKeySearchText = [t('OpenAI API key'), t('Encrypted with the system keychain. Used only after confirming a request; OpenAI may charge for tokens.'), 'OpenAI API key'].join(' ').toLowerCase();
+  const showAiKey = !repoRoot && aiProvider === 'openai' && (searching
+    ? query.trim().toLowerCase().split(/\s+/).every((word) => aiKeySearchText.includes(word))
+    : shownSection === 'integrations');
   const showIdentity = searching ? matchesIdentity(query.trim()) : shownSection === 'git';
 
   const render = (key: SettingKey) => (props: ControlProps): ReactNode => {
@@ -198,9 +207,9 @@ export function Preferences({ repo, section: initialSection = 'tools', onClose }
           {repoRoot && <p className="scope-note">{t('Settings below apply only to {path}; anything not set here follows the settings for all repositories.', { path: repo?.root ?? '' })}</p>}
           {shownSection === 'tools' && !searching && detected.error && <p className="setting-error">{t('Could not detect installed tools: {error}', { error: detected.error })}</p>}
           {rows(keys)}
-          {shownSection === 'integrations' && !repoRoot && !searching && <AiKeyEditor />}
+          {showAiKey && <AiKeyEditor />}
           {showIdentity && <GitIdentityEditor key={repoRoot ?? 'global'} repo={repoRoot} />}
-          {searching && keys.length === 0 && !showIdentity && <p className="empty-note">{t('No settings match “{query}”', { query })}</p>}
+          {searching && keys.length === 0 && !showIdentity && !showAiKey && <p className="empty-note">{t('No settings match “{query}”', { query })}</p>}
         </div>
       </div>
       {dialog}

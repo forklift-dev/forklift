@@ -30,4 +30,18 @@ export default async function ({ check }) {
   await page.invoke('settings:update', { values: { 'ai.provider': 'openai' } });
   await page.click(`[...document.querySelectorAll('.modal button')].find(b => b.textContent === 'Send to Codex')`);
   check('a provider change invalidates the earlier consent', await page.waitFor(`document.querySelector('.ai-assist [role="alert"]')?.textContent.includes('provider changed')`));
+
+  await page.click(`document.querySelector('[aria-label="Preferences"]')`);
+  await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'Integrations')`);
+  const providerSelect = `document.querySelector('[data-setting="ai.provider"] select')`;
+  check('OpenAI shows its model and key', await page.waitFor(`!!document.querySelector('[data-setting="ai.openaiModel"]') && !!document.querySelector('.ai-key-editor') && !document.querySelector('[data-setting="ai.model"]')`));
+  await page.selectOption(providerSelect, 'ollama');
+  check('Ollama shows only its model', await page.waitFor(`!!document.querySelector('[data-setting="ai.model"]') && !document.querySelector('[data-setting="ai.openaiModel"], .ai-key-editor')`));
+  for (const provider of ['claude', 'codex', 'opencode', 'qwen', 'off']) {
+    await page.selectOption(providerSelect, provider);
+    check(`${provider} shows no model or API key fields`, await page.waitFor(`!document.querySelector('[data-setting="ai.model"], [data-setting="ai.openaiModel"], .ai-key-editor')`));
+  }
+  await page.selectOption(providerSelect, 'openai');
+  await page.fill(`document.querySelector('.preferences-search')`, 'API key');
+  check('search finds the OpenAI key editor when OpenAI is selected', await page.waitFor(`!!document.querySelector('.ai-key-editor') && !document.querySelector('.empty-note')`));
 }
