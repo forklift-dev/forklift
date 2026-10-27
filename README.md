@@ -4,6 +4,8 @@
 
 # Forklift
 
+<p><strong>English</strong> · <a href="README.ru.md">Русский</a></p>
+
 **A desktop Git workspace for the whole journey from first diff to final release.**
 
 Visual history · precise staging · safe operations · your choice of colors
