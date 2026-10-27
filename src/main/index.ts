@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain, net, safeStorage, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
+import { GitToolSetup, type GitToolScope } from './external/gitToolSetup';
 import { ExternalTools } from './external/tools';
 import { BranchService } from './git/branches';
 import { GitCli, isVersionAtLeast, MIN_GIT_VERSION } from './git/cli';
@@ -61,7 +62,9 @@ import { resolveLanguage, setLanguage } from '../shared/i18n';
 
 // Started by git or ssh to ask for credentials (see AskpassServer): no window, no single-instance lock.
 const askpassMode = process.argv.includes(ASKPASS_FLAG);
-if (!askpassMode) registerAppScheme();
+const commandArgs = process.argv.slice(app.isPackaged ? 1 : 2);
+const configCommand = commandArgs[0] === 'setup' || commandArgs[0] === 'uninstall' ? commandArgs[0] : null;
+if (!askpassMode && !configCommand) registerAppScheme();
 
 let mainWindow: BrowserWindow | null = null;
 /** Opens a folder named by a later launch (`forklift <path>` while running); set once the app is ready. */
@@ -278,6 +281,33 @@ async function start() {
   app.on('activate', showMainWindow);
 }
 
+async function runGitToolConfigCommand(command: 'setup' | 'uninstall', args: string[]): Promise<void> {
+  let scope: GitToolScope = 'global';
+  let dryRun = false;
+  for (const arg of args) {
+    if (arg === '--local') scope = 'local';
+    else if (arg === '--dry-run') dryRun = true;
+    else throw new TypeError(`unknown ${command} option: ${arg}`);
+  }
+
+  await app.whenReady();
+  const runner = new ProcessRunner();
+  try {
+    const setup = new GitToolSetup(new GitCli(runner));
+    const executable = app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()];
+    const changes = command === 'setup'
+      ? await setup.setup(process.cwd(), scope, executable, dryRun)
+      : await setup.uninstall(process.cwd(), scope, dryRun);
+    const verb = command === 'setup' ? 'Set' : 'Restore';
+    const lines = changes.map(({ key, values }) => values.length ? `${verb} ${key} = ${values.join(', ')}` : `Remove ${key}`);
+    process.stdout.write(`${dryRun ? 'Dry run — no changes written.\n' : ''}${lines.join('\n')}\n`, () => app.exit(0));
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`, () => app.exit(1));
+  } finally {
+    runner.dispose();
+  }
+}
+
 if (askpassMode) {
   const extra = process.argv.slice(process.argv.indexOf(ASKPASS_FLAG) + 1);
   const finish = (code: number) => process.stdout.write('', () => process.exit(code)); // let stdout drain
@@ -291,6 +321,8 @@ if (askpassMode) {
     const prompt = process.argv[process.argv.length - 1] ?? '';
     void runAskpassClient(prompt === ASKPASS_FLAG ? '' : prompt, process.env, (text) => process.stdout.write(text)).then(finish);
   }
+} else if (configCommand) {
+  void runGitToolConfigCommand(configCommand, commandArgs.slice(1));
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
