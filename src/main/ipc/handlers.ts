@@ -1,5 +1,6 @@
 import { isAbsolute, join } from 'node:path';
 import { stat, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { Repository } from '@axosoft/nodegit';
 import { app, BrowserWindow, dialog, shell, type OpenDialogOptions, type WebContents } from 'electron';
 import type { CheckoutTarget } from '../../shared/branches';
@@ -30,7 +31,7 @@ import { MAX_PAGE, type HistoryService } from '../history/service';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
-import { cloneActivity, noticeAdded, noticesDismissed, type AppStore } from '../store';
+import { cloneActivity, groupSyncChanged, noticeAdded, noticesDismissed, type AppStore } from '../store';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
@@ -47,12 +48,14 @@ import type { CredentialStore } from '../askpass/credentials';
 import type { HostingService } from '../hosting/service';
 import { PROVIDERS, type RepoHosting } from '../../shared/hosting';
 import { applicationMemory, runningGitCommands } from '../status';
-import { favoriteToggled, repoForgotten } from '../store/librarySlice';
+import { favoriteToggled, groupChanged, groupCreated, groupRemoved, repoForgotten } from '../store/librarySlice';
 import { bisectActivity, hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { listHooks } from '../git/hooks';
 import { COMMIT_HOOKS, PUSH_HOOKS, type HookActivity } from '../../shared/hooks';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
+import { MAX_GROUPS, MAX_GROUP_REPOS } from '../../shared/state';
+import { GroupSyncRunner, readGroupStatus } from '../repos/groupSync';
 
 export interface HandlerDeps {
   store: AppStore;
@@ -308,6 +311,13 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
 
   const recorder = new UndoRecorder(undo);
+  const groupSync = new GroupSyncRunner(store, git, gitCli, remotes, networkOps);
+  const getGroup = (id: unknown) => {
+    assertString(id, 'group id');
+    const group = store.getState().library.groups.find((item) => item.id === id);
+    if (!group) throw new Error(t('Repository group not found'));
+    return group;
+  };
 
   /** The tab's repository on its server; commands for pull requests and issues need one. */
   const hostingOf = async (root: string): Promise<RepoHosting & { client: Awaited<ReturnType<HostingService['client']>> }> => {
@@ -979,6 +989,55 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
     async 'repos:forget'(_ctx, path) {
       assertAbsolutePath(path, 'path');
       store.dispatch(repoForgotten(path));
+    },
+
+    async 'repos:groupCreate'(_ctx, name) {
+      if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) throw new TypeError('Group name must contain 1–100 characters');
+      const groups = store.getState().library.groups;
+      if (groups.length >= MAX_GROUPS) throw new Error(t('The maximum number of repository groups has been reached'));
+      const group = { id: randomUUID(), name: name.trim(), color: groups.length % 10, repos: [] };
+      store.dispatch(groupCreated(group));
+      return group;
+    },
+
+    async 'repos:groupUpdate'(_ctx, id, patch) {
+      const group = getGroup(id);
+      if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw new TypeError('Group changes must be an object');
+      if (patch.name !== undefined && (typeof patch.name !== 'string' || !patch.name.trim() || patch.name.trim().length > 100)) throw new TypeError('Group name must contain 1–100 characters');
+      if (patch.color !== undefined && (!Number.isInteger(patch.color) || patch.color < 0 || patch.color > 9)) throw new TypeError('Group color must be between 0 and 9');
+      if (patch.repos !== undefined) {
+        if (!Array.isArray(patch.repos) || patch.repos.length > MAX_GROUP_REPOS) throw new TypeError(`A group can contain at most ${MAX_GROUP_REPOS} repositories`);
+        for (const path of patch.repos) assertAbsolutePath(path, 'repository path');
+      }
+      store.dispatch(groupChanged({ id: group.id, ...patch, ...(patch.name !== undefined && { name: patch.name.trim() }) }));
+    },
+
+    async 'repos:groupRemove'(_ctx, id) {
+      const group = getGroup(id);
+      const sync = store.getState().app.groupSync;
+      if (sync?.groupId === group.id && !sync.done) throw new Error(t('Wait for the group update to finish or cancel it first'));
+      store.dispatch(groupRemoved(group.id));
+      if (sync?.groupId === group.id) store.dispatch(groupSyncChanged(null));
+    },
+
+    async 'repos:groupSync'(_ctx, id, mode) {
+      if (mode !== 'fetch' && mode !== 'pull') throw new TypeError('mode must be fetch or pull');
+      const group = getGroup(id);
+      if (!group.repos.length) throw new Error(t('Add repositories to this group first'));
+      await groupSync.run(group, mode);
+    },
+
+    async 'repos:groupCancel'() {
+      groupSync.cancel();
+    },
+
+    async 'repos:groupDismiss'() {
+      if (!store.getState().app.groupSync?.done) return;
+      store.dispatch(groupSyncChanged(null));
+    },
+
+    async 'repos:groupStatus'(_ctx, id) {
+      return readGroupStatus(getGroup(id), git, gitCli);
     },
 
     async 'file:openInEditor'(_ctx, repo, path, line) {

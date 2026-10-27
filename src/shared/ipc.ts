@@ -18,7 +18,7 @@ import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
-import type { AppStatus } from './state';
+import type { AppStatus, RepoGroup, RepoGroupStatus } from './state';
 
 /** Repository commands name their tab explicitly (`repo` = the tab id, i.e. the repository root). */
 export interface Commands {
@@ -169,6 +169,13 @@ export interface Commands {
   'repos:toggleFavorite': { args: [path: string]; result: void };
   /** Removes a repository from the recent list and favorites. */
   'repos:forget': { args: [path: string]; result: void };
+  'repos:groupCreate': { args: [name: string]; result: RepoGroup };
+  'repos:groupUpdate': { args: [id: string, patch: Partial<Pick<RepoGroup, 'name' | 'color' | 'repos'>>]; result: void };
+  'repos:groupRemove': { args: [id: string]; result: void };
+  'repos:groupSync': { args: [id: string, mode: 'fetch' | 'pull']; result: void };
+  'repos:groupCancel': { args: []; result: void };
+  'repos:groupDismiss': { args: []; result: void };
+  'repos:groupStatus': { args: [id: string]; result: RepoGroupStatus[] };
   /** Opens a file of the repository (path relative to its root) in the external editor. */
   'file:openInEditor': { args: [repo: string, path: string, line?: number]; result: void };
   /** Commits that changed a file (following renames), newest first. */
@@ -353,6 +360,13 @@ const commandChannelSet = {
   'repos:cancelScan': true,
   'repos:toggleFavorite': true,
   'repos:forget': true,
+  'repos:groupCreate': true,
+  'repos:groupUpdate': true,
+  'repos:groupRemove': true,
+  'repos:groupSync': true,
+  'repos:groupCancel': true,
+  'repos:groupDismiss': true,
+  'repos:groupStatus': true,
   'file:openInEditor': true,
   'file:externalDiff': true,
   'file:history': true,

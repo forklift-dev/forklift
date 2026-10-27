@@ -173,6 +173,8 @@ export interface AppInfo {
   logVersion: number;
   /** Passwords can be remembered (the system keychain is available to the app). */
   secretStorage: boolean;
+  /** A group's fetch or pull, while it runs and after (until the next one or dismissed). */
+  groupSync: GroupSync | null;
 }
 
 /** A tab in the tab bar; `id` is the repository root (or the remembered path when it is gone). */
@@ -200,6 +202,37 @@ export interface RecentRepo {
 export interface LibraryState {
   recent: RecentRepo[];
   favorites: string[];
+  groups: RepoGroup[];
+}
+
+/** A named set of repositories (local only), opened and fetched or pulled together. */
+export interface RepoGroup {
+  id: string;
+  name: string;
+  /** Index into the theme's lane colors. */
+  color: number;
+  repos: string[];
+}
+
+export const MAX_GROUPS = 50;
+export const MAX_GROUP_REPOS = 200;
+
+/** A group's fetch or pull running from the Repositories screen, with a line per repository. */
+export interface GroupSync {
+  groupId: string;
+  mode: 'fetch' | 'pull';
+  done: boolean;
+  repos: Array<{ path: string; name: string; status: 'waiting' | 'running' | 'ok' | 'up-to-date' | 'skipped' | 'failed'; message: string }>;
+}
+
+export interface RepoGroupStatus {
+  path: string;
+  name: string;
+  branch: string | null;
+  dirty: boolean;
+  ahead: number;
+  behind: number;
+  error: string | null;
 }
 
 /**

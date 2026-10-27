@@ -1,6 +1,6 @@
 import { readFile, rename } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import type { LibraryState, RecentRepo } from '../../shared/state';
+import { MAX_GROUP_REPOS, MAX_GROUPS, type LibraryState, type RecentRepo, type RepoGroup } from '../../shared/state';
 import { AtomicFile } from '../atomicFile';
 import { MAX_RECENT } from '../store/librarySlice';
 
@@ -17,7 +17,7 @@ export interface LibraryData {
 
 const VERSION = 1;
 const MAX_TABS = 100;
-const EMPTY: LibraryData = { session: { tabs: [], active: null }, library: { recent: [], favorites: [] } };
+const EMPTY: LibraryData = { session: { tabs: [], active: null }, library: { recent: [], favorites: [], groups: [] } };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096 && isAbsolute(value);
@@ -34,15 +34,26 @@ export function decodeLibrary(text: string): LibraryData {
     .map(({ path, name, openedAt }) => ({ path, name, openedAt }))
     .slice(0, MAX_RECENT);
   const favorites = [...new Set((Array.isArray(library['favorites']) ? library['favorites'] : []).filter(isPath))];
+  const ids = new Set<string>();
+  const groups: RepoGroup[] = (Array.isArray(library['groups']) ? library['groups'] : [])
+    .filter((g): g is Record<string, unknown> => isRecord(g) && typeof g['id'] === 'string' && /^[a-z0-9-]{1,40}$/.test(g['id']) && !ids.has(g['id']) && !!ids.add(g['id']))
+    .filter((g) => typeof g['name'] === 'string' && g['name'].trim().length > 0 && g['name'].length <= 100)
+    .map((g) => ({
+      id: g['id'] as string,
+      name: (g['name'] as string).trim(),
+      color: Number.isInteger(g['color']) && (g['color'] as number) >= 0 && (g['color'] as number) < 10 ? (g['color'] as number) : 0,
+      repos: [...new Set((Array.isArray(g['repos']) ? g['repos'] : []).filter(isPath))].slice(0, MAX_GROUP_REPOS),
+    }))
+    .slice(0, MAX_GROUPS);
   return {
     session: { tabs, active: isPath(session['active']) && tabs.includes(session['active']) ? session['active'] : (tabs[0] ?? null) },
-    library: { recent, favorites },
+    library: { recent, favorites, groups },
   };
 }
 
 export const encodeLibrary = ({ session, library }: LibraryData) => `${JSON.stringify({ version: VERSION, session, library }, null, 2)}\n`;
 
-/** userData/repositories.json: the open tabs, recently opened and favorite repositories. */
+/** userData/repositories.json: the open tabs, recently opened and favorite repositories, groups. */
 export class LibraryFile {
   private readonly file: AtomicFile;
 

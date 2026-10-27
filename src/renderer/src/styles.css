@@ -1925,6 +1925,39 @@ select {
   max-width: 900px;
 }
 
+.repo-group-create {
+  display: flex;
+  gap: 8px;
+  max-width: 900px;
+  margin-bottom: 12px;
+}
+.repo-group-create input { flex: 1; min-width: 0; }
+.repo-group {
+  max-width: 1100px;
+  margin: 8px 0 14px;
+  padding: 4px 8px 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--lane);
+  border-radius: 7px;
+}
+.repo-group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+}
+.repo-group-header input { flex: 1 1 150px; min-width: 100px; }
+.repo-group-color { width: 9px; height: 9px; border-radius: 50%; background: var(--lane); }
+.repo-group-status { flex: 0 1 260px; color: var(--fg-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repo-group-drop { margin: 8px 4px; padding: 18px; border: 1px dashed var(--border); color: var(--fg-muted); text-align: center; }
+.repo-group-activity { padding: 8px 8px 2px; border-top: 1px solid var(--border); font-size: 12px; }
+.repo-group-activity > button { margin-left: 8px; }
+.repo-group-activity ul { list-style: none; max-height: 200px; overflow: auto; margin: 6px 0 0; padding: 0; }
+.repo-group-activity li { display: flex; gap: 12px; justify-content: space-between; padding: 3px 0; color: var(--fg-muted); }
+.repo-group-activity li[data-status='failed'] { color: var(--danger-fg); }
+.repo-group-activity li[data-status='ok'], .repo-group-activity li[data-status='up-to-date'] { color: var(--lane); }
+
 .repo-row {
   display: flex;
   align-items: center;

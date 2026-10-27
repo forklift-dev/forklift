@@ -90,14 +90,14 @@ describe('library', () => {
     );
     expect(decoded).toEqual({
       session: { tabs: ['/a', '/b'], active: '/a' },
-      library: { recent: [{ path: '/a', name: 'a', openedAt: 5 }], favorites: ['/a'] },
+      library: { recent: [{ path: '/a', name: 'a', openedAt: 5 }], favorites: ['/a'], groups: [] },
     });
   });
 
   it('a damaged file is set aside and the app starts without remembered repositories', async () => {
     const path = join(dir, 'repositories.json');
     writeFileSync(path, '{ nope');
-    expect(await new LibraryFile(path).load()).toEqual({ session: { tabs: [], active: null }, library: { recent: [], favorites: [] } });
+    expect(await new LibraryFile(path).load()).toEqual({ session: { tabs: [], active: null }, library: { recent: [], favorites: [], groups: [] } });
     expect(readFileSync(`${path}.damaged`, 'utf8')).toBe('{ nope');
   });
 });

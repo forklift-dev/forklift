@@ -1,5 +1,5 @@
 import { combineReducers, configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { EMPTY_REPO_STATE, type AppInfo, type AppState, type AskPrompt, type GitCliInfo } from '../../shared/state';
+import { EMPTY_REPO_STATE, type AppInfo, type GroupSync, type AppState, type AskPrompt, type GitCliInfo } from '../../shared/state';
 import { librarySlice } from './librarySlice';
 import { reposSlice } from './reposSlice';
 import { settingsSlice } from './settingsSlice';
@@ -9,7 +9,7 @@ import type { ThunkExtra } from './types';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0, secretStorage: false } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0, secretStorage: false, groupSync: null } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -39,10 +39,13 @@ const appSlice = createSlice({
     secretStorageChecked: (state, action: PayloadAction<boolean>) => {
       state.secretStorage = action.payload;
     },
+    groupSyncChanged: (state, action: PayloadAction<GroupSync | null>) => {
+      state.groupSync = action.payload;
+    },
   },
 });
 
-export const { cloneActivity, gitCliDetected, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, secretStorageChecked, userThemesRead } = appSlice.actions;
+export const { cloneActivity, gitCliDetected, groupSyncChanged, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, secretStorageChecked, userThemesRead } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,
