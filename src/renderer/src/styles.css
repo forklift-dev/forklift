@@ -3977,3 +3977,34 @@ select {
 .commit-graph-hint span {
   flex: 1;
 }
+.tool-diff-window {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #1c2029);
+  color: var(--fg, #e6e8ed);
+}
+
+.tool-diff-window > header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border, #343a47);
+}
+
+.tool-diff-window > header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-diff-window > p {
+  padding: 12px 16px;
+}
+
+.tool-diff-window > .diff-editor {
+  flex: 1;
+  min-height: 0;
+}

@@ -53,6 +53,10 @@ const bridge: ForkliftBridge = {
   pathForFile(file) {
     return file instanceof File ? webUtils.getPathForFile(file) : '';
   },
+
+  toolDiff() {
+    return ipcRenderer.invoke('tool-diff:get');
+  },
 };
 
 contextBridge.exposeInMainWorld('forklift', bridge);

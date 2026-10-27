@@ -5,16 +5,21 @@ import { stateReady } from './state';
 import { installCodicons } from './icons';
 import { startThemes } from './theme';
 import { startLanguage } from './i18n';
+import { ToolDiffApp } from './ToolDiffApp';
 import './styles.css';
 
 installCodicons();
-await stateReady;
-startThemes();
-// Before the first render, and subscribed before any component: a change of language is applied before they re-render.
-startLanguage();
+if (new URLSearchParams(window.location.search).has('tool-diff')) {
+  createRoot(document.getElementById('root')!).render(<ToolDiffApp />);
+} else {
+  await stateReady;
+  startThemes();
+  // Before the first render, and subscribed before any component: a change of language is applied before they re-render.
+  startLanguage();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}

@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { lstat, readFile } from 'node:fs/promises';
 import { app, BrowserWindow, ipcMain, net, safeStorage, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { GitToolSetup, type GitToolScope } from './external/gitToolSetup';
@@ -34,6 +35,7 @@ import { ProcessRunner } from './process/runner';
 import { resolveShellEnv, shouldResolveShellEnv } from './process/shellEnv';
 import { installAppMenu } from './menu';
 import { handleAppProtocol, registerAppScheme } from './protocol';
+import { devServerUrl, isAppUrl } from './origin';
 import { pathFromArgv } from './repos/argv';
 import { LibraryFile } from './repos/libraryFile';
 import { RepoCreator } from './repos/create';
@@ -59,11 +61,18 @@ import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
 import { resolveLanguage, setLanguage } from '../shared/i18n';
+import { parseToolMode, type ToolMode } from './external/toolMode';
+import { MAX_DIFF_FILE_BYTES, type FileDiff, type FileVersion } from '../shared/diff';
 
 // Started by git or ssh to ask for credentials (see AskpassServer): no window, no single-instance lock.
 const askpassMode = process.argv.includes(ASKPASS_FLAG);
 const commandArgs = process.argv.slice(app.isPackaged ? 1 : 2);
 const configCommand = commandArgs[0] === 'setup' || commandArgs[0] === 'uninstall' ? commandArgs[0] : null;
+// Electron may leave Chromium switches in process.argv before the app command (for example
+// --remote-debugging-port in the e2e harness), so locate the explicit tool subcommand.
+const toolModeIndex = process.argv.findIndex((arg, index) => arg === 'difftool' && process.argv[index + 1] === '--local');
+const toolModeCommand = toolModeIndex >= 0 ? 'difftool' : null;
+const toolModeArgs = toolModeIndex >= 0 ? process.argv.slice(toolModeIndex) : [];
 if (!askpassMode && !configCommand) registerAppScheme();
 
 let mainWindow: BrowserWindow | null = null;
@@ -308,6 +317,60 @@ async function runGitToolConfigCommand(command: 'setup' | 'uninstall', args: str
   }
 }
 
+async function readToolVersion(path: string): Promise<FileVersion> {
+  const missing = { path, exists: false, binary: false, tooLarge: false, size: 0, text: null, lossy: false, hash: null } satisfies FileVersion;
+  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!info) return missing;
+  if (!info.isFile()) throw new Error('Git diff side is not a regular file');
+  if (info.size > MAX_DIFF_FILE_BYTES) return { ...missing, exists: true, tooLarge: true, size: info.size };
+  const bytes = await readFile(path);
+  if (bytes.byteLength > MAX_DIFF_FILE_BYTES) return { ...missing, exists: true, tooLarge: true, size: bytes.byteLength };
+  const binary = bytes.subarray(0, 8000).includes(0);
+  let text: string | null = null;
+  let lossy = false;
+  if (!binary) {
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch { text = new TextDecoder('utf-8').decode(bytes); lossy = true; }
+  }
+  return { path, exists: true, binary, tooLarge: false, size: bytes.byteLength, text, lossy, hash: null };
+}
+
+async function runGitDiffTool(): Promise<void> {
+  let mode: ToolMode;
+  try {
+    mode = parseToolMode(toolModeArgs, process.cwd());
+    if (mode.kind !== 'diff') throw new TypeError('difftool command expected');
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`, () => app.exit(1));
+    return;
+  }
+  await app.whenReady();
+  handleAppProtocol(join(__dirname, '../renderer'));
+  const window = new BrowserWindow({
+    title: mode.path ?? 'Forklift Diff', width: 1100, height: 760, minWidth: 640, minHeight: 420,
+    show: false,
+    ...(process.platform === 'linux' && { icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'window.png') }),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: true,
+      nodeIntegration: false, webSecurity: true, spellcheck: false,
+    },
+  });
+  ipcMain.handle('tool-diff:get', async (event) => {
+    if (!isTrustedSender(event.senderFrame)) throw new Error('Untrusted diff window');
+    const [original, modified] = await Promise.all([readToolVersion(mode.local), readToolVersion(mode.remote)]);
+    const diff: FileDiff = { original, modified };
+    return { path: mode.path ?? mode.remote, diff };
+  });
+  window.once('ready-to-show', () => window.show());
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
+  window.on('closed', () => app.quit());
+  void window.loadURL(`${devServerUrl ?? 'app://forklift/index.html'}?tool-diff`).catch((error: unknown) => {
+    console.error('Could not open git diff window', error);
+    app.exit(1);
+  });
+}
+
 if (askpassMode) {
   const extra = process.argv.slice(process.argv.indexOf(ASKPASS_FLAG) + 1);
   const finish = (code: number) => process.stdout.write('', () => process.exit(code)); // let stdout drain
@@ -323,6 +386,11 @@ if (askpassMode) {
   }
 } else if (configCommand) {
   void runGitToolConfigCommand(configCommand, commandArgs.slice(1));
+} else if (toolModeCommand) {
+  void runGitDiffTool().catch((error: unknown) => {
+    console.error('Could not start git diff tool', error);
+    app.exit(1);
+  });
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

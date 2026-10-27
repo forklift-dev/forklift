@@ -100,7 +100,7 @@ async function electronBinary() {
  * never touch a copy the developer has running. `env` entries override, `undefined` removes.
  * `baseEnv: 'minimal'` starts from DISPLAY only (a desktop-menu launch); default inherits process.env.
  */
-export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, args = [], windowSize = '1400,900', lang = 'en-US', home = tempDir('forklift-home-') } = {}) {
+export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false, page = true, waitForApp = true, args = [], windowSize = '1400,900', lang = 'en-US', home = tempDir('forklift-home-') } = {}) {
   if (inspect && binary) throw new Error('the main-process inspector is fused off in packaged builds');
   const display = { DISPLAY: process.env.DISPLAY, XAUTHORITY: process.env.XAUTHORITY };
   const merged = {
@@ -163,7 +163,7 @@ export async function launchApp({ env = {}, baseEnv = 'inherit', inspect = false
     await app.page.send('Runtime.enable');
     await app.page.send('Log.enable');
     await app.page.send('Page.enable');
-    await app.page.waitFor('!!document.querySelector(".app")', 15000);
+    await app.page.waitFor(waitForApp ? '!!document.querySelector(".app")' : 'document.readyState === "complete"', 15000);
   }
   if (app.main) {
     await app.main.waitFor(`typeof globalThis.forkliftDebug === 'object'`, 15000);
@@ -183,6 +183,10 @@ async function connect(port, pick, logs) {
   }
   if (!target) throw new Error(`no debug target on port ${port}\n${logs().slice(-2000)}`);
   return new CdpSession(target.webSocketDebuggerUrl).open();
+}
+
+export async function connectToPage(port) {
+  return connect(port, (targets) => targets.find((target) => target.type === 'page'), () => '');
 }
 
 /** One DevTools protocol connection: evaluate, wait for conditions, real mouse and keyboard input. */

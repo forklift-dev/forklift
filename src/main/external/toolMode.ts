@@ -1,11 +1,11 @@
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 
 export type ToolMode =
   | { kind: 'diff'; local: string; remote: string; path?: string }
   | { kind: 'merge'; base: string; local: string; remote: string; merged: string };
 
 /** Parses arguments after the `difftool` or `mergetool` command name. */
-export function parseToolMode(args: readonly string[]): ToolMode {
+export function parseToolMode(args: readonly string[], cwd = process.cwd()): ToolMode {
   const kind = args[0];
   if (kind !== 'difftool' && kind !== 'mergetool') throw new TypeError('expected difftool or mergetool');
   const accepted = kind === 'difftool' ? ['--local', '--remote', '--path'] : ['--base', '--local', '--remote', '--merged'];
@@ -21,8 +21,8 @@ export function parseToolMode(args: readonly string[]): ToolMode {
   const required = kind === 'difftool' ? ['--local', '--remote'] : ['--base', '--local', '--remote', '--merged'];
   for (const flag of required) if (!options.has(flag)) throw new TypeError(`missing ${flag}`);
   for (const [flag, path] of options) {
-    if (!isAbsolute(path)) throw new TypeError(`${flag} must be an absolute path`);
     if (path.includes('\0')) throw new TypeError(`${flag} contains a NUL byte`);
+    options.set(flag, isAbsolute(path) ? path : resolve(cwd, path));
   }
   if (kind === 'difftool') {
     const path = options.get('--path');
