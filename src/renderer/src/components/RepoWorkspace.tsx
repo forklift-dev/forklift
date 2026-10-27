@@ -22,6 +22,7 @@ import { ConflictView } from './ConflictView';
 import { FileHistoryView } from './FileHistoryView';
 import { InteractiveRebaseView } from './InteractiveRebaseView';
 import { OperationBanner } from './OperationBanner';
+import { BisectBanner } from './BisectBanner';
 import { copyText, useContextMenu } from './ContextMenu';
 import { LeftPanel } from './LeftPanel';
 import { useRefActions } from './useRefActions';
@@ -55,6 +56,8 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
   // The repository's server, when one of Preferences → Integrations matches its remotes.
   const hostingContext = useCommand(accountIds ? 'hosting:context' : null, [repo], { reloadKey: JSON.stringify([data.remoteUrls, accountIds]), keepPrevious: true });
   const hosting = accountIds ? (hostingContext.data ?? null) : null;
+  const bisect = useCommand('bisect:status', [repo], { reloadKey: data.loadedAt, keepPrevious: true });
+  const bisectRunning = useAppState((state) => Boolean(state.repo.path === repo && state.repo.bisect?.running));
   const { form: openForm, dialog: formDialog } = useFormDialog();
   const [filter, setFilterState] = useState<HistoryFilter>(() => loadFilter(data.root));
   const setFilter = (next: HistoryFilter) => {
@@ -284,6 +287,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
       <Splitter label={t('Resize the left panel')} className="left" value={layout.leftHidden ? 0 : layout.left} min={LIMITS.left[0]} max={LIMITS.left[1]} direction={1} onChange={(width) => setPanelWidth('left', width)} onReset={() => resetPanelWidth('left')} />
       <div className="center">
       <OperationBanner repo={repo} data={data} run={run} />
+      {bisect.data && <BisectBanner repo={repo} status={bisect.data} head={data.branch.oid} run={run} runInBackground={runInBackground} />}
       <CommitGraphHint data={data} filter={filter} run={run} />
       {lfsMissing && !lfsWarningHidden && (
         <div className="error-banner notices lfs-missing" role="alert">
@@ -368,6 +372,7 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
         <CommitGraph
           repo={repo}
           data={data}
+          bisect={bisect.data}
           filter={filter}
           matches={searching && found.data ? matches : undefined}
           reveal={reveal}
@@ -386,9 +391,14 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
               ]);
             }
             const isHead = row.hash === data.branch.oid;
-            const busy = data.operation !== null;
+            const gitBusy = data.operation !== null;
+            const busy = gitBusy || Boolean(bisect.data);
             openMenu(event, [
-              { label: t('Check out this commit (detached)'), disabled: isHead, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
+              { label: t('Mark good for bisect'), disabled: gitBusy || bisectRunning || Boolean(bisect.data?.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'good', row.hash)) },
+              { label: t('Mark bad for bisect'), disabled: gitBusy || bisectRunning || Boolean(bisect.data?.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'bad', row.hash)) },
+              ...(bisect.data ? [{ label: t('Skip for bisect'), disabled: bisectRunning || Boolean(bisect.data.found), onSelect: () => void run(() => invoke('bisect:mark', repo, 'skip', row.hash)) }] : []),
+              'separator',
+              { label: t('Check out this commit (detached)'), disabled: isHead || busy, onSelect: () => refActions.checkout({ kind: 'commit', sha: row.hash }) },
               'separator',
               { label: t('Cherry-pick commit'), disabled: isHead || busy, onSelect: () => refActions.cherryPick(row.hash, row.subject) },
               { label: t('Revert commit…'), disabled: busy, onSelect: () => refActions.revert(row.hash, row.subject) },

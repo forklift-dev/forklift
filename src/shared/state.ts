@@ -2,6 +2,7 @@
 import type { CloneActivity } from './repos';
 import type { UserThemesState } from './themes';
 import type { HookActivity } from './hooks';
+import type { BisectActivity } from './bisect';
 import type { SettingsState } from './settings';
 
 export type ChangeKind =
@@ -122,6 +123,7 @@ export interface RemoteActivity {
 
 /** One open repository (a tab). */
 export interface RepoState {
+  bisect?: BisectActivity | null;
   /** Network operation in progress (it can be cancelled). */
   remote?: RemoteActivity | null;
   /** Hooks running in a commit or push. */

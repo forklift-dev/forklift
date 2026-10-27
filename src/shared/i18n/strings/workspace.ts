@@ -1,6 +1,28 @@
 // The repository workspace: left panel, changes, commit panel, tabs, banners.
 export const workspace = {
   ru: {
+    'Mark good for bisect': 'Отметить хорошим для бисекта',
+    'Mark bad for bisect': 'Отметить плохим для бисекта',
+    'Skip for bisect': 'Пропустить в бисекте',
+    'Bisect: mark a good and a bad commit to define the range': 'Бисект: отметьте хороший и плохой коммиты, чтобы задать диапазон',
+    'Bisect: step {step}, {count} candidates, about {remaining} checks left': 'Бисект: шаг {step}, кандидатов {count}, осталось примерно {remaining} проверок',
+    'First bad commit: {sha}': 'Первый плохой коммит: {sha}',
+    'First bad': 'Первый плохой',
+    Good: 'Хороший',
+    Bad: 'Плохой',
+    Skipped: 'Пропущен',
+    'Run bisect script': 'Запустить скрипт бисекта',
+    'The program runs at each checked-out commit. Exit 0 means good, 1 means bad, and 125 skips a commit.': 'Программа запускается на каждом проверяемом коммите. Код 0 означает хороший, 1 — плохой, 125 — пропустить.',
+    Program: 'Программа',
+    'Arguments (one per line)': 'Аргументы (по одному на строку)',
+    'Run bisect': 'Запустить бисект',
+    'Enter a program': 'Укажите программу',
+    'End bisect?': 'Завершить бисект?',
+    'Git will restore the branch and checkout from before bisect.': 'Git восстановит исходную ветку и состояние файлов.',
+    'End bisect': 'Завершить бисект',
+    'Run script…': 'Запустить скрипт…',
+    'Bisect log': 'Журнал бисекта',
+    'Script output': 'Вывод скрипта',
     // ChangesPanel
     'Unstage all': 'Убрать всё из индекса',
     'Discard all': 'Отменить все изменения',

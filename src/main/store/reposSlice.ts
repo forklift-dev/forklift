@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { HookActivity } from '../../shared/hooks';
+import type { BisectActivity } from '../../shared/bisect';
 import { basename } from 'node:path';
 import { EMPTY_REPO_STATE, type RemoteActivity, type RepoData, type RepoState, type TabInfo, type TabsState } from '../../shared/state';
 import type { ThunkExtra } from './types';
@@ -71,6 +72,10 @@ export const reposSlice = createSlice({
       const repo = state.byId[action.payload.id];
       if (repo) repo.hooks = action.payload.activity;
     },
+    bisectActivity: (state, action: PayloadAction<{ id: string; activity: BisectActivity | null }>) => {
+      const repo = state.byId[action.payload.id];
+      if (repo) repo.bisect = action.payload.activity;
+    },
     undoChanged: (state, action: PayloadAction<{ id: string; undo: string | null; redo: string | null }>) => {
       const repo = state.byId[action.payload.id];
       if (repo) repo.undo = { undo: action.payload.undo, redo: action.payload.redo };
@@ -121,4 +126,4 @@ export const reposSlice = createSlice({
   },
 });
 
-export const { tabOpened, tabActivated, tabClosed, tabMoved, remoteActivity, hookActivity, undoChanged } = reposSlice.actions;
+export const { tabOpened, tabActivated, tabClosed, tabMoved, remoteActivity, hookActivity, bisectActivity, undoChanged } = reposSlice.actions;

@@ -12,6 +12,7 @@ import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
+import type { BisectService } from '../git/bisect';
 import type { InteractiveRebase } from '../git/interactiveRebase';
 import type { UndoService } from '../git/undo';
 import type { FileHistory } from '../git/fileHistory';
@@ -47,7 +48,7 @@ import type { HostingService } from '../hosting/service';
 import { PROVIDERS, type RepoHosting } from '../../shared/hosting';
 import { applicationMemory, runningGitCommands } from '../status';
 import { favoriteToggled, repoForgotten } from '../store/librarySlice';
-import { hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
+import { bisectActivity, hookActivity, loadRepo, tabActivated, tabClosed, tabMoved } from '../store/reposSlice';
 import { listHooks } from '../git/hooks';
 import { COMMIT_HOOKS, PUSH_HOOKS, type HookActivity } from '../../shared/hooks';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
@@ -67,6 +68,7 @@ export interface HandlerDeps {
   stashes: StashService;
   conflicts: ConflictService;
   commitOps: CommitOps;
+  bisect: BisectService;
   remotes: RemoteService;
   networkOps: NetworkOps;
   interactiveRebase: InteractiveRebase;
@@ -240,7 +242,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
@@ -346,6 +348,33 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
   };
 
   return {
+    async 'bisect:status'(_ctx, repo) { return bisect.status(tab(repo)); },
+    async 'bisect:mark'(_ctx, repo, mark, sha) {
+      const root = tab(repo);
+      assertSha(sha);
+      if (mark !== 'good' && mark !== 'bad' && mark !== 'skip') throw new TypeError('Invalid bisect mark');
+      if (repoData(root)?.operation) throw new Error('Finish the current Git operation first');
+      await thenRefresh(root, () => bisect.mark(root, mark, sha));
+    },
+    async 'bisect:run'(_ctx, repo, executable, args) {
+      const root = tab(repo);
+      if (typeof executable !== 'string' || !Array.isArray(args) || !args.every((arg) => typeof arg === 'string')) throw new TypeError('Invalid bisect command');
+      let timer: NodeJS.Timeout | null = null;
+      let latest: { running: boolean; output: string[] } = { running: true, output: [] };
+      const publish = () => {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        store.dispatch(bisectActivity({ id: root, activity: latest }));
+      };
+      await thenRefresh(root, () => bisect.run(root, executable, args, (activity) => {
+        latest = activity;
+        if (!activity.running) publish();
+        else timer ??= setTimeout(publish, 100);
+      }));
+    },
+    async 'bisect:cancel'(_ctx, repo) { bisect.cancel(tab(repo)); },
+    async 'bisect:reset'(_ctx, repo) { const root = tab(repo); await thenRefresh(root, () => bisect.reset(root)); store.dispatch(bisectActivity({ id: root, activity: null })); },
+    async 'bisect:clearOutput'(_ctx, repo) { store.dispatch(bisectActivity({ id: tab(repo), activity: null })); },
     async 'commit:cherryPick'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);

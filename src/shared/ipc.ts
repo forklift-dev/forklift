@@ -1,5 +1,6 @@
 // Typed contract for renderer → main commands. The channel name doubles as the command name.
 import type { CheckoutTarget } from './branches';
+import type { BisectMark, BisectStatus } from './bisect';
 import type { ConflictFile, ConflictSide, OperationAction } from './conflicts';
 import type { CommitDetails, DiffTarget, FileDiff } from './diff';
 import type { RebaseCommit, RebaseStep } from './rebase';
@@ -73,6 +74,12 @@ export interface Commands {
   'commit:revert': { args: [repo: string, sha: string]; result: 'done' | 'conflicts' };
   /** Moves the current branch to a commit: soft keeps changes staged, mixed unstaged, hard discards them. */
   'commit:reset': { args: [repo: string, sha: string, mode: 'soft' | 'mixed' | 'hard']; result: void };
+  'bisect:status': { args: [repo: string]; result: BisectStatus | null };
+  'bisect:mark': { args: [repo: string, mark: BisectMark, sha: string]; result: void };
+  'bisect:run': { args: [repo: string, executable: string, args: string[]]; result: void };
+  'bisect:cancel': { args: [repo: string]; result: void };
+  'bisect:reset': { args: [repo: string]; result: void };
+  'bisect:clearOutput': { args: [repo: string]; result: void };
   /** Merges a branch or commit into the current branch ('conflicts': git stopped, see RepoData.operation). */
   'branch:merge': { args: [repo: string, ref: string, mode: 'default' | 'no-ff' | 'ff-only' | 'squash', message: string | null]; result: 'done' | 'conflicts' };
   /** Rebases the current branch onto a branch or commit. */
@@ -288,6 +295,12 @@ const commandChannelSet = {
   'commit:cherryPick': true,
   'commit:revert': true,
   'commit:reset': true,
+  'bisect:status': true,
+  'bisect:mark': true,
+  'bisect:run': true,
+  'bisect:cancel': true,
+  'bisect:reset': true,
+  'bisect:clearOutput': true,
   'branch:merge': true,
   'branch:rebase': true,
   'remote:fetch': true,

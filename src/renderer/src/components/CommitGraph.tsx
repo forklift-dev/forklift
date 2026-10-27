@@ -1,7 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { colorIndex, initials } from '../../../shared/avatars';
 import { EdgeKind, type GraphRowLayout } from '../../../shared/graph';
 import type { HistoryFilter, HistoryRow } from '../../../shared/history';
+import type { BisectStatus } from '../../../shared/bisect';
 import type { RepoData } from '../../../shared/state';
 import { formatDate, t } from '../../../shared/i18n';
 import { historyPages } from '../history';
@@ -151,6 +152,7 @@ function RefBadges({ labels }: { labels: string[] | undefined }) {
 interface CommitGraphProps {
   repo: string;
   data: RepoData;
+  bisect?: BisectStatus | null;
   /** null: the working tree (WIP row) is selected. */
   selectedHash: string | null;
   onSelect(hash: string | null): void;
@@ -169,7 +171,8 @@ const MAX_SCROLL_HEIGHT = 30_000_000;
  * The history list with its graph, virtualized: only rows in view are rendered and history pages are
  * fetched from main as they come into view. A "WIP" row on top stands for uncommitted changes.
  */
-export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
+export function CommitGraph({ repo, data, bisect, selectedHash, onSelect, onContextMenu, filter, matches, reveal }: CommitGraphProps) {
+  const bisectCandidates = useMemo(() => new Set(bisect?.candidates ?? []), [bisect]);
   const baseStyle = graphStyle(useAppState((s) => s.settings.values['ui.graphStyle']));
   // Reserve a second label line throughout the graph when refs share a commit. Keeping one row height
   // for the virtual list preserves correct positions for unloaded history pages and leaves a clear gap
@@ -354,7 +357,7 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
         key={row.hash}
         role="row"
         aria-selected={selected}
-        className={`commit-row lane-${row.graph.color % 10}${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}`}
+        className={`commit-row lane-${row.graph.color % 10}${selected ? ' selected' : ''}${row.stash ? ' stash' : ''}${matches?.has(index - offset) ? ' match' : ''}${matches && matches.size && !matches.has(index - offset) ? ' dimmed' : ''}${bisect?.remaining !== null && bisect?.remaining !== undefined && !bisectCandidates.has(row.hash) && row.hash !== bisect.bad && !bisect.good.includes(row.hash) && !bisect.skipped.includes(row.hash) ? ' bisect-excluded' : ''}`}
         style={position}
         data-hash={row.hash}
         onClick={() => onSelect(row.hash)}
@@ -376,6 +379,10 @@ export function CommitGraph({ repo, data, selectedHash, onSelect, onContextMenu,
           />
         </div>
         <div className="cell message subject" title={row.subject}>
+          {bisect?.found === row.hash && <span className="bisect-badge bad">{t('First bad')}</span>}
+          {bisect?.bad === row.hash && bisect.found !== row.hash && <span className="bisect-badge bad">{t('Bad')}</span>}
+          {bisect?.good.includes(row.hash) && <span className="bisect-badge good">{t('Good')}</span>}
+          {bisect?.skipped.includes(row.hash) && <span className="bisect-badge skip">{t('Skipped')}</span>}
           {row.subject}
         </div>
         <div className="cell author" title={row.authorEmail}>
