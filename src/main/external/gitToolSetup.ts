@@ -17,6 +17,7 @@ export class GitToolSetup {
   constructor(private readonly git: GitCli) {}
 
   async setup(cwd: string, scope: GitToolScope, executable: readonly string[], dryRun = false): Promise<GitConfigChange[]> {
+    if (!executable.length || executable.some((part) => !part || part.includes('\0'))) throw new TypeError('an executable command is required');
     const scopeArgs = scope === 'global' ? ['--global'] : ['--local'];
     const existingBackup = await this.get(cwd, scopeArgs, BACKUP_KEY);
     if (existingBackup.length) throw new Error(`Forklift is already configured in ${scope} Git config`);
@@ -63,6 +64,9 @@ export class GitToolSetup {
     } catch {
       throw new Error('Forklift Git config backup is invalid; no settings were changed');
     }
+    if (!backup || typeof backup !== 'object' || Array.isArray(backup) || Object.entries(backup).some(([key, values]) =>
+      !OWNED_KEYS.includes(key as (typeof OWNED_KEYS)[number]) || !Array.isArray(values) || !values.every((value) => typeof value === 'string'),
+    )) throw new Error('Forklift Git config backup is invalid; no settings were changed');
     const changes = OWNED_KEYS.map((key) => ({ key, values: backup[key] ?? [] }));
     if (dryRun) return changes;
     for (const change of changes) {

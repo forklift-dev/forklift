@@ -55,7 +55,7 @@
 | [T-013](tasks/stage-1-processes/T-013-editor-terminal.md) | Открытие во внешнем редакторе и терминале | review |
 | [T-014](tasks/stage-1-processes/T-014-diff-merge-tools.md) | Внешние diff/merge tools | review |
 | [T-076](tasks/stage-1-processes/T-076-difftool-mergetool-mode.md) | Forklift как git difftool и mergetool | in-progress |
-| [T-076a](tasks/stage-1-processes/T-076a-git-setup.md) | CLI и безопасная настройка Git для Forklift tools | in-progress |
+| [T-076a](tasks/stage-1-processes/T-076a-git-setup.md) | CLI и безопасная настройка Git для Forklift tools | review |
 | [T-076b](tasks/stage-1-processes/T-076b-standalone-diff.md) | Отдельное окно Forklift для git difftool | todo |
 | [T-076c](tasks/stage-1-processes/T-076c-standalone-merge.md) | Отдельное окно Forklift для git mergetool | todo |
 
