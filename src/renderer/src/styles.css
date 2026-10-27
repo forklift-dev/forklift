@@ -4008,3 +4008,90 @@ select {
   flex: 1;
   min-height: 0;
 }
+
+.tool-merge-window {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg, #1c2029);
+  color: var(--fg, #e6e8ed);
+}
+
+.tool-merge-window > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+}
+
+.tool-merge-window > header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-merge-window > header div {
+  display: flex;
+  gap: 6px;
+}
+
+.tool-merge-window > p {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--fg-dimmed);
+}
+
+.tool-merge-sides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tool-merge-sides > section,
+.tool-merge-result {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border, #343a47);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tool-merge-window h2 {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border, #343a47);
+}
+
+.tool-merge-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.tool-merge-result {
+  flex: 1;
+}
+
+.tool-merge-message {
+  position: absolute;
+  inset: 38px 0 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: var(--bg, #1c2029);
+  color: var(--fg-dimmed);
+  text-align: center;
+}
+
+@media (max-height: 650px) {
+  .tool-merge-window { gap: 4px; padding: 4px; }
+}

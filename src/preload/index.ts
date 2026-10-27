@@ -57,6 +57,12 @@ const bridge: ForkliftBridge = {
   toolDiff() {
     return ipcRenderer.invoke('tool-diff:get');
   },
+  toolMerge() {
+    return ipcRenderer.invoke('tool-merge:get');
+  },
+  saveToolMerge(text) {
+    return ipcRenderer.invoke('tool-merge:save', text);
+  },
 };
 
 contextBridge.exposeInMainWorld('forklift', bridge);

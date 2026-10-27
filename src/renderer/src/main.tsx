@@ -6,11 +6,14 @@ import { installCodicons } from './icons';
 import { startThemes } from './theme';
 import { startLanguage } from './i18n';
 import { ToolDiffApp } from './ToolDiffApp';
+import { ToolMergeApp } from './ToolMergeApp';
 import './styles.css';
 
 installCodicons();
 if (new URLSearchParams(window.location.search).has('tool-diff')) {
   createRoot(document.getElementById('root')!).render(<ToolDiffApp />);
+} else if (new URLSearchParams(window.location.search).has('tool-merge')) {
+  createRoot(document.getElementById('root')!).render(<ToolMergeApp />);
 } else {
   await stateReady;
   startThemes();

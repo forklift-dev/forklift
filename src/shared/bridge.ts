@@ -1,7 +1,7 @@
 import type { CommandArgs, CommandName, CommandResult, IpcResult } from './ipc';
 import type { ReplicaMessage } from './state';
 import type { TerminalEvent } from './terminal';
-import type { FileDiff } from './diff';
+import type { FileDiff, FileVersion } from './diff';
 
 /** API the preload script exposes to the renderer as `window.forklift`. */
 export interface ForkliftBridge {
@@ -14,6 +14,10 @@ export interface ForkliftBridge {
   pathForFile(file: File): string;
   /** Data for the isolated `git difftool` window; paths remain in the main process. */
   toolDiff(): Promise<{ path: string; diff: FileDiff }>;
+  /** Merge sides for the isolated `git mergetool` window. */
+  toolMerge(): Promise<{ path: string; base: FileVersion; local: FileVersion; remote: FileVersion; merged: FileVersion }>;
+  /** Writes the explicitly saved result to Git's MERGED path. */
+  saveToolMerge(text: string): Promise<void>;
   /** Embedded terminals: output and exits from main, keystrokes to it (fire and forget). */
   terminal: {
     onEvent(listener: (event: TerminalEvent) => void): () => void;

@@ -21,6 +21,14 @@ describe('parseToolMode', () => {
   });
 
   it.each([
+    [['mergetool', '--auto', '--L1', 'Base', '--L2', 'Local', '--L3', 'Remote', '-o', 'out', 'base', 'ours', 'theirs'], { base: '/repo/base', local: '/repo/ours', remote: '/repo/theirs', merged: '/repo/out' }],
+    [['mergetool', '--auto-merge', '--output=out', 'ours', 'base', 'theirs'], { base: '/repo/base', local: '/repo/ours', remote: '/repo/theirs', merged: '/repo/out' }],
+    [['mergetool', '--auto-merge', 'ours', 'out', 'theirs'], { base: null, local: '/repo/ours', remote: '/repo/theirs', merged: '/repo/out' }],
+  ] as const)('maps supported positional merge arguments %j', (args, expected) => {
+    expect(parseToolMode(args, '/repo')).toEqual({ kind: 'merge', ...expected });
+  });
+
+  it.each([
     [['difftool', '--local', '/tmp/a'], 'missing --remote'],
     [['difftool', '--local', '/tmp/a', '--local', '/tmp/b', '--remote', '/tmp/c'], '--local may be specified only once'],
     [['mergetool', '--base', '/tmp/a', '--local', '/tmp/b', '--remote', '/tmp/c'], 'missing --merged'],

@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { lstat, readFile } from 'node:fs/promises';
+import { lstat, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { app, BrowserWindow, ipcMain, net, safeStorage, session, shell } from 'electron';
 import { DiffTools } from './external/diffTools';
 import { GitToolSetup, type GitToolScope } from './external/gitToolSetup';
@@ -70,8 +71,16 @@ const commandArgs = process.argv.slice(app.isPackaged ? 1 : 2);
 const configCommand = commandArgs[0] === 'setup' || commandArgs[0] === 'uninstall' ? commandArgs[0] : null;
 // Electron may leave Chromium switches in process.argv before the app command (for example
 // --remote-debugging-port in the e2e harness), so locate the explicit tool subcommand.
-const toolModeIndex = process.argv.findIndex((arg, index) => arg === 'difftool' && process.argv[index + 1] === '--local');
-const toolModeCommand = toolModeIndex >= 0 ? 'difftool' : null;
+const toolModeIndex = process.argv.findIndex((arg, index) =>
+  (arg === 'difftool' && process.argv[index + 1] === '--local') ||
+  (arg === 'mergetool' && (
+    process.argv[index + 1] === '--base' ||
+    ['--auto', '--auto-merge', '-o', '--output', '--L1'].includes(process.argv[index + 1] ?? '') ||
+    process.argv[index + 1]?.startsWith('--output=') ||
+    process.argv.length - index >= 4
+  )),
+);
+const toolModeCommand = toolModeIndex >= 0 ? process.argv[toolModeIndex] as 'difftool' | 'mergetool' : null;
 const toolModeArgs = toolModeIndex >= 0 ? process.argv.slice(toolModeIndex) : [];
 if (!askpassMode && !configCommand) registerAppScheme();
 
@@ -371,6 +380,68 @@ async function runGitDiffTool(): Promise<void> {
   });
 }
 
+async function runGitMergeTool(): Promise<void> {
+  let mode: ToolMode;
+  try {
+    mode = parseToolMode(toolModeArgs, process.cwd());
+    if (mode.kind !== 'merge') throw new TypeError('mergetool command expected');
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`, () => app.exit(1));
+    return;
+  }
+  let originalHash: string | null = null;
+  let baselineLoaded = false;
+  let saved = false;
+  await app.whenReady();
+  handleAppProtocol(join(__dirname, '../renderer'));
+  const window = new BrowserWindow({
+    title: mode.merged, width: 1280, height: 900, minWidth: 760, minHeight: 600, show: false,
+    ...(process.platform === 'linux' && { icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'window.png') }),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: true,
+      nodeIntegration: false, webSecurity: true, spellcheck: false,
+    },
+  });
+  ipcMain.handle('tool-merge:get', async (event) => {
+    if (!isTrustedSender(event.senderFrame)) throw new Error('Untrusted merge window');
+    const absentBase: FileVersion = { path: mode.merged, exists: false, binary: false, tooLarge: false, size: 0, text: null, lossy: false, hash: null };
+    const [base, local, remote, merged] = await Promise.all([
+      mode.base ? readToolVersion(mode.base) : Promise.resolve(absentBase),
+      readToolVersion(mode.local), readToolVersion(mode.remote), readToolVersion(mode.merged),
+    ]);
+    const current = await lstat(mode.merged).then(async (info) => {
+      if (!info.isFile()) throw new Error('MERGED is not a regular file');
+      if (info.size > MAX_DIFF_FILE_BYTES) return null;
+      return readFile(mode.merged);
+    }).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
+    originalHash = current ? createHash('sha256').update(current).digest('hex') : null;
+    baselineLoaded = true;
+    return { path: mode.merged, base, local, remote, merged };
+  });
+  ipcMain.handle('tool-merge:save', async (event, value: unknown) => {
+    if (!isTrustedSender(event.senderFrame)) throw new Error('Untrusted merge window');
+    if (!baselineLoaded) throw new Error('Merge inputs have not loaded yet');
+    if (typeof value !== 'string' || value.includes('\0') || Buffer.byteLength(value, 'utf8') > MAX_DIFF_FILE_BYTES) throw new TypeError('Merged result is invalid or too large');
+    const info = await lstat(mode.merged).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
+    if (info && !info.isFile()) throw new Error('MERGED is not a regular file');
+    if (info && info.size > MAX_DIFF_FILE_BYTES) throw new Error('MERGED is too large to update safely');
+    const current = info ? await readFile(mode.merged) : null;
+    const currentHash = current ? createHash('sha256').update(current).digest('hex') : null;
+    if (currentHash !== originalHash) throw new Error('MERGED changed outside this window; reopen the tool before saving');
+    await writeFile(mode.merged, value, { encoding: 'utf8', mode: info?.mode });
+    saved = true;
+    window.close();
+  });
+  window.once('ready-to-show', () => window.show());
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
+  window.on('closed', () => app.exit(saved ? 0 : 1));
+  void window.loadURL(`${devServerUrl ?? 'app://forklift/index.html'}?tool-merge`).catch((error: unknown) => {
+    console.error('Could not open git merge window', error);
+    app.exit(1);
+  });
+}
+
 if (askpassMode) {
   const extra = process.argv.slice(process.argv.indexOf(ASKPASS_FLAG) + 1);
   const finish = (code: number) => process.stdout.write('', () => process.exit(code)); // let stdout drain
@@ -387,8 +458,8 @@ if (askpassMode) {
 } else if (configCommand) {
   void runGitToolConfigCommand(configCommand, commandArgs.slice(1));
 } else if (toolModeCommand) {
-  void runGitDiffTool().catch((error: unknown) => {
-    console.error('Could not start git diff tool', error);
+  void (toolModeCommand === 'difftool' ? runGitDiffTool() : runGitMergeTool()).catch((error: unknown) => {
+    console.error(`Could not start git ${toolModeCommand}`, error);
     app.exit(1);
   });
 } else if (!app.requestSingleInstanceLock()) {
