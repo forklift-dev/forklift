@@ -3,6 +3,7 @@ import { invoke } from '../api';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
 import { t } from '../../../shared/i18n';
+import { AiAssist } from './AiAssist';
 
 interface CommitPanelProps {
   repo: string;
@@ -113,6 +114,12 @@ export function CommitPanel({ repo, stagedCount, headSha, onCommit, preparedMess
         onChange={(event) => setDescription(event.target.value)}
         onKeyDown={onKeyDown}
       />
+      <AiAssist repo={repo} task="message" onUse={(message) => {
+        const [subject = '', ...body] = message.trim().split('\n');
+        setSummary(subject.replace(/^['"`]|['"`]$/g, ''));
+        setDescription(body.join('\n').trim());
+      }} />
+      <AiAssist repo={repo} task="review" />
       <CommitIdentity repo={repo} reloadKey={loadedAt} />
       {running && (
         <div className="hook-activity" role="status" aria-live="polite">

@@ -294,6 +294,23 @@ export const SETTING_FIELDS = {
     label: 'Accounts',
     description: 'Servers whose repositories, pull requests and issues Forklift shows. Tokens are kept encrypted in the system keychain, never in the settings file.',
   },
+  'ai.provider': {
+    section: 'integrations',
+    type: 'enum',
+    default: 'off',
+    options: [{ value: 'off', label: 'Off' }, { value: 'ollama', label: 'Ollama (local)' }],
+    label: 'AI assistant',
+    description: 'Uses your local Ollama server only after you confirm each request. Repository content stays on this computer.',
+  },
+  'ai.model': {
+    section: 'integrations',
+    type: 'string',
+    default: '',
+    maxLength: 120,
+    placeholder: 'Installed Ollama model',
+    label: 'Ollama model',
+    description: 'Name of a model already installed in Ollama, for example qwen2.5-coder.',
+  },
   'keys.bindings': {
     section: 'keys',
     type: 'keybindings',

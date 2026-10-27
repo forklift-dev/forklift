@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { IssueRefs, type HostingItem } from './HostingView';
 import type { HostingProvider } from '../../../shared/hosting';
 import { formatDate, t } from '../../../shared/i18n';
+import { AiAssist } from './AiAssist';
 
 const STATUS_LABEL: Record<FileChangeStatus, string> = {
   added: 'A',
@@ -98,6 +99,7 @@ export function CommitDetailsPanel({ repo, sha, selectedPath, onOpenFile, onClos
           <IssueRefs text={body} provider={provider} onOpen={onOpenRef} />
         </pre>
       )}
+      <AiAssist repo={repo} task="commit" target={sha} />
       <dl className="commit-meta">
         <dt>{t('Author')}</dt>
         <dd title={data.author.email} className="commit-person">

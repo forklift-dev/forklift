@@ -8,6 +8,7 @@ import { CODE_FONT, languageForPath, monaco } from '../monaco/setup';
 import { useAppState } from '../state';
 import { useCommand } from '../useCommand';
 import { useConfirm } from './ConfirmDialog';
+import { AiAssist } from './AiAssist';
 
 interface ConflictViewProps {
   repo: string;
@@ -351,6 +352,7 @@ export function ConflictView({ repo, path, run, runInBackground, onClose }: Conf
   const labels = blocks[0] ?? null;
   return (
     <section className="conflict-view" aria-label={t('Conflicts in {path}', { path })}>
+      <AiAssist repo={repo} task="conflict" target={path} />
       <header className="diff-header">
         <div className="diff-title" title={path}>
           <strong>{path}</strong>

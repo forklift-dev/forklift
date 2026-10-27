@@ -31,6 +31,8 @@ export interface Commands {
   /** Commits the index (hooks run); returns the new commit hash. */
   /** `skipHooks`: `--no-verify` (pre-commit and commit-msg hooks do not run). */
   'commit:create': { args: [repo: string, message: string, amend: boolean, options?: { skipHooks?: boolean }]; result: string };
+  'ai:assist': { args: [repo: string, task: 'message' | 'review' | 'conflict' | 'commit', requestId: string, target?: string]; result: string };
+  'ai:cancel': { args: [requestId: string]; result: void };
   /** Hooks git would run in this repository (honouring core.hooksPath). */
   'hooks:list': { args: [repo: string]; result: HooksInfo };
   /** Rows `start…start+count` of the commit history with graph layout; `version` is RepoData.historyVersion. */
@@ -280,6 +282,8 @@ const commandChannelSet = {
   'index:discard': true,
   'index:applyLines': true,
   'commit:create': true,
+  'ai:assist': true,
+  'ai:cancel': true,
   'hooks:list': true,
   'commit:details': true,
   'comparison:details': true,

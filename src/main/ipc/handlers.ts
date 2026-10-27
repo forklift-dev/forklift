@@ -56,6 +56,7 @@ import { settingsProblemsDismissed } from '../store/settingsSlice';
 import type { CommandHandlers } from './registry';
 import { MAX_GROUPS, MAX_GROUP_REPOS } from '../../shared/state';
 import { GroupSyncRunner, readGroupStatus } from '../repos/groupSync';
+import { askOllama } from '../ai/ollama';
 
 export interface HandlerDeps {
   store: AppStore;
@@ -99,7 +100,7 @@ export interface HandlerDeps {
   credentials: Pick<CredentialStore, 'list' | 'remove'>;
   hosting: HostingService;
   /** External processes running through the shared process host. */
-  processes: Pick<ProcessRunner, 'running' | 'cancel'>;
+  processes: Pick<ProcessRunner, 'running' | 'cancel' | 'run'>;
 }
 
 // Arguments arrive from the renderer and are validated at runtime despite the typed contract.
@@ -253,6 +254,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
 export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
+  const aiRequests = new Map<string, { sender: number; controller: AbortController }>();
   const isOpen = (id: string) => Boolean(store.getState().repos.byId[id]);
 
   /** The tab named by the window; operations always say which repository they mean. */
@@ -797,6 +799,30 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
           recorder.commit(root, amend ? t('amend “{subject}”', { subject }) : t('commit “{subject}”', { subject }), () => staging.commit(root, message, amend, { skipHooks: skipHooks === true, onOutput })),
         ),
       );
+    },
+
+    async 'ai:assist'(ctx, repo, task, requestId, target) {
+      const root = tab(repo);
+      if (task !== 'message' && task !== 'review' && task !== 'conflict' && task !== 'commit') throw new TypeError('Unknown AI task');
+      if (typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/.test(requestId) || aiRequests.has(requestId)) throw new TypeError('Invalid AI request ID');
+      if (task === 'conflict' && typeof target !== 'string') throw new TypeError('Conflict path is required');
+      if (task === 'commit') assertSha(target);
+      const setting = effective(root);
+      if (setting['ai.provider'] !== 'ollama') throw new Error('Enable Ollama in Preferences first');
+      const controller = new AbortController();
+      const onClosed = () => controller.abort();
+      ctx.sender.once('destroyed', onClosed);
+      aiRequests.set(requestId, { sender: ctx.sender.id, controller });
+      try {
+        return await askOllama(processes, gitCli.executable, { repo: root, task, model: setting['ai.model'], ...(task === 'conflict' && { path: normalizeRepoRelative(target!) }), ...(task === 'commit' && { sha: target }), signal: controller.signal });
+      } finally {
+        ctx.sender.removeListener('destroyed', onClosed);
+        aiRequests.delete(requestId);
+      }
+    },
+    async 'ai:cancel'(ctx, requestId) {
+      const request = aiRequests.get(requestId);
+      if (request?.sender === ctx.sender.id) request.controller.abort();
     },
 
     async 'hooks:list'(_ctx, repo) {

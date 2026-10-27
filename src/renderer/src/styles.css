@@ -1453,6 +1453,12 @@ button.danger {
   justify-content: space-between;
 }
 
+.ai-assist { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ai-assist .ai-result { flex: 1 0 100%; min-width: 0; }
+.ai-assist .ai-result pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font: inherit; }
+.ai-assist .setting-error { flex: 1 0 100%; margin: 0; }
+.conflict-view > .ai-assist { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+
 .commit-actions label {
   display: flex;
   align-items: center;

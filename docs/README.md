@@ -130,7 +130,7 @@
 | [T-071](tasks/stage-5-settings/T-071-status-bar.md) | Строка статуса внизу окна | review |
 | [T-074](tasks/stage-5-settings/T-074-i18n.md) | Локализация интерфейса (i18n) | review |
 | [T-075](tasks/stage-5-settings/T-075-profile-sync.md) | Хранение профилей и настроек на сервере | draft |
-| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | todo |
+| [T-084](tasks/stage-5-settings/T-084-ai-assist.md) | AI: сообщение коммита, ревью, объяснение конфликта (локально) | in-progress |
 | [T-086](tasks/stage-5-settings/T-086-translation-catalogs.md) | Каталоги переводов и автоматическая проверка | todo |
 | [T-087](tasks/stage-5-settings/T-087-more-languages.md) | Подключение новых языков интерфейса | todo |
 | [T-088](tasks/stage-5-settings/T-088-community-translations.md) | Процесс переводов от сообщества | todo |

@@ -11,6 +11,15 @@ export const settings = {
     'Keyboard shortcuts': 'Сочетания клавиш',
     'Profiles and keys': 'Профили и ключи',
     Integrations: 'Интеграции',
+    'AI assistant': 'AI-помощник',
+    'Off': 'Выключено',
+    'Ollama (local)': 'Ollama (локально)',
+    'Uses your local Ollama server only after you confirm each request. Repository content stays on this computer.':
+      'Использует локальный сервер Ollama только после подтверждения каждого запроса. Данные репозитория остаются на этом компьютере.',
+    'Ollama model': 'Модель Ollama',
+    'Installed Ollama model': 'Установленная модель Ollama',
+    'Name of a model already installed in Ollama, for example qwen2.5-coder.':
+      'Имя уже установленной модели Ollama, например qwen2.5-coder.',
     'Reopen repositories at startup': 'Открывать репозитории при запуске',
     'Open the tabs that were open when Forklift was last closed.': 'Открывать вкладки, которые были открыты при последнем закрытии Forklift.',
     'Fetch automatically': 'Выполнять Fetch автоматически',

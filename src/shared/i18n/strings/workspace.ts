@@ -41,6 +41,15 @@ export const workspace = {
     Unstaged: 'Не в индексе',
     Staged: 'В индексе',
     // CommitPanel
+    'Suggest commit message': 'Предложить сообщение коммита',
+    'Review staged changes': 'Проверить изменения в индексе',
+    'Explain conflict': 'Объяснить конфликт',
+    'Explain commit': 'Объяснить коммит',
+    'Allow local Ollama to process the selected repository content for this request? Local Ollama uses no paid API tokens. Other providers may charge for tokens and will ask separately.':
+      'Разрешить локальной Ollama обработать выбранные данные репозитория для этого запроса? Локальная Ollama не расходует платные API-токены. Другие провайдеры могут брать плату за токены и запросят отдельное согласие.',
+    'Send to Ollama': 'Отправить в Ollama',
+    'Asking Ollama…': 'Запрос к Ollama…',
+    'Use suggestion': 'Применить предложение',
     'Change it with a profile: Preferences → Profiles and keys, or “Switch profile…” in the command palette':
       'Сменить можно профилем: Настройки → Профили и ключи или «Сменить профиль…» в палитре команд',
     'as {name} <{email}>': 'как {name} <{email}>',
