@@ -109,7 +109,7 @@ building with `node scripts/capture-readme.mjs` (on headless Linux, use `xvfb-ru
 
 ### Help translate Forklift
 
-Interface translations are welcome. The [translation guide](docs/translating.md) explains how to edit a catalog, preview a partial language, run checks, and send a pull request. Documentation translations are reviewed separately from interface catalogs.
+Interface translations are welcome. Start the visual translation table with `npm run translations:dev`; the [translation guide](docs/translating.md) explains how to add a language, export JSON, run checks, and send a pull request. Documentation translations are reviewed separately from interface catalogs.
 
 ### Architecture at a glance
 

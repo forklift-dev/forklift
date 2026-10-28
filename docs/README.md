@@ -138,6 +138,7 @@
 | [T-088](tasks/stage-5-settings/T-088-community-translations.md) | Процесс переводов от сообщества | review |
 | [T-089](tasks/stage-5-settings/T-089-stable-message-ids.md) | Устойчивые идентификаторы строк интерфейса | review |
 | [T-090](tasks/stage-5-settings/T-090-translation-platform.md) | Платформа совместного перевода (при появлении потребности) | draft |
+| [T-090a](tasks/stage-5-settings/T-090a-translation-editor.md) | Локальная таблица переводов с экспортом JSON | review |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)
 

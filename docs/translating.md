@@ -4,6 +4,10 @@ Forklift accepts interface translations through pull requests. You can improve a
 
 ## Choose a string
 
+For a visual editor, run `npm ci` and `npm run translations:dev`, then open the local URL printed by Vite. The table shows English and existing translations side by side. Search by text or message ID, select a focus language, and use **Missing only** to find gaps. Add a language code and native name to create a column. Edits are saved in this browser; use **Download JSON** in that column to get a catalog. You can also import an existing catalog. The editor checks placeholders and plural forms before export. Keep a downloaded copy of your work, since browser storage is local to that browser and origin.
+
+For a new language, place the downloaded `xx.json` in `src/shared/i18n/catalogs/` and add its code and native name to [`locales.json`](../src/shared/i18n/locales.json). Run `npm run i18n:check` before sending a pull request. The editor is also available as a static build with `npm run translations:build` (`dist/translator/`).
+
 The English source is [`src/shared/i18n/catalogs/en.json`](../src/shared/i18n/catalogs/en.json). Find the text among its **values**, copy the `msg.…` ID beside it, then find that ID in the target catalog under `src/shared/i18n/catalogs/`. Change the **value**, never the ID. For example:
 
 ```json
