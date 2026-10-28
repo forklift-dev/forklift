@@ -68,6 +68,8 @@ export interface Commands {
   /** `message` null: a lightweight tag; otherwise an annotated one. */
   'tag:create': { args: [repo: string, name: string, sha: string, message: string | null]; result: void };
   'tag:delete': { args: [repo: string, name: string]; result: void };
+  'tag:push': { args: [repo: string, name: string, remote: string]; result: void };
+  'tag:deleteRemote': { args: [repo: string, name: string, remote: string]; result: void };
   /** Stashes uncommitted changes; resolves false when there was nothing to stash. */
   'stash:push': { args: [repo: string, options: { message: string; includeUntracked: boolean; stagedOnly: boolean }]; result: boolean };
   /** Applies a stash (by its sha) and keeps it; conflicts or failures become a notice. */
@@ -310,6 +312,8 @@ const commandChannelSet = {
   'branch:delete': true,
   'tag:create': true,
   'tag:delete': true,
+  'tag:push': true,
+  'tag:deleteRemote': true,
   'stash:push': true,
   'stash:apply': true,
   'stash:pop': true,

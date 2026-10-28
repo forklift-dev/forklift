@@ -431,7 +431,42 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           selectedHash={selectedCommit}
           compareHash={comparison?.right}
           onSelect={selectCommit}
-          onContextMenu={(event, row) => {
+          onContextMenu={(event, row, refLabel) => {
+            if (refLabel) {
+              const tagName = refLabel.startsWith('tag: ') ? refLabel.slice(5) : null;
+              if (tagName) {
+                const tag = data.tags.find((item) => item.name === tagName);
+                if (tag) return openMenu(event, [
+                  { label: t('Check out {tag} (detached)', { tag: tagName }), onSelect: () => refActions.checkout({ kind: 'commit', sha: tag.sha }) },
+                  { label: t('Push tag…'), disabled: data.remotes.length === 0, onSelect: () => refActions.pushTag(tagName) },
+                  { label: t('Delete remote tag…'), disabled: data.remotes.length === 0, danger: true, onSelect: () => refActions.deleteRemoteTag(tagName) },
+                  'separator',
+                  { label: t('Delete tag…'), danger: true, onSelect: () => refActions.deleteTag(tagName) },
+                  { label: t('Copy tag name'), onSelect: () => copyText(tagName) },
+                ]);
+              }
+              const branchName = refLabel.startsWith('HEAD -> ') ? refLabel.slice(8) : refLabel;
+              const local = data.branches.find((branch) => branch.name === branchName);
+              if (local) return openMenu(event, [
+                { label: t('Check out {branch}', { branch: local.name }), disabled: local.name === data.branch.head, onSelect: () => refActions.checkout({ kind: 'branch', name: local.name }) },
+                { label: t('Merge {source} into {target}…', { source: local.name, target: data.branch.head ?? 'HEAD' }), disabled: local.name === data.branch.head || Boolean(data.operation), onSelect: () => refActions.merge(local.name, local.name) },
+                { label: t('Rebase {source} onto {target}…', { source: data.branch.head ?? 'HEAD', target: local.name }), disabled: local.name === data.branch.head || Boolean(data.operation), onSelect: () => refActions.rebase(local.name, local.name) },
+                'separator',
+                { label: t('Set upstream…'), disabled: !data.remoteBranches.length, onSelect: () => refActions.setUpstream(local.name) },
+                { label: t('Rename…'), onSelect: () => refActions.renameBranch(local.name) },
+                { label: t('Delete…'), danger: true, disabled: local.name === data.branch.head, onSelect: () => refActions.deleteBranch(local.name) },
+                { label: t('Copy branch name'), onSelect: () => copyText(local.name) },
+              ]);
+              const remote = data.remoteBranches.find((branch) => branch.name === refLabel);
+              if (remote) return openMenu(event, [
+                { label: t('Check out {branch}', { branch: remote.name }), onSelect: () => refActions.checkout({ kind: 'remote', name: remote.name, remote: remote.remote }) },
+                { label: t('Set {remoteBranch} as upstream for {localBranch}', { remoteBranch: remote.name, localBranch: data.branch.head ?? 'HEAD' }), disabled: !data.branch.head || data.branch.upstream === remote.name, onSelect: () => refActions.trackCurrentWith(remote.name) },
+                'separator',
+                { label: t('Merge {source} into {target}…', { source: remote.name, target: data.branch.head ?? 'HEAD' }), disabled: Boolean(data.operation), onSelect: () => refActions.merge(remote.name, remote.name) },
+                { label: t('Rebase {source} onto {target}…', { source: data.branch.head ?? 'HEAD', target: remote.name }), disabled: Boolean(data.operation), onSelect: () => refActions.rebase(remote.name, remote.name) },
+                { label: t('Copy branch name'), onSelect: () => copyText(remote.name) },
+              ]);
+            }
             const compareFrom = selectedCommit && selectedCommit !== row.hash ? selectedCommit : null;
             if (!compareFrom) selectCommit(row.hash);
             const short = row.hash.slice(0, 7);

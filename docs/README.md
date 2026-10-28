@@ -82,6 +82,9 @@
 | [T-028](tasks/stage-2-git-core/T-028-hunk-view.md) | Hunk View и File View | review |
 | [T-072](tasks/stage-2-git-core/T-072-three-way-merge.md) | 3-way merge: панель BASE и выбор строк | review |
 | [T-077](tasks/stage-2-git-core/T-077-image-and-large-diff.md) | Diff изображений и больших файлов | review |
+| [T-097](tasks/stage-2-git-core/T-097-tag-remote-actions.md) | Управление тегами на удалённом репозитории | review |
+| [T-098](tasks/stage-2-git-core/T-098-graph-ref-context-menus.md) | Контекстные меню меток графа | review |
+| [T-099](tasks/stage-2-git-core/T-099-dismissible-error-banner.md) | Закрываемая полоса ошибки | review |
 
 ### Этап 3 — История и операции над коммитами
 

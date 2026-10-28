@@ -1,8 +1,9 @@
 // Branches and tags through the UI: left panel, double-click checkout with automatic stash (clean, carried
 // over, conflict), create/rename/delete with dialogs, tags from the graph's context menu, remote branches.
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { createRepo, launchApp } from '../harness.mjs';
+import { createRepo, launchApp, tempDir } from '../harness.mjs';
 
 const item = (name) => `document.querySelector('.ref-item[data-ref=${JSON.stringify(name)}]')`;
 const menuItem = (label) => `[...document.querySelectorAll('.context-menu button')].find(b => b.textContent === ${JSON.stringify(label)})`;
@@ -34,6 +35,8 @@ async function doubleClick(page, expression) {
 
 export default async function ({ check }) {
   const { root, git, write } = createRepo();
+  const origin = join(tempDir('forklift-tags-'), 'origin.git');
+  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
   write('shared.txt', 'line 1\nline 2\nline 3\n');
   write('other.txt', 'other\n');
   git('add', '.');
@@ -43,7 +46,7 @@ export default async function ({ check }) {
   git('commit', '-qam', 'Feature change');
   git('switch', '-q', 'main');
   git('update-ref', 'refs/remotes/origin/review', git('rev-parse', 'feature'));
-  git('config', 'remote.origin.url', join(root, 'nowhere'));
+  git('config', 'remote.origin.url', origin);
   git('config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*');
   const read = (path) => readFileSync(join(root, path), 'utf8');
 
@@ -126,6 +129,17 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('.form-dialog button[type=submit]')`);
   check('annotated tag created on the commit', await page.waitFor(`!!${item('v1.0')}`) && git('cat-file', '-t', 'v1.0') === 'tag' && git('rev-parse', 'v1.0^{commit}') === git('rev-parse', 'main~0'));
   check('tag shown in the graph', await page.waitFor(`[...document.querySelectorAll('.ref.tag')].some(r => r.textContent === 'v1.0')`));
+  await contextMenu(page, `[...document.querySelectorAll('.commit-row .ref.tag')].find(r => r.textContent === 'v1.0')`);
+  check('graph tag opens its tag menu rather than the commit menu', await page.evaluate(`!!${menuItem('Push tag…')} && !${menuItem('Create tag here…')}`));
+  await page.press('Escape');
+  await contextMenu(page, item('v1.0'));
+  await page.click(menuItem('Push tag…'));
+  await page.click(`document.querySelector('.form-dialog button[type=submit]')`);
+  check('tag is pushed without pushing a branch', await page.waitFor(`execFileSync('git', ['--git-dir', ${JSON.stringify(origin)}, 'show-ref', '--tags', 'v1.0'], { encoding: 'utf8' }).includes('refs/tags/v1.0')`));
+  await contextMenu(page, item('v1.0'));
+  await page.click(menuItem('Delete remote tag…'));
+  await page.click(`[...document.querySelectorAll('.modal button')].find(b => b.textContent === 'Delete remote tag')`);
+  check('remote tag deleted separately from local tag', await page.waitFor(`(() => { try { execFileSync('git', ['--git-dir', ${JSON.stringify(origin)}, 'show-ref', '--tags', 'v1.0']); return false; } catch { return true; } })()`) && git('tag').includes('v1.0'));
   await contextMenu(page, item('v1.0'));
   await page.click(menuItem('Delete tag…'));
   await page.click(`[...document.querySelectorAll('.modal button')].find(b => b.textContent === 'Delete')`);

@@ -755,6 +755,20 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
       await thenRefresh(root, () => recorder.tag(root, tagName, false, () => branches.deleteTag(root, tagName)));
     },
 
+    async 'tag:push'(_ctx, repo, name, remote) {
+      const root = tab(repo);
+      const tagName = parseName(name, 'tag');
+      const remoteName = parseName(remote, 'remote');
+      await thenRefresh(root, () => network(root, 'push', (run) => remotes.networkCommand(root, ['push', '--progress', '--porcelain', remoteName, `refs/tags/${tagName}:refs/tags/${tagName}`], run)));
+    },
+
+    async 'tag:deleteRemote'(_ctx, repo, name, remote) {
+      const root = tab(repo);
+      const tagName = parseName(name, 'tag');
+      const remoteName = parseName(remote, 'remote');
+      await thenRefresh(root, () => network(root, 'push', (run) => remotes.networkCommand(root, ['push', '--progress', '--porcelain', remoteName, `:refs/tags/${tagName}`], run)));
+    },
+
     async 'index:stage'(_ctx, repo, paths) {
       const root = tab(repo);
       await thenRefresh(root, () => staging.stageFiles(root, parsePaths(paths)));

@@ -304,7 +304,7 @@ export function App() {
       {notices.length > 0 && (
         <div className="error-banner notices" role="alert">
           {notices.join('\n')}
-          <button type="button" onClick={() => void invoke('app:dismissNotices')}>
+          <button type="button" aria-label={t('Dismiss error messages')} onClick={() => void invoke('app:dismissNotices')}>
             {t('Dismiss')}
           </button>
         </div>
@@ -319,6 +319,7 @@ export function App() {
       {error && (
         <div className="error-banner">
           {error.message}
+          <button type="button" aria-label={t('Dismiss error')} onClick={() => setActionError(null)}>{t('Dismiss')}</button>
           {error.logId !== null && (
             <button type="button" className="error-details" onClick={() => showLog(error.logId)}>
               {t('Details')}

@@ -50,6 +50,15 @@ describe('parseProgress', () => {
 });
 
 describe('RemoteService', () => {
+  it('pushes and deletes one remote tag without pushing branches', async () => {
+    sh(mine, 'tag', 'v1.0');
+    await service.networkCommand(mine, ['push', '--porcelain', 'origin', 'refs/tags/v1.0:refs/tags/v1.0'], run());
+    expect(sh(origin, 'show-ref', '--tags', 'v1.0')).toMatch(/ refs\/tags\/v1\.0$/);
+    expect(sh(origin, 'show-ref', '--heads', 'main')).toBeTruthy();
+    await service.networkCommand(mine, ['push', '--porcelain', 'origin', ':refs/tags/v1.0'], run());
+    expect(() => sh(origin, 'show-ref', '--tags', 'v1.0')).toThrow();
+  });
+
   it('fetches with progress and shows the remote branch moved', async () => {
     // Enough objects for git to report progress.
     for (let i = 0; i < 3; i++) theirCommit(`n${i}.txt`, `${i}\n`.repeat(2000), `theirs ${i}`);

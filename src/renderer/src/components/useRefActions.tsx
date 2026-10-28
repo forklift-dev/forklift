@@ -45,6 +45,8 @@ export interface RefActions {
   unsetUpstream(name: string): void;
   deleteBranch(name: string): void;
   deleteTag(name: string): void;
+  pushTag(name: string): void;
+  deleteRemoteTag(name: string): void;
   /** Opens the stash dialog (message, untracked files, only staged). */
   stash(): void;
   applyStash(sha: string): void;
@@ -176,6 +178,28 @@ export function useRefActions(repo: string, data: RepoData, run: RunAction): Ref
         const ok = await confirm({ title: t('Delete tag {name}?', { name }), detail: t('The tag is deleted in this repository only.'), confirmLabel: t('Delete'), danger: true });
         if (ok) await run(() => invoke('tag:delete', repo, name));
       })(),
+
+    pushTag: (name) => void form({
+      title: t('Push tag {name}', { name }),
+      fields: [{ name: 'remote', label: t('field|Remote'), type: 'select', initial: data.remotes.includes('origin') ? 'origin' : data.remotes[0], options: data.remotes.map((remote) => ({ value: remote, label: remote })) }],
+      confirmLabel: t('Push tag'),
+      submit: async (values) => attempt(() => invoke('tag:push', repo, name, String(values['remote']))),
+    }),
+
+    deleteRemoteTag: (name) => {
+      if (!data.remotes.length) return;
+      const remove = async (remote: string) => {
+        const ok = await confirm({ title: t('Delete tag {name} from {remote}?', { name, remote }), detail: t('This removes the tag from the remote repository.'), confirmLabel: t('Delete remote tag'), danger: true });
+        if (ok) await run(() => invoke('tag:deleteRemote', repo, name, remote));
+      };
+      if (data.remotes.length === 1) return void remove(data.remotes[0]!);
+      void form({
+        title: t('Delete remote tag {name}', { name }),
+        fields: [{ name: 'remote', label: t('field|Remote'), type: 'select', initial: data.remotes.includes('origin') ? 'origin' : data.remotes[0], options: data.remotes.map((remote) => ({ value: remote, label: remote })) }],
+        confirmLabel: t('Continue'),
+        submit: async (values) => { await remove(String(values['remote'])); return null; },
+      });
+    },
 
     stash: () =>
       void form({

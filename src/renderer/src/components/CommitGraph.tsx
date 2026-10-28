@@ -131,7 +131,7 @@ function PassingLanes({ style, pages, first, last, top, left, width, scroll, dim
   );
 }
 
-function RefBadges({ labels }: { labels: string[] | undefined }) {
+function RefBadges({ labels, onContextMenu }: { labels: string[] | undefined; onContextMenu?: (event: MouseEvent, label: string) => void }) {
   if (!labels?.length) return null;
   return (
     <>
@@ -139,7 +139,7 @@ function RefBadges({ labels }: { labels: string[] | undefined }) {
         const tag = label.startsWith('tag: ');
         const head = label.startsWith('HEAD');
         return (
-          <span key={label} className={`ref${tag ? ' tag' : ''}${head ? ' head' : ''}`} title={label}>
+          <span key={label} className={`ref${tag ? ' tag' : ''}${head ? ' head' : ''}`} title={label} onContextMenu={onContextMenu ? (event) => { event.stopPropagation(); onContextMenu(event, label); } : undefined}>
             {tag ? label.slice(5) : label.replace(/^HEAD -> /, '')}
             {tag && <span className="codicon codicon-tag ref-icon" aria-hidden="true" />}
           </span>
@@ -157,7 +157,7 @@ interface CommitGraphProps {
   selectedHash: string | null;
   compareHash?: string | null;
   onSelect(hash: string | null, additive?: boolean): void;
-  onContextMenu?(event: MouseEvent, row: HistoryRow): void;
+  onContextMenu?(event: MouseEvent, row: HistoryRow, refLabel?: string): void;
   filter: HistoryFilter;
   /** Rows matching the search, highlighted. */
   matches?: ReadonlySet<number>;
@@ -365,7 +365,7 @@ export function CommitGraph({ repo, data, bisect, selectedHash, compareHash, onS
         onContextMenu={onContextMenu && ((event) => onContextMenu(event, row))}
       >
         <div className={`cell refs${row.stash || data.refs[row.hash]?.length ? ' has-refs' : ''}`}>
-          {row.stash ? <span className="ref stash-ref">stash@{`{${row.stash.index}}`}</span> : <RefBadges labels={data.refs[row.hash]} />}
+          {row.stash ? <span className="ref stash-ref" onContextMenu={(event) => { event.stopPropagation(); onContextMenu?.(event, row, `stash@{${row.stash!.index}}`); }}>stash@{`{${row.stash.index}}`}</span> : <RefBadges labels={data.refs[row.hash]} onContextMenu={(event, label) => onContextMenu?.(event, row, label)} />}
         </div>
         <div className="cell graph" style={{ width: graphWidth }}>
           <GraphCell

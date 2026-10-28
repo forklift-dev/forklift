@@ -42,6 +42,12 @@ export default async function ({ check }) {
   const output = await page.waitFor(`${failed}.querySelector('.log-details')?.textContent`);
   check('with the error message', /Error/.test(output ?? ''), output);
   check('and the failing git command with its output', await page.waitFor(`[...document.querySelectorAll('.log-entry.git.error.nested')].some(e => e.querySelector('.log-title').textContent.startsWith('git pull'))`));
+  await page.press('Escape');
+  await page.waitFor(`!document.querySelector('.log-view')`);
+  await page.click(`document.querySelector('.error-banner:not(.notices) button[aria-label="Dismiss error"]')`);
+  check('the transient error banner can be dismissed', await page.waitFor(`!document.querySelector('.error-banner:not(.notices)')`));
+  await page.click(`document.querySelector('.tab-bar-end [aria-label="Operation log"]')`);
+  await page.waitFor(`!!document.querySelector('.log-view')`);
 
   // Filtering.
   await page.click(`[...document.querySelectorAll('.log-header label')].find(l => l.textContent.includes('Errors only')).querySelector('input')`);
