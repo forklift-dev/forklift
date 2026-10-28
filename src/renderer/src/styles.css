@@ -1581,6 +1581,25 @@ button.danger {
   color: var(--fg-muted);
 }
 
+.commit-range-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.commit-range-list {
+  max-height: min(45vh, 420px);
+  margin: 0 0 16px;
+  padding: 0 8px 0 28px;
+  overflow: auto;
+}
+
+.commit-range-list li {
+  padding: 3px 0;
+}
+
+.commit-range-list code {
+  color: var(--fg-muted);
+}
+
 /* Main area under the toolbar; hidden (not unmounted) while Preferences is open */
 .app-main {
   flex: 1;
@@ -4256,3 +4275,17 @@ select {
 @media (max-height: 650px) {
   .tool-merge-window { gap: 4px; padding: 4px; }
 }
+
+.commit-range-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-dimmed);
+  font-size: 12px;
+}
+
+.commit-range-toolbar span { flex: 1; }
+.commit-range-toolbar button { padding: 3px 8px; }

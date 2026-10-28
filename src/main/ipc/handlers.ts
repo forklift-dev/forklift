@@ -403,6 +403,31 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
       return thenRefresh(root, () => recorder.history(root, t('cherry-pick of {sha}', { sha: sha.slice(0, 7) }), () => commitOps.cherryPick(root, sha)));
     },
 
+    async 'commit:rangePreview'(_ctx, repo, from, to) {
+      const root = tab(repo);
+      assertSha(from);
+      assertSha(to);
+      return commitOps.previewRange(root, from, to);
+    },
+
+    async 'commit:rangeApply'(_ctx, repo, from, to, action) {
+      const root = tab(repo);
+      assertSha(from);
+      assertSha(to);
+      if (action !== 'cherry-pick' && action !== 'revert') throw new TypeError('action must be cherry-pick or revert');
+      let counts = { applied: 0, total: 0 };
+      const result = await thenRefresh(root, () => recorder.history(
+        root,
+        t('Apply commit range ({action})', { action: action === 'cherry-pick' ? t('Cherry-pick') : t('Revert') }),
+        async () => {
+          const range = await commitOps.applyRange(root, from, to, action);
+          counts = { applied: range.applied, total: range.total };
+          return range.result;
+        },
+      ));
+      return { result, ...counts };
+    },
+
     async 'commit:revert'(_ctx, repo, sha) {
       const root = tab(repo);
       assertSha(sha);

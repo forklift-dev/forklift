@@ -100,7 +100,7 @@
 | [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | review |
 | [T-073](tasks/stage-3-history/T-073-bisect.md) | Bisect | review |
 | [T-078](tasks/stage-3-history/T-078-compare-commits.md) | Сравнение двух коммитов и веток | review |
-| [T-102](tasks/stage-3-history/T-102-commit-ranges.md) | Операции над диапазоном коммитов | todo |
+| [T-102](tasks/stage-3-history/T-102-commit-ranges.md) | Операции над диапазоном коммитов | review |
 | [T-080](tasks/stage-3-history/T-080-history-memory-and-graph.md) | История: память и отрисовка графа на сотнях дорожек | review |
 
 ### Этап 4 — Репозитории

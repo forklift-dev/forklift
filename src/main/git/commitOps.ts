@@ -9,6 +9,10 @@ export type ResetMode = 'soft' | 'mixed' | 'hard';
 export type MergeMode = 'default' | 'no-ff' | 'ff-only' | 'squash';
 /** `conflicts`: git stopped to let the user resolve them (the operation banner takes over). */
 export type CommitOpResult = 'done' | 'conflicts';
+export interface CommitRangePreview {
+  commits: { sha: string; subject: string }[];
+  tooLarge: boolean;
+}
 
 export class CommitOpError extends Error {
   constructor(message: string) {
@@ -34,6 +38,39 @@ export class CommitOps {
   /** A new commit that undoes `sha`; the message is git's "Revert ..." one. */
   revert(root: string, sha: string): Promise<CommitOpResult> {
     return this.queue.run(root, () => this.apply(root, 'revert', sha, 'REVERT_HEAD'));
+  }
+
+  previewRange(root: string, from: string, to: string): Promise<CommitRangePreview> {
+    return this.queue.run(root, () => this.range(root, from, to));
+  }
+
+  applyRange(root: string, from: string, to: string, action: 'cherry-pick' | 'revert'): Promise<{ result: CommitOpResult; applied: number; total: number }> {
+    return this.queue.run(root, async () => {
+      const preview = await this.range(root, from, to);
+      if (preview.tooLarge) throw new CommitOpError(t('This range is too large; select a smaller range (500 commits maximum).'));
+      const ordered = action === 'revert' ? [...preview.commits].reverse() : preview.commits;
+      let applied = 0;
+      for (const commit of ordered) {
+        const result = await this.apply(root, action, commit.sha, action === 'revert' ? 'REVERT_HEAD' : 'CHERRY_PICK_HEAD');
+        if (result === 'conflicts') return { result, applied, total: ordered.length };
+        applied++;
+      }
+      return { result: 'done', applied, total: ordered.length };
+    });
+  }
+
+  private async range(root: string, from: string, to: string): Promise<CommitRangePreview> {
+    assertSha(from);
+    assertSha(to);
+    if (from === to) throw new CommitOpError(t('Choose two different commits for the range.'));
+    const ancestor = await this.git.exec(['merge-base', '--is-ancestor', from, to], { cwd: root, readOnly: true, allowedExitCodes: [1] });
+    if (ancestor.exitCode !== 0) throw new CommitOpError(t('The older boundary must be an ancestor of the newer boundary.'));
+    const { stdout } = await this.git.exec(['log', '--reverse', '--format=%H%x00%s', '--max-count=501', `${from}..${to}`], { cwd: root, readOnly: true });
+    const commits = stdout.split('\n').filter(Boolean).map((line) => {
+      const [sha, ...subject] = line.split('\0');
+      return { sha: sha!, subject: subject.join('\0') };
+    });
+    return { commits: commits.slice(0, 500), tooLarge: commits.length > 500 };
   }
 
   /** Moves the current branch (or detached HEAD) to `sha`: soft keeps changes staged, mixed unstaged, hard discards them. */

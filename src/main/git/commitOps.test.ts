@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -33,6 +33,28 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('CommitOps', () => {
+  it('previews and cherry-picks a commit range oldest first', async () => {
+    const base = sh('rev-parse', 'main');
+    const tip = sh('rev-parse', 'feature');
+    const preview = await ops.previewRange(root, base, tip);
+    expect(preview.tooLarge).toBe(false);
+    expect(preview.commits.map((commit) => commit.subject)).toEqual(['add g', 'edit f']);
+    expect(await ops.applyRange(root, base, tip, 'cherry-pick')).toEqual({ result: 'done', applied: 2, total: 2 });
+    expect(sh('log', '-2', '--format=%s')).toBe('edit f\nadd g');
+    expect(read('f.txt')).toBe('feature edit\n');
+    expect(read('g.txt')).toBe('feature file\n');
+  });
+
+  it('reverts a range newest first and rejects a reversed range', async () => {
+    const base = sh('rev-parse', 'main');
+    const tip = sh('rev-parse', 'feature');
+    await ops.applyRange(root, base, tip, 'cherry-pick');
+    expect(await ops.applyRange(root, base, tip, 'revert')).toEqual({ result: 'done', applied: 2, total: 2 });
+    expect(read('f.txt')).toBe('base\n');
+    expect(existsSync(join(root, 'g.txt'))).toBe(false);
+    await expect(ops.previewRange(root, tip, base)).rejects.toThrow(/ancestor/);
+  });
+
   it('cherry-picks a commit onto the current branch', async () => {
     const addG = sh('rev-parse', 'feature~1');
     expect(await ops.cherryPick(root, addG)).toBe('done');

@@ -51,6 +51,8 @@ export interface Commands {
   'repo:files': { args: [repo: string]; result: { paths: string[]; truncated: boolean } };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
+  'commit:rangePreview': { args: [repo: string, from: string, to: string]; result: { commits: { sha: string; subject: string }[]; tooLarge: boolean } };
+  'commit:rangeApply': { args: [repo: string, from: string, to: string, action: 'cherry-pick' | 'revert']; result: { result: 'done' | 'conflicts'; applied: number; total: number } };
   'comparison:details': { args: [repo: string, left: string, right: string, mode: ComparisonMode]; result: ComparisonDetails };
   /** Both versions of one file for the built-in diff view. */
   'diff:file': { args: [repo: string, target: DiffTarget]; result: FileDiff };
@@ -322,6 +324,8 @@ const commandChannelSet = {
   'stash:pop': true,
   'stash:drop': true,
   'commit:cherryPick': true,
+  'commit:rangePreview': true,
+  'commit:rangeApply': true,
   'commit:revert': true,
   'commit:reset': true,
   'bisect:status': true,

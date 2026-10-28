@@ -47,6 +47,10 @@ interface RepoWorkspaceProps {
 export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps) {
   const repo = data.root;
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
+  const experimentalFeatures = useAppState((state) => state.settings.values['general.experimentalFeatures']);
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [commitRange, setCommitRange] = useState<{ from: string; to: string } | null>(null);
+  const rangePreview = useCommand(experimentalFeatures && commitRange ? 'commit:rangePreview' : null, [repo, commitRange?.from ?? '', commitRange?.to ?? ''], { reloadKey: data.historyVersion });
   const [comparison, setComparison] = useState<{ left: string; right: string; mode: ComparisonMode } | null>(null);
   const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
   const [conflictPath, setConflictPath] = useState<string | null>(null);
@@ -100,6 +104,20 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
 
   const { confirm, dialog } = useConfirm();
   const refActions = useRefActions(repo, data, run);
+  const applyCommitRange = async (action: 'cherry-pick' | 'revert') => {
+    if (!commitRange || !rangePreview.data || rangePreview.data.tooLarge) return;
+    const count = rangePreview.data.commits.length;
+    const ok = await confirm({
+      title: t('{action} selected range ({count} commits)?', { action: action === 'cherry-pick' ? t('Cherry-pick') : t('Revert'), count }),
+      detail: t('Commits are applied in Git-safe order. The operation stops at the first conflict.'),
+      confirmLabel: action === 'cherry-pick' ? t('Cherry-pick range') : t('Revert range'),
+      danger: action === 'revert',
+    });
+    if (!ok) return;
+    await run(() => invoke('commit:rangeApply', repo, commitRange.from, commitRange.to, action));
+    setCommitRange(null);
+    setRangeStart(null);
+  };
   const gitflow = useGitflow(repo, data);
   const { open: openMenu, menu } = useContextMenu();
   const compareWith = (sha: string, mode: ComparisonMode = 'direct') => {
@@ -421,6 +439,11 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           onStep={step}
           error={found.error}
         />
+        {experimentalFeatures && <div className="commit-range-toolbar" aria-label={t('Commit range')}>
+          <span>{rangeStart ? t('Older: {sha}', { sha: rangeStart.slice(0, 7) }) : t('Choose two different commits for the range.')}</span>
+          <button type="button" disabled={!selectedCommit} onClick={() => { if (!selectedCommit) return; if (!rangeStart) setRangeStart(selectedCommit); else if (selectedCommit !== rangeStart) setCommitRange({ from: rangeStart, to: selectedCommit }); }}>{rangeStart ? t('Select newer range boundary') : t('Select older range boundary')}</button>
+          {rangeStart && <button type="button" onClick={() => { setRangeStart(null); setCommitRange(null); }}>{t('Clear range selection')}</button>}
+        </div>}
         <CommitGraph
           repo={repo}
           data={data}
@@ -483,6 +506,12 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
             const gitBusy = data.operation !== null;
             const busy = gitBusy || Boolean(bisect.data);
             openMenu(event, [
+              ...(experimentalFeatures ? [
+                { label: t('Select older range boundary'), onSelect: () => { setRangeStart(row.hash); setCommitRange(null); } },
+                { label: t('Select newer range boundary'), disabled: !rangeStart || rangeStart === row.hash, onSelect: () => rangeStart && setCommitRange({ from: rangeStart, to: row.hash }) },
+                ...(rangeStart ? [{ label: t('Clear range selection'), onSelect: () => { setRangeStart(null); setCommitRange(null); } }] : []),
+                'separator' as const,
+              ] : []),
               ...(compareFrom ? [
                 { label: t('Compare with selected commit (A..B)'), onSelect: () => setComparison({ left: compareFrom, right: row.hash, mode: 'direct' as const }) },
                 { label: t('Compare from common ancestor (A...B)'), onSelect: () => setComparison({ left: compareFrom, right: row.hash, mode: 'merge-base' as const }) },
@@ -588,6 +617,26 @@ export function RepoWorkspace({ data, run, runInBackground }: RepoWorkspaceProps
           </>
         )}
       </aside>
+      {experimentalFeatures && commitRange && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setCommitRange(null); setRangeStart(null); } }}>
+          <section className="modal form-dialog commit-range-dialog" role="dialog" aria-modal="true" aria-label={t('Selected commit range')}>
+            <h2>{t('Selected commit range')}</h2>
+            <p>{t('Older: {sha}', { sha: commitRange.from.slice(0, 7) })} · {t('Newer: {sha}', { sha: commitRange.to.slice(0, 7) })}</p>
+            {rangePreview.loading && <p>{t('Loading…')}</p>}
+            {rangePreview.error && <p className="setting-error" role="alert">{rangePreview.error}</p>}
+            {rangePreview.data?.tooLarge && <p className="setting-error" role="alert">{t('This range is too large; select a smaller range (500 commits maximum).')}</p>}
+            {rangePreview.data && !rangePreview.data.tooLarge && <ol className="commit-range-list">
+              {rangePreview.data.commits.map((commit) => <li key={commit.sha}><code>{commit.sha.slice(0, 7)}</code> {commit.subject}</li>)}
+            </ol>}
+            <p className="scope-note">{t('Commits are applied in Git-safe order. The operation stops at the first conflict.')}</p>
+            <div className="modal-actions">
+              <button type="button" onClick={() => { setCommitRange(null); setRangeStart(null); }}>{t('Cancel')}</button>
+              <button type="button" disabled={rangePreview.loading || !rangePreview.data?.commits.length || rangePreview.data.tooLarge || Boolean(data.operation)} onClick={() => void applyCommitRange('revert')}>{t('Revert range')}</button>
+              <button type="button" className="primary" disabled={rangePreview.loading || !rangePreview.data?.commits.length || rangePreview.data.tooLarge || Boolean(data.operation)} onClick={() => void applyCommitRange('cherry-pick')}>{t('Cherry-pick range')}</button>
+            </div>
+          </section>
+        </div>
+      )}
       {dialog}
       {formDialog}
       {refActions.dialogs}

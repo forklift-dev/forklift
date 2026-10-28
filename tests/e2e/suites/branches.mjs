@@ -10,8 +10,9 @@ const menuItem = (label) => `[...document.querySelectorAll('.context-menu button
 const currentBranch = `document.querySelector('.toolbar .branch')?.firstChild?.textContent`;
 
 async function contextMenu(page, expression) {
+  await page.waitFor(`!document.querySelector('.context-menu')`);
   await page.evaluate(`(() => { const el = ${expression}; const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.x + 30, clientY: r.y + 8 })); })()`);
-  await page.waitFor(`!!document.querySelector('.context-menu')`);
+  await page.waitFor(`!!document.querySelector('.context-menu button')`);
 }
 
 /** The branch's upstream once it equals `expected` (null: none), waiting for the app's command to finish. */
@@ -192,4 +193,28 @@ export default async function ({ check }) {
   check('cleanup deletes the selected merged branch', await page.waitFor(`!${item('merged-copy')}`));
   await page.invoke('settings:update', { values: { 'general.experimentalFeatures': false } });
   check('disabling experimental features hides branch cleanup immediately', await page.waitFor(`!document.querySelector('[aria-label="Clean up branches"]')`));
+
+  git('switch', '-qc', 'range-source');
+  write('range-one.txt', 'one\n');
+  git('add', '.');
+  git('commit', '-qm', 'range one');
+  write('range-two.txt', 'two\n');
+  git('add', '.');
+  git('commit', '-qm', 'range two');
+  const rangeTip = git('rev-parse', 'HEAD');
+  const rangeBase = git('rev-parse', 'HEAD~2');
+  git('switch', '-q', 'review');
+  await page.invoke('repo:refresh', root);
+  await page.invoke('settings:update', { values: { 'general.experimentalFeatures': true } });
+  await page.waitFor(`!!document.querySelector('[aria-label="Clean up branches"]')`);
+  await page.waitFor(`!!document.querySelector('.commit-row[data-hash="${rangeBase}"]')`);
+  await page.click(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeBase)}]')`);
+  await page.waitFor(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeBase)}]')?.classList.contains('selected')`);
+  await page.click(`document.querySelector('.commit-range-toolbar button')`);
+  await page.click(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeTip)}]')`);
+  await page.waitFor(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeTip)}]')?.classList.contains('selected')`);
+  await page.click(`document.querySelector('.commit-range-toolbar button')`);
+  check('range preview lists commits in oldest-first order', await page.waitFor(`document.querySelector('.commit-range-list')?.textContent.includes('range one') && document.querySelector('.commit-range-list')?.textContent.indexOf('range one') < document.querySelector('.commit-range-list')?.textContent.indexOf('range two')`));
+  await page.invoke('commit:rangeApply', root, rangeBase, rangeTip, 'cherry-pick');
+  check('cherry-pick applies the selected range in order', await page.waitFor(`git('log', '-2', '--format=%s') === 'range two\\nrange one'`) && git('log', '-2', '--format=%s') === 'range two\nrange one');
 }
