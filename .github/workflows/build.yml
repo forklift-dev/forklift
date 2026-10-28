@@ -4,7 +4,7 @@
 # be further matrix entries (ubuntu-22.04-arm, windows-11-arm, macos-15-intel). Packages are not signed yet (T-004): macOS asks to open the app with right-click → Open, Windows
 # SmartScreen shows "More info → Run anyway".
 #
-# Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.4.1): after all packages
+# Run it by hand (Actions → Build → Run workflow), or push a tag v* (e.g. v0.5.0): after all packages
 # succeed, a pre-release is published with the installers from every platform.
 name: Build
 
