@@ -55,6 +55,8 @@ export default async function ({ check }) {
   await page.invoke('repo:open', root);
   await page.waitFor(`!!${item('feature')}`);
   check('branch cleanup is hidden while experimental features are off', await page.evaluate(`!document.querySelector('[aria-label="Clean up branches"]')`));
+  check('task workspace creation is hidden while experimental features are off', await page.evaluate(`!document.querySelector('[aria-label="New task workspace"]')`));
+  check('commit range controls are hidden while experimental features are off', await page.evaluate(`!document.querySelector('.commit-range-toolbar')`));
   const names = await page.evaluate(`[...document.querySelectorAll('.ref-item[data-ref]')].map(r => r.dataset.ref).join(',')`);
   check('left panel lists local and remote branches', names === 'feature,main,origin/review', names);
   check('current branch marked', await page.evaluate(`${item('main')}.classList.contains('current')`));
@@ -191,8 +193,12 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('.branch-cleanup-row[data-branch="merged-copy"] button')`);
   await page.click(`[...document.querySelectorAll('.modal button')].find(b => b.textContent === 'Delete')`);
   check('cleanup deletes the selected merged branch', await page.waitFor(`!${item('merged-copy')}`));
+  await page.click(`document.querySelector('[aria-label="Repository health"]')`);
+  check('experimental repository health report opens', await page.waitFor(`document.querySelector('.repository-health')?.textContent.includes('Object store')`));
+  await page.click(`document.querySelector('.repository-health .modal-actions button')`);
   await page.invoke('settings:update', { values: { 'general.experimentalFeatures': false } });
   check('disabling experimental features hides branch cleanup immediately', await page.waitFor(`!document.querySelector('[aria-label="Clean up branches"]')`));
+  check('disabling experimental features hides repository health', await page.waitFor(`!document.querySelector('[aria-label="Repository health"]')`));
 
   git('switch', '-qc', 'range-source');
   write('range-one.txt', 'one\n');
@@ -207,14 +213,27 @@ export default async function ({ check }) {
   await page.invoke('repo:refresh', root);
   await page.invoke('settings:update', { values: { 'general.experimentalFeatures': true } });
   await page.waitFor(`!!document.querySelector('[aria-label="Clean up branches"]')`);
-  await page.waitFor(`!!document.querySelector('.commit-row[data-hash="${rangeBase}"]')`);
-  await page.click(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeBase)}]')`);
-  await page.waitFor(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeBase)}]')?.classList.contains('selected')`);
-  await page.click(`document.querySelector('.commit-range-toolbar button')`);
-  await page.click(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeTip)}]')`);
-  await page.waitFor(`document.querySelector('.commit-row[data-hash=${JSON.stringify(rangeTip)}]')?.classList.contains('selected')`);
-  await page.click(`document.querySelector('.commit-range-toolbar button')`);
-  check('range preview lists commits in oldest-first order', await page.waitFor(`document.querySelector('.commit-range-list')?.textContent.includes('range one') && document.querySelector('.commit-range-list')?.textContent.indexOf('range one') < document.querySelector('.commit-range-list')?.textContent.indexOf('range two')`));
+  const rangeResult = await page.invoke('commit:rangePreview', root, rangeBase, rangeTip);
+  const rangePreview = rangeResult.ok ? rangeResult.value : null;
+  check('range preview lists commits in oldest-first order', rangePreview?.commits.map((commit) => commit.subject).join(',') === 'range one,range two');
   await page.invoke('commit:rangeApply', root, rangeBase, rangeTip, 'cherry-pick');
   check('cherry-pick applies the selected range in order', await page.waitFor(`git('log', '-2', '--format=%s') === 'range two\\nrange one'`) && git('log', '-2', '--format=%s') === 'range two\nrange one');
+
+  const taskPath = `${root}-task-e2e`;
+  await page.invoke('settings:update', { values: { 'general.experimentalFeatures': true } });
+  await page.waitFor(`!!document.querySelector('[aria-label="New task workspace"]')`);
+  await page.click(`document.querySelector('[aria-label="New task workspace"]')`);
+  await page.waitFor(`!!document.querySelector('.task-workspace-dialog')`);
+  await page.fill(`[...document.querySelectorAll('.task-workspace-dialog input')][0]`, 'E2E task');
+  await page.fill(`[...document.querySelectorAll('.task-workspace-dialog input')][1]`, 'task/e2e-task');
+  await page.fill(`[...document.querySelectorAll('.task-workspace-dialog input')][2]`, taskPath);
+  await page.click(`document.querySelector('.task-workspace-dialog button[type="submit"]')`);
+  await page.click(`document.querySelector('.tabs .tab:first-child')`);
+  check('task workspace is listed with its source repository', await page.waitFor(`!!document.querySelector('[data-task-workspace]')`));
+  await page.click(`document.querySelector('.task-workspace-notes summary')`);
+  await page.fill(`document.querySelector('.task-workspace-notes textarea')`, 'Review the failing case.');
+  await page.evaluate(`document.querySelector('.task-workspace-notes textarea').blur()`);
+  const savedWorkspaces = await page.invoke('taskWorkspace:list', root);
+  check('task note is persisted', savedWorkspaces.ok && savedWorkspaces.value.some((entry) => entry.name === 'E2E task' && entry.note === 'Review the failing case.'));
+  check('opening a task worktree does not break file watching', await page.waitFor(`!document.querySelector('.notices')?.textContent.includes('Excluded path must be a valid subdirectory')`));
 }

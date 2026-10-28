@@ -14,6 +14,7 @@ import type { CommitSignature, KeysInfo, ProfileApplied, SshKeyInfo } from './pr
 import type { CloneRequest, CreateDefaults, InitRequest } from './repos';
 import type { SubmoduleInfo } from './submodules';
 import type { WorktreeAddRequest, WorktreeInfo } from './worktrees';
+import type { TaskWorkspace, TaskWorkspaceCreate } from './taskWorkspaces';
 import type { BlameResult, FileHistoryEntry } from './fileHistory';
 import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResult } from './history';
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
@@ -49,6 +50,7 @@ export interface Commands {
   'history:find': { args: [repo: string, version: string, filter: HistoryFilter, text: string]; result: FoundCommit[] };
   /** Files of the working tree (tracked and untracked, not ignored), for the finder. */
   'repo:files': { args: [repo: string]; result: { paths: string[]; truncated: boolean } };
+  'repo:health': { args: [repo: string]; result: { healthy: boolean; integrity: string[]; objectStore: { loose: number; packed: number; size: string; packs: number }; largeFiles: { path: string; size: number }[]; scannedObjects: number; truncated: boolean } };
   /** Metadata and changed files of a commit. */
   'commit:details': { args: [repo: string, sha: string]; result: CommitDetails };
   'commit:rangePreview': { args: [repo: string, from: string, to: string]; result: { commits: { sha: string; subject: string }[]; tooLarge: boolean } };
@@ -262,6 +264,9 @@ export interface Commands {
   'worktree:remove': { args: [repo: string, path: string, force: boolean]; result: void };
   'worktree:lock': { args: [repo: string, path: string, locked: boolean]; result: void };
   'worktree:prune': { args: [repo: string]; result: void };
+  'taskWorkspace:list': { args: [repo: string]; result: TaskWorkspace[] };
+  'taskWorkspace:create': { args: [repo: string, input: TaskWorkspaceCreate]; result: TaskWorkspace };
+  'taskWorkspace:updateNote': { args: [repo: string, id: string, note: string]; result: void };
   /** Gravatar pictures (data: URLs) by email; empty unless the setting is on. */
   'avatars:get': { args: [emails: string[]]; result: Record<string, string> };
   /** Opens userData/themes in the file manager. */
@@ -307,6 +312,7 @@ const commandChannelSet = {
   'history:search': true,
   'history:find': true,
   'repo:files': true,
+  'repo:health': true,
   'diff:file': true,
   'ref:validateName': true,
   'branch:create': true,
@@ -421,6 +427,9 @@ const commandChannelSet = {
   'worktree:remove': true,
   'worktree:lock': true,
   'worktree:prune': true,
+  'taskWorkspace:list': true,
+  'taskWorkspace:create': true,
+  'taskWorkspace:updateNote': true,
   'submodule:list': true,
   'submodule:add': true,
   'submodule:update': true,

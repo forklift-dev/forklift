@@ -75,6 +75,8 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
   const [mergedBranches, setMergedBranches] = useState<string[] | null>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const health = useCommand(healthOpen && experimentalFeatures ? 'repo:health' : null, [data.root]);
   const openCleanup = async () => {
     setCleanupOpen(true);
     setCleanupError(null);
@@ -108,6 +110,12 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
   };
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [taskDialog, setTaskDialog] = useState(false);
+  const [taskName, setTaskName] = useState('');
+  const [taskBranch, setTaskBranch] = useState('');
+  const [taskPath, setTaskPath] = useState('');
+  const [taskError, setTaskError] = useState<string | null>(null);
+  const taskWorkspaceList = useCommand(experimentalFeatures ? 'taskWorkspace:list' : null, [data.root], { reloadKey: data.loadedAt, keepPrevious: true });
   const toggle = (id: string) => setCollapsed((current) => ({ ...current, [id]: !current[id] }));
   const match = (name: string) => name.toLowerCase().includes(filter.trim().toLowerCase());
   const head = data.branch.oid;
@@ -169,6 +177,7 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
           onToggle={toggle}
           action={<>
             {experimentalFeatures && <button type="button" className="icon-button" aria-label={t('Clean up branches')} title={t('Clean up branches')} onClick={() => void openCleanup()}><span className="codicon codicon-trash" aria-hidden="true" /></button>}
+            {experimentalFeatures && <button type="button" className="icon-button" aria-label={t('Repository health')} title={t('Repository health')} onClick={() => setHealthOpen(true)}><span className="codicon codicon-pulse" aria-hidden="true" /></button>}
             {head && addButton(t('Create branch'), () => actions.createBranch(head, headLabel(data)))}
           </>}
         >
@@ -491,11 +500,25 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
           collapsed={Boolean(collapsed['worktrees'])}
           onToggle={toggle}
           action={
-            <button type="button" className="icon-button" aria-label={t('Add a working tree')} title={t('Add a working tree')} onClick={() => actions.addWorktree()}>
-              <span className="codicon codicon-add" aria-hidden="true" />
-            </button>
+            <>
+              {experimentalFeatures && <button type="button" className="icon-button" aria-label={t('New task workspace')} title={t('New task workspace')} onClick={() => { setTaskName(''); setTaskBranch(''); setTaskPath(`${data.root}-task`); setTaskError(null); setTaskDialog(true); }}><span className="codicon codicon-sparkle" aria-hidden="true" /></button>}
+              <button type="button" className="icon-button" aria-label={t('Add a working tree')} title={t('Add a working tree')} onClick={() => actions.addWorktree()}>
+                <span className="codicon codicon-add" aria-hidden="true" />
+              </button>
+            </>
           }
         >
+          {experimentalFeatures && (taskWorkspaceList.data ?? []).filter((workspace) => match(workspace.name) || match(workspace.branch)).map((workspace) => (
+            <li key={workspace.id} className="ref-item task-workspace" data-task-workspace={workspace.id}>
+              <span className="codicon codicon-notebook" aria-hidden="true" />
+              <span className="ref-name">{workspace.name}</span>
+              <span className="task-workspace-actions">
+                <button type="button" aria-label={t('Open task workspace')} title={t('Open task workspace')} onClick={() => actions.openWorktree(workspace.path)}><span className="codicon codicon-folder-opened" aria-hidden="true" /></button>
+                <button type="button" aria-label={t('Open task terminal')} title={t('Open task terminal')} onClick={() => void invoke('repo:open', workspace.path).then(() => invoke('repo:openTerminal', workspace.path))}><span className="codicon codicon-terminal" aria-hidden="true" /></button>
+              </span>
+              <details className="task-workspace-notes"><summary>{t('Task note')}</summary><textarea defaultValue={workspace.note} maxLength={20000} aria-label={t('Task note')} onBlur={(event) => { const note = event.currentTarget.value; if (note !== workspace.note) void invoke('taskWorkspace:updateNote', data.root, workspace.id, note); }} /></details>
+            </li>
+          ))}
           {worktrees.map((tree) => {
             const name = tree.path.split(/[\\/]/).filter(Boolean).pop() ?? tree.path;
             const note = [tree.current && t('this tab'), tree.main && t('worktree|main'), tree.locked !== null && t('locked'), tree.prunable && t('missing')].filter(Boolean).join(', ');
@@ -551,6 +574,46 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
             {!cleanupLoading && !cleanupError && !(mergedBranches ?? []).some((name) => name !== data.branch.head) && <p className="empty-note">{t('No merged branches to clean up.')}</p>}
             <div className="modal-actions"><button type="button" onClick={() => setCleanupOpen(false)}>{t('Close')}</button></div>
           </section>
+        </div>
+      )}
+      {healthOpen && experimentalFeatures && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setHealthOpen(false); }}>
+          <section className="modal form-dialog repository-health" role="dialog" aria-modal="true" aria-label={t('Repository health')}>
+            <h2>{t('Repository health')}</h2>
+            {health.loading && <p>{t('Loading…')}</p>}
+            {health.error && <p className="setting-error" role="alert">{health.error}</p>}
+            {health.data && <>
+              <p className={health.data.healthy ? 'health-good' : 'setting-error'}>{health.data.healthy ? t('No repository integrity problems found.') : t('Repository integrity needs attention.')}</p>
+              <p>{t('Object store')}: {health.data.objectStore.size} · {t('Loose')}: {health.data.objectStore.loose} · {t('Packed')}: {health.data.objectStore.packed} · {t('Packs')}: {health.data.objectStore.packs}</p>
+              {health.data.integrity.length > 0 && <ul>{health.data.integrity.map((line, index) => <li key={index}><code>{line}</code></li>)}</ul>}
+              <h3>{t('Large files (10 MB or more)')}</h3>
+              {health.data.largeFiles.length ? <ul>{health.data.largeFiles.map((file) => <li key={file.path}><code>{file.path}</code> · {(file.size / 1024 / 1024).toFixed(1)} MB</li>)}</ul> : <p>{t('No large tracked files found.')}</p>}
+              {health.data.truncated && <p className="scope-note">{t('Only the first {count} reachable objects were scanned.', { count: health.data.scannedObjects })}</p>}
+            </>}
+            <div className="modal-actions"><button type="button" onClick={() => setHealthOpen(false)}>{t('Close')}</button></div>
+          </section>
+        </div>
+      )}
+      {taskDialog && experimentalFeatures && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTaskDialog(false); }}>
+          <form className="modal form-dialog task-workspace-dialog" role="dialog" aria-modal="true" aria-label={t('New task workspace')} onSubmit={(event) => {
+            event.preventDefault();
+            void (async () => {
+              try {
+                const workspace = await invoke('taskWorkspace:create', data.root, { name: taskName, branch: taskBranch, path: taskPath });
+                await invoke('repo:open', workspace.path);
+                setTaskDialog(false);
+              } catch (error) { setTaskError(error instanceof Error ? error.message : String(error)); }
+            })();
+          }}>
+            <h2>{t('New task workspace')}</h2>
+            <label>{t('Task name')}<input autoFocus required maxLength={120} value={taskName} onChange={(event) => { const value = event.target.value; setTaskName(value); const slug = value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, ''); if (slug) { setTaskBranch(`task/${slug}`); setTaskPath(`${data.root}-${slug}`); } }} /></label>
+            <label>{t('Branch')}<input required value={taskBranch} onChange={(event) => setTaskBranch(event.target.value)} /></label>
+            <label>{t('Working tree folder')}<input required value={taskPath} onChange={(event) => setTaskPath(event.target.value)} /></label>
+            <p className="scope-note">{t('Creates a worktree and branch. No agent or shell commands run automatically.')}</p>
+            {taskError && <p className="setting-error" role="alert">{taskError}</p>}
+            <div className="modal-actions"><button type="button" onClick={() => setTaskDialog(false)}>{t('Cancel')}</button><button type="submit" className="primary">{t('Create task workspace')}</button></div>
+          </form>
         </div>
       )}
     </aside>

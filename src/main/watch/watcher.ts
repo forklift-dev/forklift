@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { Ignore, Repository } from '@axosoft/nodegit';
 import nsfw from 'nsfw';
 import { classifyPath } from './paths';
@@ -42,10 +42,13 @@ export class RepoWatcher {
   }
 
   private async watch(path: string): Promise<void> {
+    const objectsPath = join(this.gitDir, 'objects');
+    const objectsRelative = relative(path, objectsPath);
+    const excludeObjects = Boolean(objectsRelative && objectsRelative !== '..' && !objectsRelative.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) && !isAbsolute(objectsRelative));
     const watcher = await nsfw(path, (events) => void this.onEvents(events), {
       debounceMS: 100,
       // Object files churn during fetch and gc and never change what is shown.
-      excludedPaths: [join(this.gitDir, 'objects')],
+      ...(excludeObjects ? { excludedPaths: [objectsPath] as [string] } : {}),
       errorCallback: (error: unknown) => this.events.failed(error instanceof Error ? error : new Error(String(error))),
     });
     await watcher.start();

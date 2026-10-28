@@ -11,6 +11,7 @@ import { RepoQueue } from './git/repoQueue';
 import { StashService } from './git/stash';
 import { ConflictService } from './git/conflicts';
 import { CommitOps } from './git/commitOps';
+import { RepositoryHealthService } from './git/repositoryHealth';
 import { BisectService } from './git/bisect';
 import { InteractiveRebase } from './git/interactiveRebase';
 import { UndoService } from './git/undo';
@@ -59,6 +60,7 @@ import { SubmoduleService } from './git/submodules';
 import { WorktreeService } from './git/worktrees';
 import { LfsService } from './git/lfs';
 import { GitflowService } from './git/gitflow';
+import { TaskWorkspaceService } from './repos/taskWorkspaces';
 import { undoChanged } from './store/reposSlice';
 import { WatchManager } from './watch/manager';
 import { createMainWindow } from './window';
@@ -144,6 +146,9 @@ async function start() {
   const branches = new BranchService(gitCli, repoQueue, stashes);
   const conflicts = new ConflictService(gitCli, repoQueue);
   const commitOps = new CommitOps(gitCli, repoQueue);
+  const repositoryHealth = new RepositoryHealthService(gitCli);
+  const worktrees = new WorktreeService(gitCli, repoQueue);
+  const taskWorkspaces = new TaskWorkspaceService(worktrees, join(app.getPath('userData'), 'task-workspaces.json'));
   const bisect = new BisectService(gitCli, repoQueue);
   // Credential prompts: shown in the window; answers go straight to the waiting git process. Passwords the
   // user asks to remember are kept by the app's credential helper, encrypted with the system keychain.
@@ -241,7 +246,7 @@ async function start() {
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli, new HistoryStore(join(app.getPath('userData'), 'history')));
   const checkRelease = () => checkReleases(app.getVersion(), process.platform, process.arch, (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init));
-  registerCommands(createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, aiTokens, aiFetch: (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init), processes: runner, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  registerCommands(createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, repositoryHealth, taskWorkspaces, bisect, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees, lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, aiTokens, aiFetch: (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init), processes: runner, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));

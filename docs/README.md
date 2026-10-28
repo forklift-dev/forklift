@@ -117,8 +117,8 @@
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | review |
 | [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | review |
 | [T-095](tasks/stage-4-repositories/T-095-upstream-selector.md) | Удобный выбор upstream для ветки | review |
-| [T-103](tasks/stage-4-repositories/T-103-repository-health.md) | Диагностика здоровья репозитория | todo |
-| [T-104](tasks/stage-4-repositories/T-104-task-workspaces.md) | Рабочие места для задач | todo |
+| [T-103](tasks/stage-4-repositories/T-103-repository-health.md) | Диагностика здоровья репозитория | review |
+| [T-104](tasks/stage-4-repositories/T-104-task-workspaces.md) | Рабочие места для задач | review |
 
 ### Этап 5 — Настройки и удобство
 
@@ -133,7 +133,7 @@
 | [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
 | [T-096](tasks/stage-5-settings/T-096-update-delivery-plan.md) | Исследовать способ доставки обновлений приложения | todo |
 | [T-096a](tasks/stage-5-settings/T-096a-github-release-check.md) | Проверка новых релизов на GitHub | review |
-| [T-100](tasks/stage-5-settings/T-100-experimental-features.md) | Переключатель экспериментальных функций | in-progress |
+| [T-100](tasks/stage-5-settings/T-100-experimental-features.md) | Переключатель экспериментальных функций | review |
 | [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | review |
 | [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | review |
 | [T-059](tasks/stage-5-settings/T-059-resizable-layout.md) | Изменяемая ширина колонок графа и боковых панелей | review |

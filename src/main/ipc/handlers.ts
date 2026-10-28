@@ -13,6 +13,8 @@ import type { BranchService, SwitchResult } from '../git/branches';
 import type { ApplyOutcome, StashService } from '../git/stash';
 import type { ConflictService } from '../git/conflicts';
 import type { CommitOps } from '../git/commitOps';
+import type { RepositoryHealthService } from '../git/repositoryHealth';
+import type { TaskWorkspaceService } from '../repos/taskWorkspaces';
 import type { BisectService } from '../git/bisect';
 import type { InteractiveRebase } from '../git/interactiveRebase';
 import type { UndoService } from '../git/undo';
@@ -75,6 +77,8 @@ export interface HandlerDeps {
   stashes: StashService;
   conflicts: ConflictService;
   commitOps: CommitOps;
+  repositoryHealth: RepositoryHealthService;
+  taskWorkspaces: TaskWorkspaceService;
   bisect: BisectService;
   remotes: RemoteService;
   networkOps: NetworkOps;
@@ -256,7 +260,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, aiTokens, aiFetch, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, repositoryHealth, taskWorkspaces, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, aiTokens, aiFetch, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const aiRequests = new Map<string, { sender: number; controller: AbortController }>();
@@ -408,6 +412,10 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
       assertSha(from);
       assertSha(to);
       return commitOps.previewRange(root, from, to);
+    },
+
+    async 'repo:health'(_ctx, repo) {
+      return repositoryHealth.scan(tab(repo));
     },
 
     async 'commit:rangeApply'(_ctx, repo, from, to, action) {
@@ -1389,6 +1397,22 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
     async 'worktree:prune'(_ctx, repo) {
       const root = tab(repo);
       await thenRefresh(root, () => worktrees.prune(root));
+    },
+
+    async 'taskWorkspace:list'(_ctx, repo) {
+      return taskWorkspaces.list(tab(repo));
+    },
+
+    async 'taskWorkspace:create'(_ctx, repo, input) {
+      const root = tab(repo);
+      if (!input || typeof input.name !== 'string' || typeof input.branch !== 'string' || typeof input.path !== 'string') throw new TypeError(t('Invalid task workspace details'));
+      const workspace = await thenRefresh(root, () => taskWorkspaces.create(root, input));
+      return workspace;
+    },
+
+    async 'taskWorkspace:updateNote'(_ctx, repo, id, note) {
+      if (typeof id !== 'string' || typeof note !== 'string') throw new TypeError('Invalid task workspace note');
+      await taskWorkspaces.updateNote(tab(repo), id, note);
     },
 
     async 'avatars:get'(_ctx, emails) {

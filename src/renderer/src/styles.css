@@ -4289,3 +4289,14 @@ select {
 
 .commit-range-toolbar span { flex: 1; }
 .commit-range-toolbar button { padding: 3px 8px; }
+
+.task-workspace { flex-wrap: wrap; }
+.task-workspace-actions { display: inline-flex; margin-left: auto; gap: 2px; }
+.task-workspace-actions button { border: 0; background: transparent; color: var(--fg-dimmed); cursor: pointer; padding: 2px 4px; }
+.task-workspace-actions button:hover { color: var(--fg); }
+.task-workspace-notes { flex-basis: 100%; margin-left: 22px; color: var(--fg-dimmed); font-size: 11px; }
+.task-workspace-notes textarea { display: block; width: 100%; min-height: 52px; resize: vertical; }
+.task-workspace-dialog label { display: grid; gap: 5px; margin: 10px 0; }
+.task-workspace-dialog input { width: 100%; }
+.repository-health { max-height: min(80vh, 680px); overflow: auto; }
+.health-good { color: var(--success, #72c989); }
