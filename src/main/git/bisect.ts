@@ -91,7 +91,7 @@ export class BisectService {
       try {
         await this.git.exec(['bisect', 'run', executable, ...args], { cwd: root, signal: controller.signal, onStdoutLine: append, onStderrLine: append, streamOnly: true });
       } finally {
-        const found = /([0-9a-f]{40,64})\s+is the first bad commit\b/i.exec(output.join('\n'))?.[1];
+        const found = /([0-9a-f]{40,64})\s+is the first ['"]?bad['"]? commit\b/i.exec(output.join('\n'))?.[1];
         if (found) this.completed.set(root, found);
         this.running.delete(root);
         onActivity({ running: false, output: [...output] });

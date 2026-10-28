@@ -67,8 +67,8 @@ it('runs an argv-only test to find the first bad commit', async () => {
   omitBisectLogSummary = true;
   await service.run(root, process.execPath, ['-e', "process.exit(Number(require('fs').readFileSync('version.txt','utf8')) >= 3 ? 1 : 0)"], (state) => activity.push(...state.output));
   expect(activity.join('')).toContain(culprit);
-  expect(activity.join('')).toMatch(/first bad commit/i);
-  expect(activity.join('')).toMatch(new RegExp(`${culprit}\\s+is the first bad commit`, 'i'));
+  expect(activity.join('')).toMatch(/first ['"]?bad['"]? commit/i);
+  expect(activity.join('')).toMatch(new RegExp(`${culprit}\\s+is the first ['"]?bad['"]? commit`, 'i'));
   expect((await service.status(root))?.found).toBe(culprit);
   await service.reset(root);
 });
