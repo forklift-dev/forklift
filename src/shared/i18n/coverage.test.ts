@@ -3,9 +3,10 @@ import { COMMANDS } from '../keybindings';
 import { SETTING_FIELDS, SETTINGS_SECTIONS } from '../settings';
 import { BUILTIN_THEMES } from '../themes';
 import { RU } from './strings';
+import { LANGUAGE_REGISTRY } from './index';
 
 /** Shown by their own name in every language. */
-const LANGUAGE_NAMES = new Set(['English', 'Русский']);
+const LANGUAGE_NAMES = new Set(LANGUAGE_REGISTRY.map(({ name }) => name));
 
 /** Text from schemas, shown through translate(): each needs a translation as much as a t() message does. */
 function schemaTexts(): string[] {

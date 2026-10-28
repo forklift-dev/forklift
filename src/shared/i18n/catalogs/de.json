@@ -1,0 +1,9 @@
+{
+  "Cancel": "Abbrechen",
+  "General": "Allgemein",
+  "Language": "Sprache",
+  "Preferences": "Einstellungen",
+  "{count} files": {
+    "one": "{count} Datei"
+  }
+}

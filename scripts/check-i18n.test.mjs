@@ -14,6 +14,7 @@ function fixture(t, en = { 'Hello {name}': 'Hello {name}' }, ru = { 'Hello {name
   const src = join(root, 'src');
   mkdirSync(catalogs);
   mkdirSync(src);
+  writeFileSync(join(root, 'locales.json'), JSON.stringify([{ code: 'en', name: 'English' }, { code: 'ru', name: 'Русский' }]));
   writeFileSync(join(catalogs, 'en.json'), `${JSON.stringify(en, null, 2)}\n`);
   writeFileSync(join(catalogs, 'ru.json'), `${JSON.stringify(ru, null, 2)}\n`);
   writeFileSync(join(src, 'view.ts'), code);
@@ -23,6 +24,17 @@ function fixture(t, en = { 'Hello {name}': 'Hello {name}' }, ru = { 'Hello {name
 test('valid catalogs pass', (t) => {
   const result = fixture(t).run();
   if (result.status !== 0) throw new Error(result.stderr);
+});
+
+test('partial third locale is counted and validated', (t) => {
+  const data = fixture(t);
+  writeFileSync(join(data.catalogs, '..', 'locales.json'), JSON.stringify([{ code: 'en', name: 'English' }, { code: 'ru', name: 'Русский' }, { code: 'de', name: 'Deutsch' }]));
+  writeFileSync(join(data.catalogs, 'de.json'), JSON.stringify({ 'Hello {name}': 'Hallo {name}' }));
+  const result = data.run();
+  if (result.status !== 0 || !/de has 1\/1 translated messages/.test(result.stdout)) throw new Error(result.stderr || result.stdout);
+  writeFileSync(join(data.catalogs, 'de.json'), JSON.stringify({ 'Hello {name}': 'Hallo {wrong}' }));
+  const invalid = data.run();
+  if (invalid.status === 0 || !/different placeholders/.test(invalid.stderr)) throw new Error(invalid.stderr);
 });
 
 test('duplicate keys, bad parameters, new and unused strings fail clearly', (t) => {

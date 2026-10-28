@@ -7,13 +7,15 @@ const root = new URL('../', import.meta.url);
 const option = (name) => { const index = process.argv.indexOf(name); return index < 0 ? null : process.argv[index + 1]; };
 const catalogDir = resolve(option('--catalog-dir') ?? fileURLToPath(new URL('../src/shared/i18n/catalogs/', import.meta.url)));
 const sourceDir = resolve(option('--source-dir') ?? fileURLToPath(new URL('../src/', import.meta.url)));
-const locales = ['en', 'ru'];
-const requiredForms = { en: ['one', 'other'], ru: ['one', 'few', 'many', 'other'] };
+const registry = JSON.parse(readFileSync(join(catalogDir, '..', 'locales.json'), 'utf8'));
+const locales = registry.map(({ code }) => code);
+const requiredForms = Object.fromEntries(locales.map((locale) => [locale, new Intl.PluralRules(locale).resolvedOptions().pluralCategories]));
 const context = /^[a-z][a-z-]*\|/;
 // These are selected through a typed runtime value; the plural example is an intentional test fixture.
 const DYNAMIC_MESSAGES = new Set(['operation|cherry-pick', 'operation|merge', 'operation|rebase', 'operation|revert', '{count} files']);
 const failures = [];
 const fail = (message) => failures.push(message);
+if (new Set(locales).size !== locales.length || !locales.includes('en') || !locales.includes('ru') || registry.some(({ code, name }) => !/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(code) || !name?.trim())) fail('locales.json: expected unique locale codes and nonempty native names, including en and ru');
 const sorted = (value) => Object.fromEntries(Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0));
 const placeholders = (value) => [...value.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort().join(',');
 
@@ -81,20 +83,31 @@ for (const key of new Set([...Object.keys(en), ...Object.keys(ru)])) {
   const russian = ru[key];
   if (typeof english === 'string' && english !== source) fail(`en.json: ${JSON.stringify(key)} must use its English source as the value`);
   if (typeof english !== typeof russian) fail(`${JSON.stringify(key)}: source and translation must both be strings or plural objects`);
-  for (const [locale, value] of [['en', english], ['ru', russian]]) {
+  for (const locale of locales) {
+    const value = catalogs[locale][key];
+    if (value === undefined && locale !== 'en' && locale !== 'ru') continue;
+    if (locale !== 'en' && typeof value !== typeof english) fail(`${locale}.json: ${JSON.stringify(key)} must use the same kind of entry as English`);
     if (typeof value === 'string') {
       if (!value.trim()) fail(`${locale}.json: ${JSON.stringify(key)} is empty`);
       if (placeholders(value) !== placeholders(source)) fail(`${locale}.json: ${JSON.stringify(key)} has different placeholders`);
       continue;
     }
     if (!value || Array.isArray(value) || typeof value !== 'object') { fail(`${locale}.json: ${JSON.stringify(key)} must be text or plural forms`); continue; }
-    if (Object.keys(value).sort().join(',') !== [...requiredForms[locale]].sort().join(',')) fail(`${locale}.json: ${JSON.stringify(key)} needs ${requiredForms[locale].join('/')} forms`);
+    const actualForms = Object.keys(value);
+    if (locale === 'en' || locale === 'ru') {
+      if (actualForms.sort().join(',') !== [...requiredForms[locale]].sort().join(',')) fail(`${locale}.json: ${JSON.stringify(key)} needs ${requiredForms[locale].join('/')} forms`);
+    } else if (actualForms.some((form) => !requiredForms[locale].includes(form))) fail(`${locale}.json: ${JSON.stringify(key)} has invalid plural forms`);
     if (!source.includes('{count}')) fail(`${locale}.json: ${JSON.stringify(key)} has plural forms without {count}`);
     for (const [form, text] of Object.entries(value)) {
       if (typeof text !== 'string' || !text.trim() || placeholders(text) !== placeholders(source)) fail(`${locale}.json: ${JSON.stringify(key)} ${form} is empty or has different placeholders`);
     }
   }
   if (typeof english === 'object' && english?.other !== source) fail(`en.json: ${JSON.stringify(key)} other form must match its source`);
+}
+for (const locale of locales.filter((name) => name !== 'en' && name !== 'ru')) {
+  for (const key of Object.keys(catalogs[locale])) if (!(key in en)) fail(`${locale}.json: unknown source ${JSON.stringify(key)}`);
+  const missing = Object.keys(en).filter((key) => !(key in catalogs[locale])).length;
+  process.stdout.write(`i18n: ${locale} has ${Object.keys(en).length - missing}/${Object.keys(en).length} translated messages; ${missing} use English fallback\n`);
 }
 
 const literals = new Set();

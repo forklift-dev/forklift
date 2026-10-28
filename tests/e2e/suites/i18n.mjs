@@ -142,4 +142,11 @@ export default async function ({ check }) {
   check('switching to English applies without a restart', await page.waitFor(`document.documentElement.lang === 'en' && document.querySelector('.preferences h1')?.textContent === 'Preferences'`));
   await page.invoke('settings:update', { values: { 'ui.language': 'ru' } });
   check('and back to Russian', await page.waitFor(`document.querySelector('.preferences h1')?.textContent === 'Настройки'`));
+  await page.invoke('settings:update', { values: { 'ui.language': 'de' } });
+  check('partial German applies without a restart', await page.waitFor(`document.documentElement.lang === 'de' && document.querySelector('.preferences h1')?.textContent === 'Einstellungen'`));
+  check('untranslated labels use English', await page.evaluate(`[...document.querySelectorAll('.preferences-nav button')].some(button => button.textContent === 'External tools')`));
+  await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(button => button.textContent === 'UI')`);
+  check('German language is selectable by its own name', await page.evaluate(`[...document.querySelectorAll('[data-setting="ui.language"] select option')].some(option => option.value === 'de' && option.textContent === 'Deutsch')`));
+  check('language selector has an accessible label', await page.evaluate(`document.querySelector('[data-setting="ui.language"] label')?.control === document.querySelector('[data-setting="ui.language"] select')`));
+  check('German labels fit the Preferences layout', (await page.evaluate(OVERFLOWING)).length === 0);
 }

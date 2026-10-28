@@ -3,6 +3,7 @@
 import { parseKeybindingOverrides, type KeybindingOverrides } from './keybindings';
 import { parseProfiles, type Profile } from './profiles';
 import { parseAccounts, type HostingAccount } from './hosting';
+import locales from './i18n/locales.json';
 
 /** A program with arguments; placeholders are substituted per argument, never through a shell. */
 export interface CommandLine {
@@ -104,11 +105,7 @@ export const SETTING_FIELDS = {
     type: 'enum',
     default: 'system',
     // Language names are shown in their own language (not translated).
-    options: [
-      { value: 'system', label: 'System' },
-      { value: 'en', label: 'English' },
-      { value: 'ru', label: 'Русский' },
-    ],
+    options: [{ value: 'system', label: 'System' }, ...locales.map(({ code, name }) => ({ value: code, label: name }))],
     label: 'Language',
     description: 'Language of the interface. "System" follows the language of your system. Messages from git itself stay in English.',
   },

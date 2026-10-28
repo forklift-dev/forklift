@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { english, fill, formatDate, LANGUAGES, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
+import { english, fill, formatDate, formatNumber, LANGUAGES, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
 import { EN, RU } from './strings';
 
 afterEach(() => setLanguage('en'));
@@ -49,6 +49,14 @@ describe('t', () => {
     expect([1, 2, 5, 21, 22, 25, 111].map((count) => t('{count} files', { count }))).toEqual(['1 файл', '2 файла', '5 файлов', '21 файл', '22 файла', '25 файлов', '111 файлов']);
   });
 
+  it('falls back to English for missing German messages and plural forms', () => {
+    setLanguage('de');
+    expect(t('Cancel')).toBe('Abbrechen');
+    expect(t('Save')).toBe('Save');
+    expect(t('{count} files', { count: 1 })).toBe('1 Datei');
+    expect(t('{count} files', { count: 2 })).toBe('2 files');
+  });
+
   it('shows run-time text as it is when no dictionary has it, and drops a context prefix in English', () => {
     setLanguage('ru');
     expect(translate('Something new {x}', { x: 1 })).toBe('Something new 1');
@@ -66,9 +74,11 @@ describe('resolveLanguage', () => {
   it('takes the setting, else the first supported system language, else English', () => {
     expect(resolveLanguage('ru', ['en-US'])).toBe('ru');
     expect(resolveLanguage('system', ['ru-RU', 'en-US'])).toBe('ru');
-    expect(resolveLanguage('system', ['de-DE', 'ru'])).toBe('ru');
+    expect(resolveLanguage('system', ['de-DE', 'ru'])).toBe('de');
     expect(resolveLanguage('system', ['ru_RU.UTF-8'])).toBe('ru');
-    expect(resolveLanguage('system', ['de-DE'])).toBe('en');
+    expect(resolveLanguage('system', ['de-DE'])).toBe('de');
+    expect(resolveLanguage('de', ['ru-RU'])).toBe('de');
+    expect(resolveLanguage('system', ['fr-FR'])).toBe('en');
     expect(resolveLanguage('system', [])).toBe('en');
   });
 });
@@ -79,6 +89,9 @@ describe('formatDate', () => {
     expect(formatDate(time, { month: 'long', timeZone: 'UTC' })).toBe('October');
     setLanguage('ru');
     expect(formatDate(time, { month: 'long', timeZone: 'UTC' })).toBe('октябрь');
+    setLanguage('de');
+    expect(formatDate(time, { month: 'long', timeZone: 'UTC' })).toBe('Oktober');
+    expect(formatNumber(1234.5)).toBe(new Intl.NumberFormat('de').format(1234.5));
   });
 });
 
