@@ -85,6 +85,7 @@
 | [T-097](tasks/stage-2-git-core/T-097-tag-remote-actions.md) | Управление тегами на удалённом репозитории | review |
 | [T-098](tasks/stage-2-git-core/T-098-graph-ref-context-menus.md) | Контекстные меню меток графа | review |
 | [T-099](tasks/stage-2-git-core/T-099-dismissible-error-banner.md) | Закрываемая полоса ошибки | review |
+| [T-101](tasks/stage-2-git-core/T-101-branch-cleanup.md) | Центр очистки веток | review |
 
 ### Этап 3 — История и операции над коммитами
 
@@ -99,6 +100,7 @@
 | [T-036](tasks/stage-3-history/T-036-undo-redo.md) | Undo/Redo операций | review |
 | [T-073](tasks/stage-3-history/T-073-bisect.md) | Bisect | review |
 | [T-078](tasks/stage-3-history/T-078-compare-commits.md) | Сравнение двух коммитов и веток | review |
+| [T-102](tasks/stage-3-history/T-102-commit-ranges.md) | Операции над диапазоном коммитов | todo |
 | [T-080](tasks/stage-3-history/T-080-history-memory-and-graph.md) | История: память и отрисовка графа на сотнях дорожек | review |
 
 ### Этап 4 — Репозитории
@@ -115,6 +117,8 @@
 | [T-047](tasks/stage-4-repositories/T-047-hooks.md) | Хуки | review |
 | [T-079](tasks/stage-4-repositories/T-079-repo-groups.md) | Группы репозиториев (fetch/pull для набора) | review |
 | [T-095](tasks/stage-4-repositories/T-095-upstream-selector.md) | Удобный выбор upstream для ветки | review |
+| [T-103](tasks/stage-4-repositories/T-103-repository-health.md) | Диагностика здоровья репозитория | todo |
+| [T-104](tasks/stage-4-repositories/T-104-task-workspaces.md) | Рабочие места для задач | todo |
 
 ### Этап 5 — Настройки и удобство
 
@@ -129,6 +133,7 @@
 | [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
 | [T-096](tasks/stage-5-settings/T-096-update-delivery-plan.md) | Исследовать способ доставки обновлений приложения | todo |
 | [T-096a](tasks/stage-5-settings/T-096a-github-release-check.md) | Проверка новых релизов на GitHub | review |
+| [T-100](tasks/stage-5-settings/T-100-experimental-features.md) | Переключатель экспериментальных функций | in-progress |
 | [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | review |
 | [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | review |
 | [T-059](tasks/stage-5-settings/T-059-resizable-layout.md) | Изменяемая ширина колонок графа и боковых панелей | review |

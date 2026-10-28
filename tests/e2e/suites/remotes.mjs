@@ -67,5 +67,5 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('[aria-label="Preferences"]')`);
   await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'General')`);
   const general = await page.waitFor(`[...document.querySelectorAll('.setting-row')].map(r => r.dataset.setting).join(',')`);
-  check('auto-fetch and release-check settings in General', general === 'general.restoreTabs,general.checkUpdates,general.autoFetch,general.autoFetchMinutes,general.fetchPrune,general.notifications,general.repositoriesFolder', general);
+  check('auto-fetch, release-check and experimental settings in General', general === 'general.restoreTabs,general.checkUpdates,general.autoFetch,general.autoFetchMinutes,general.fetchPrune,general.notifications,general.experimentalFeatures,general.repositoriesFolder', general);
 }

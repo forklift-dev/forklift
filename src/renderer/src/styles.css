@@ -1568,6 +1568,19 @@ button.danger {
   gap: 8px;
 }
 
+.branch-cleanup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.branch-cleanup-row small {
+  color: var(--fg-muted);
+}
+
 /* Main area under the toolbar; hidden (not unmounted) while Preferences is open */
 .app-main {
   flex: 1;

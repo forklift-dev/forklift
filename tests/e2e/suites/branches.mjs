@@ -53,6 +53,7 @@ export default async function ({ check }) {
   const { page } = await launchApp();
   await page.invoke('repo:open', root);
   await page.waitFor(`!!${item('feature')}`);
+  check('branch cleanup is hidden while experimental features are off', await page.evaluate(`!document.querySelector('[aria-label="Clean up branches"]')`));
   const names = await page.evaluate(`[...document.querySelectorAll('.ref-item[data-ref]')].map(r => r.dataset.ref).join(',')`);
   check('left panel lists local and remote branches', names === 'feature,main,origin/review', names);
   check('current branch marked', await page.evaluate(`${item('main')}.classList.contains('current')`));
@@ -179,4 +180,16 @@ export default async function ({ check }) {
   await page.click(menuItem('Set origin/main as upstream for review'));
   check('a remote branch can become the current branch upstream directly', await upstreamBecomes(git, 'review', 'origin/main'));
   check('the header shows the newly selected upstream', await page.waitFor(`document.querySelector('.toolbar .crumb-upstream .upstream-value')?.textContent === 'origin/main'`));
+
+  git('branch', 'merged-copy', 'main');
+  await page.invoke('repo:refresh', root);
+  await page.invoke('settings:update', { values: { 'general.experimentalFeatures': true } });
+  await page.waitFor(`!!document.querySelector('[aria-label="Clean up branches"]')`);
+  await page.click(`document.querySelector('[aria-label="Clean up branches"]')`);
+  check('cleanup lists merged branches and excludes unmerged ones', await page.waitFor(`!!document.querySelector('.branch-cleanup-row[data-branch="merged-copy"]') && !document.querySelector('.branch-cleanup-row[data-branch="topic/renamed"]')`));
+  await page.click(`document.querySelector('.branch-cleanup-row[data-branch="merged-copy"] button')`);
+  await page.click(`[...document.querySelectorAll('.modal button')].find(b => b.textContent === 'Delete')`);
+  check('cleanup deletes the selected merged branch', await page.waitFor(`!${item('merged-copy')}`));
+  await page.invoke('settings:update', { values: { 'general.experimentalFeatures': false } });
+  check('disabling experimental features hides branch cleanup immediately', await page.waitFor(`!document.querySelector('[aria-label="Clean up branches"]')`));
 }

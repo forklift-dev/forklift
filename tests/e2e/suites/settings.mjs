@@ -40,6 +40,9 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('[aria-label="Preferences"]')`);
   check('gear button opens Preferences', await page.waitFor(`!!document.querySelector('.preferences')`));
   check('Preferences opens on General by default', await page.waitFor(`document.querySelector('.preferences-content h2')?.textContent === 'General'`));
+  check('experimental features are off in a new profile', await page.waitFor(`${row('general.experimentalFeatures')}?.querySelector('input[type=checkbox]').checked === false`));
+  await page.click(`${row('general.experimentalFeatures')}?.querySelector('input[type=checkbox]')`);
+  check('experimental features can be enabled explicitly', await page.waitFor(`${row('general.experimentalFeatures')}?.querySelector('input[type=checkbox]').checked === true`));
   await page.press('Escape');
   check('Esc closes Preferences', await page.waitFor(`!document.querySelector('.preferences') && !!document.querySelector('.change-row')`));
   await page.press(',', { code: 'Comma', keyCode: 188, modifiers: 2 });
@@ -127,13 +130,16 @@ export default async function ({ check }) {
   await page.invoke('repo:open', root);
   await page.click(`document.querySelector('[aria-label="Preferences"]')`);
   await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'Diff')`);
+  await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'General')`);
+  check('experimental opt-in survives a restart', await page.waitFor(`${row('general.experimentalFeatures')}?.querySelector('input[type=checkbox]').checked === true`));
+  await page.click(`[...document.querySelectorAll('.preferences-nav button')].find(b => b.textContent === 'Diff')`);
   const persisted = await page.waitFor(`${row('diff.contextLines')}?.querySelector('input').value`);
   check('settings survive a restart', persisted === '5', persisted);
   await page.press('Escape');
   const configDir = readdirSync(join(home, '.config')).find((name) => existsSync(join(home, '.config', name, 'settings.json')));
   const settingsFile = configDir && join(home, '.config', configDir, 'settings.json');
   const saved = settingsFile ? JSON.parse(readFileSync(settingsFile, 'utf8')) : null;
-  check('settings saved to userData/settings.json', saved?.settings?.['diff.contextLines'] === 5 && saved?.settings?.['tools.editor']?.command === 'alt-editor' && saved?.repositories?.[root]?.['tools.terminal']?.command === 'repo-term', JSON.stringify(saved));
+  check('settings saved to userData/settings.json', saved?.settings?.['diff.contextLines'] === 5 && saved?.settings?.['tools.editor']?.command === 'alt-editor' && saved?.settings?.['general.experimentalFeatures'] === true && saved?.repositories?.[root]?.['tools.terminal']?.command === 'repo-term', JSON.stringify(saved));
   execFileSync('rm', ['-f', join(work, 'repo-term.out')]);
   await page.evaluate(`[...document.querySelectorAll('.toolbar button')].find(b => b.textContent.trim() === 'Terminal').click()`);
   // The toolbar shows the embedded terminal; the external one opens from its header.

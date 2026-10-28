@@ -36,6 +36,12 @@ export class BranchService {
     return exitCode === 0 ? null : kind === 'branch' ? t('"{name}" is not a valid branch name', { name }) : t('"{name}" is not a valid tag name', { name });
   }
 
+  /** Local branch names whose tips are already reachable from HEAD; used for safe cleanup suggestions. */
+  async mergedLocalBranches(root: string): Promise<string[]> {
+    const { stdout } = await this.git.exec(['branch', '--format=%(refname:short)', '--merged', 'HEAD'], { cwd: root, readOnly: true });
+    return stdout.split('\n').map((name) => name.trim()).filter(Boolean);
+  }
+
   /** Creates a branch at a commit; with `checkout`, switches to it (carrying uncommitted changes along). */
   create(root: string, name: string, sha: string, checkout: boolean): Promise<SwitchResult> {
     return this.queue.run(root, async () => {

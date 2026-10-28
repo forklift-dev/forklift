@@ -58,6 +58,8 @@ export interface Commands {
   'ref:validateName': { args: [repo: string, kind: 'branch' | 'tag', name: string]; result: string | null };
   /** Creates a branch at a commit, optionally switching to it (uncommitted changes are carried along). */
   'branch:create': { args: [repo: string, name: string, sha: string, checkout: boolean]; result: void };
+  /** Local branches fully merged into HEAD, for safe cleanup suggestions. */
+  'branch:mergedLocal': { args: [repo: string]; result: string[] };
   /** Switches branch or commit; uncommitted changes are stashed and brought back (problems become a notice). */
   'branch:checkout': { args: [repo: string, target: CheckoutTarget]; result: void };
   'branch:rename': { args: [repo: string, from: string, to: string]; result: void };
@@ -306,6 +308,7 @@ const commandChannelSet = {
   'diff:file': true,
   'ref:validateName': true,
   'branch:create': true,
+  'branch:mergedLocal': true,
   'branch:checkout': true,
   'branch:rename': true,
   'branch:setUpstream': true,

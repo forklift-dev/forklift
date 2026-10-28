@@ -97,6 +97,13 @@ export const SETTING_FIELDS = {
     label: 'Show notifications',
     description: 'A short note when an operation (commit, push, stash…) finishes. Errors are always shown.',
   },
+  'general.experimentalFeatures': {
+    section: 'general',
+    type: 'boolean',
+    default: false,
+    label: 'Experimental features',
+    description: 'Show experimental Forklift features. They may change or be removed; enabling them never runs Git operations without your action.',
+  },
   'general.repositoriesFolder': {
     section: 'general',
     type: 'string',

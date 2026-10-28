@@ -32,6 +32,12 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('BranchService.checkout with automatic stash', () => {
+  it('lists only local branches merged into HEAD for cleanup suggestions', async () => {
+    sh('branch', 'merged-copy', 'HEAD');
+    expect(await service.mergedLocalBranches(root)).toEqual(['main', 'merged-copy']);
+    expect(head()).toBe('main');
+  });
+
   it('switches a clean working tree without stashing', async () => {
     expect(await service.checkout(root, { kind: 'branch', name: 'feature' })).toEqual({ stash: 'none', message: null });
     expect(head()).toBe('feature');

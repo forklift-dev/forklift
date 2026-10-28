@@ -715,6 +715,11 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
       report(await thenRefresh(root, () => recorder.createBranch(root, branch, sha, checkout, () => branches.create(root, branch, sha, checkout))));
     },
 
+    async 'branch:mergedLocal'(_ctx, repo) {
+      const root = tab(repo);
+      return branches.mergedLocalBranches(root);
+    },
+
     async 'branch:checkout'(_ctx, repo, target) {
       const root = tab(repo);
       const parsed = parseCheckoutTarget(target);

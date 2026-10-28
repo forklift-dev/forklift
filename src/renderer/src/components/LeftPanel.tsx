@@ -11,6 +11,8 @@ import { pullTerm, refLabel, type RepoHosting } from '../../../shared/hosting';
 import type { HostingItem } from './HostingView';
 import { t, translate } from '../../../shared/i18n';
 import { SyncCounts } from './SyncCounts';
+import { invoke } from '../api';
+import { useAppState } from '../state';
 
 /** The repository's server (when an account matches its remotes): pull requests and issues sections. */
 export interface LeftPanelHosting {
@@ -68,6 +70,23 @@ function Section({ id, title, count, collapsed, onToggle, action, children }: {
 
 /** Left panel as in GitKraken: local branches, remote branches by remote, tags; filter and context actions. */
 export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, selectedCommit, onCompare, graphFilter, onFilter, hosting }: LeftPanelProps) {
+  const experimentalFeatures = useAppState((state) => state.settings.values['general.experimentalFeatures']);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [mergedBranches, setMergedBranches] = useState<string[] | null>(null);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const openCleanup = async () => {
+    setCleanupOpen(true);
+    setCleanupError(null);
+    setCleanupLoading(true);
+    try {
+      setMergedBranches(await invoke('branch:mergedLocal', data.root));
+    } catch (error) {
+      setCleanupError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
   const compareItem = (sha: string): MenuItem[] => selectedCommit && selectedCommit !== sha && onCompare
     ? [
         { label: t('Compare with selected commit (A..B)'), onSelect: () => onCompare(sha, 'direct') },
@@ -148,7 +167,10 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
           count={data.branches.length}
           collapsed={Boolean(collapsed['local'])}
           onToggle={toggle}
-          action={head && addButton(t('Create branch'), () => actions.createBranch(head, headLabel(data)))}
+          action={<>
+            {experimentalFeatures && <button type="button" className="icon-button" aria-label={t('Clean up branches')} title={t('Clean up branches')} onClick={() => void openCleanup()}><span className="codicon codicon-trash" aria-hidden="true" /></button>}
+            {head && addButton(t('Create branch'), () => actions.createBranch(head, headLabel(data)))}
+          </>}
         >
           {local.map((branch) => (
             <li
@@ -511,6 +533,26 @@ export function LeftPanel({ data, actions, gitflow, openMenu, onSelectCommit, se
           })}
         </Section>
       </div>
+      {cleanupOpen && experimentalFeatures && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCleanupOpen(false); }}>
+          <section className="modal form-dialog branch-cleanup" role="dialog" aria-modal="true" aria-label={t('Clean up branches')}>
+            <h2>{t('Clean up branches')}</h2>
+            <p>{t('These local branches are already merged into {branch}. Deleting them keeps all their commits.', { branch: data.branch.head ?? 'HEAD' })}</p>
+            {cleanupLoading && <p>{t('Loading…')}</p>}
+            {cleanupError && <p className="setting-error" role="alert">{cleanupError}</p>}
+            {!cleanupLoading && !cleanupError && (mergedBranches ?? []).filter((name) => name !== data.branch.head).map((name) => {
+              const branch = data.branches.find((item) => item.name === name);
+              return <div className="branch-cleanup-row" key={name} data-branch={name}>
+                <span>{name}</span>
+                {branch?.upstream && <small>{branch.upstream} · ↑{branch.ahead} ↓{branch.behind}</small>}
+                <button type="button" className="danger" onClick={() => { actions.deleteBranch(name); setCleanupOpen(false); }}>{t('Delete…')}</button>
+              </div>;
+            })}
+            {!cleanupLoading && !cleanupError && !(mergedBranches ?? []).some((name) => name !== data.branch.head) && <p className="empty-note">{t('No merged branches to clean up.')}</p>}
+            <div className="modal-actions"><button type="button" onClick={() => setCleanupOpen(false)}>{t('Close')}</button></div>
+          </section>
+        </div>
+      )}
     </aside>
   );
 }
