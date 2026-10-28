@@ -11,7 +11,7 @@
 Наглядная история · точная индексация · безопасные операции · оформление на ваш вкус
 
 [![Сборка](https://github.com/forklift-dev/forklift/actions/workflows/build.yml/badge.svg)](https://github.com/forklift-dev/forklift/actions/workflows/build.yml)
-[![Версия](https://img.shields.io/badge/version-0.5.0-4169a9)](https://github.com/forklift-dev/forklift/releases)
+[![Версия](https://img.shields.io/badge/version-0.5.1-4169a9)](https://github.com/forklift-dev/forklift/releases)
 [![Лицензия: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-6b5acd)](LICENSE)
 
 [Скачать сборку](https://github.com/forklift-dev/forklift/releases) · [Документация](docs/README.md) · [Собрать из исходников](#сборка-из-исходников)

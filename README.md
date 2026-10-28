@@ -11,7 +11,7 @@
 Visual history · precise staging · safe operations · your choice of colors
 
 [![Build](https://github.com/forklift-dev/forklift/actions/workflows/build.yml/badge.svg)](https://github.com/forklift-dev/forklift/actions/workflows/build.yml)
-[![Version](https://img.shields.io/badge/version-0.5.0-4169a9)](https://github.com/forklift-dev/forklift/releases)
+[![Version](https://img.shields.io/badge/version-0.5.1-4169a9)](https://github.com/forklift-dev/forklift/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-6b5acd)](LICENSE)
 
 [Download a build](https://github.com/forklift-dev/forklift/releases) · [Explore the documentation](docs/README.md) · [Build from source](#build-from-source)
