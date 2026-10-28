@@ -6,10 +6,11 @@ import { settingsSlice } from './settingsSlice';
 import type { CloneActivity } from '../../shared/repos';
 import type { UserThemesState } from '../../shared/themes';
 import type { ThunkExtra } from './types';
+import type { AvailableRelease } from '../../shared/releases';
 
 const appSlice = createSlice({
   name: 'app',
-  initialState: { version: '0.0.0', platform: 'unknown', notices: [], prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0, secretStorage: false, groupSync: null } as AppInfo,
+  initialState: { version: '0.0.0', platform: 'unknown', notices: [], release: null, prompts: [], clone: null, userThemes: { folder: '', themes: [], problems: [] }, logVersion: 0, secretStorage: false, groupSync: null } as AppInfo,
   reducers: {
     appInfoSet: (state, action: PayloadAction<Pick<AppInfo, 'version' | 'platform'>>) => ({ ...state, ...action.payload }),
     gitCliDetected: (state, action: PayloadAction<GitCliInfo>) => {
@@ -20,6 +21,9 @@ const appSlice = createSlice({
     },
     noticesDismissed: (state) => {
       state.notices = [];
+    },
+    releaseFound: (state, action: PayloadAction<AvailableRelease | null>) => {
+      state.release = action.payload;
     },
     promptAdded: (state, action: PayloadAction<AskPrompt>) => {
       state.prompts.push(action.payload);
@@ -45,7 +49,7 @@ const appSlice = createSlice({
   },
 });
 
-export const { cloneActivity, gitCliDetected, groupSyncChanged, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, secretStorageChecked, userThemesRead } = appSlice.actions;
+export const { cloneActivity, gitCliDetected, groupSyncChanged, logChanged, noticeAdded, noticesDismissed, promptAdded, promptRemoved, releaseFound, secretStorageChecked, userThemesRead } = appSlice.actions;
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,

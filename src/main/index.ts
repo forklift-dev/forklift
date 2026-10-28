@@ -50,7 +50,8 @@ import { startReplication } from './replication';
 import { SettingsFile } from './settings/file';
 import { SettingsService } from './settings/service';
 import { ToolActions } from './settings/toolActions';
-import { createAppStore, gitCliDetected, logChanged, noticeAdded, secretStorageChecked, promptAdded, promptRemoved, userThemesRead } from './store';
+import { createAppStore, gitCliDetected, logChanged, noticeAdded, releaseFound, secretStorageChecked, promptAdded, promptRemoved, userThemesRead } from './store';
+import { checkReleases } from './releases/check';
 import { ThemeLibrary } from './themes';
 import { OperationLog } from './log/operationLog';
 import { AvatarService } from './avatars/service';
@@ -239,7 +240,8 @@ async function start() {
   });
   const scanner = new RepoScanner();
   const history = new HistoryService(gitCli, new HistoryStore(join(app.getPath('userData'), 'history')));
-  registerCommands(createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, aiTokens, aiFetch: (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init), processes: runner, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
+  const checkRelease = () => checkReleases(app.getVersion(), process.platform, process.arch, (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init));
+  registerCommands(createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase: new InteractiveRebase(gitCli, repoQueue), undo, fileHistory: new FileHistory(gitCli), terminals, creator: new RepoCreator(gitCli, remotes, () => settings.values['general.repositoriesFolder']), profiles, log, avatars: new AvatarService({ cacheDir: join(app.getPath('userData'), 'avatars'), enabled: () => settings.values['ui.gravatar'], fetch: (url, init) => net.fetch(url, init) }), submodules: new SubmoduleService(gitCli, remotes, repoQueue), worktrees: new WorktreeService(gitCli, repoQueue), lfs: new LfsService(gitCli, remotes, repoQueue), gitflow: new GitflowService(gitCli, repoQueue), gitCli, credentials, hosting, aiTokens, aiFetch: (url, init) => net.fetch(url instanceof URL ? url.toString() : url, init), processes: runner, listFiles: (root) => listFiles(gitCli, root), shellEnv: () => runner.environment(), onFetched: (root) => autoFetch.fetched(root), answerPrompt }), { waitForAck: (id) => replication.waitForAck(id), log });
 
   // Remembered tabs first, then a folder named on the command line (opened as the active tab).
   const repoSession = new RepoSession(store, new LibraryFile(join(app.getPath('userData'), 'repositories.json')));
@@ -299,6 +301,15 @@ async function start() {
   });
 
   showMainWindow();
+  if (app.isPackaged && settings.values['general.checkUpdates']) {
+    const timer = setTimeout(() => {
+      if (!settings.values['general.checkUpdates']) return;
+      void checkRelease().then((result) => {
+        if (result.status === 'available' && settings.values['general.checkUpdates']) store.dispatch(releaseFound(result.release));
+      }).catch((error: unknown) => console.warn('[releases] check failed:', error));
+    }, 5000);
+    app.once('will-quit', () => clearTimeout(timer));
+  }
   app.on('activate', showMainWindow);
 }
 

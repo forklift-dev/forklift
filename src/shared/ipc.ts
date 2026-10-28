@@ -19,6 +19,7 @@ import type { FoundCommit, HistoryFilter, HistoryPage, HistorySearch, SearchResu
 import type { DetectedTools, GitIdentity, GitToolKind, SettingsPatch, ToolKind } from './settings';
 import type { LineActionRequest } from './staging';
 import type { AppStatus, RepoGroup, RepoGroupStatus } from './state';
+import type { ReleaseCheck } from './releases';
 
 /** Repository commands name their tab explicitly (`repo` = the tab id, i.e. the repository root). */
 export interface Commands {
@@ -198,6 +199,8 @@ export interface Commands {
   /** Changes settings (validated in main); `repo` targets that open repository's overrides. */
   /** Clears the notices shown above the window content. */
   'app:dismissNotices': { args: []; result: void };
+  /** Checks public GitHub Releases now, even if startup checks are disabled. */
+  'app:checkRelease': { args: []; result: ReleaseCheck };
   /** Memory, running commands and the repository's last fetch, for the status bar. */
   'app:status': { args: [repo: string | null]; result: AppStatus };
   /** Stops a running command (from the status bar). */
@@ -383,6 +386,7 @@ const commandChannelSet = {
   'file:blame': true,
   'file:externalMerge': true,
   'app:dismissNotices': true,
+  'app:checkRelease': true,
   'app:status': true,
   'process:cancel': true,
   'terminal:create': true,

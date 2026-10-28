@@ -31,7 +31,8 @@ import { MAX_PAGE, type HistoryService } from '../history/service';
 import type { SettingsService } from '../settings/service';
 import type { ToolActions } from '../settings/toolActions';
 import { normalizeRepoRelative, resolveInsideRepo } from '../repoPaths';
-import { cloneActivity, groupSyncChanged, noticeAdded, noticesDismissed, type AppStore } from '../store';
+import { cloneActivity, groupSyncChanged, noticeAdded, noticesDismissed, releaseFound, type AppStore } from '../store';
+import type { ReleaseCheck } from '../../shared/releases';
 import type { RepoScanner } from '../repos/scan';
 import { openRepository } from '../repos/open';
 import type { RepoCreator } from '../repos/create';
@@ -61,6 +62,7 @@ import type { TokenStore } from '../hosting/tokens';
 
 export interface HandlerDeps {
   store: AppStore;
+  checkRelease(): Promise<ReleaseCheck>;
   git: GitService;
   tools: ExternalTools;
   diffTools: DiffTools;
@@ -254,7 +256,7 @@ async function showOpenDialog(sender: WebContents, options: OpenDialogOptions) {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-export function createCommandHandlers({ store, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, aiTokens, aiFetch, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
+export function createCommandHandlers({ store, checkRelease, git, tools, diffTools, staging, settings, toolActions, scanner, history, branches, stashes, conflicts, commitOps, bisect, remotes, networkOps, interactiveRebase, undo, fileHistory, terminals, creator, profiles, log, avatars, submodules, worktrees, lfs, gitflow, gitCli, credentials, hosting, aiTokens, aiFetch, processes, listFiles, shellEnv, onFetched, answerPrompt }: HandlerDeps): CommandHandlers {
   const effective = (root: string) => settings.effective(root);
   let cloning: AbortController | null = null;
   const aiRequests = new Map<string, { sender: number; controller: AbortController }>();
@@ -1126,6 +1128,12 @@ export function createCommandHandlers({ store, git, tools, diffTools, staging, s
 
     async 'app:dismissNotices'() {
       store.dispatch(noticesDismissed());
+    },
+
+    async 'app:checkRelease'() {
+      const result = await checkRelease();
+      store.dispatch(releaseFound(result.status === 'available' ? result.release : null));
+      return result;
     },
 
     async 'app:status'(_ctx, repo) {

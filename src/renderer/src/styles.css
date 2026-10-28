@@ -551,6 +551,37 @@ button:disabled {
   color: var(--fg-bright);
 }
 
+.about-update {
+  margin: 12px 0 16px;
+}
+
+.about-update p {
+  margin: 7px 0 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.release-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg-bright);
+  font-size: 12px;
+}
+
+.release-banner a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.release-banner button {
+  margin-left: auto;
+}
+
 .about-dialog blockquote {
   margin: 0 0 16px;
   color: var(--fg-muted);

@@ -48,6 +48,8 @@ export function App() {
   const tabs = useAppState((s) => s.tabs);
   const repo = useAppState((s) => s.repo);
   const notices = useAppState((s) => s.app.notices);
+  const release = useAppState((s) => s.app.release);
+  const [dismissedRelease, setDismissedRelease] = useState<string | null>(null);
   const prompts = useAppState((s) => s.app.prompts);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<{ message: string; logId: number | null } | null>(null);
@@ -305,6 +307,13 @@ export function App() {
           <button type="button" onClick={() => void invoke('app:dismissNotices')}>
             {t('Dismiss')}
           </button>
+        </div>
+      )}
+      {release && dismissedRelease !== release.version && (
+        <div className="release-banner" role="status">
+          <span>{t('A new Forklift release is available: {version}', { version: release.version })}</span>
+          <a href={release.url} target="_blank" rel="noreferrer">{t('View release')}</a>
+          <button type="button" onClick={() => setDismissedRelease(release.version)}>{t('Later')}</button>
         </div>
       )}
       {error && (

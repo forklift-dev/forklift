@@ -68,6 +68,13 @@ export const SETTING_FIELDS = {
     label: 'Reopen repositories at startup',
     description: 'Open the tabs that were open when Forklift was last closed.',
   },
+  'general.checkUpdates': {
+    section: 'general',
+    type: 'boolean',
+    default: true,
+    label: 'Check for new releases at startup',
+    description: 'Ask GitHub about published Forklift releases. No update is downloaded or installed automatically.',
+  },
   'general.autoFetch': {
     section: 'general',
     type: 'boolean',

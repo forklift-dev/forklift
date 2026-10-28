@@ -164,6 +164,8 @@ export interface AppInfo {
   gitCli?: GitCliInfo;
   /** Problems outside any window action (e.g. a repository named on the command line could not be opened). */
   notices: string[];
+  /** Newer published GitHub release with a package for this OS, if found. */
+  release: import('./releases').AvailableRelease | null;
   prompts: AskPrompt[];
   /** The clone running from the Repositories screen. */
   clone: CloneActivity | null;

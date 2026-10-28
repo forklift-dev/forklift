@@ -1,7 +1,7 @@
 // Bottom status bar: repository/system facts, graph chooser, actions, visibility command and About dialog.
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRepo, inMain, launchApp, processesMatching, sleep, tempDir } from '../harness.mjs';
+import { createRepo, inMain, launchApp, processesMatching, projectDir, sleep, tempDir } from '../harness.mjs';
 
 export const meta = { requiresMain: true, platforms: ['linux', 'darwin'] };
 
@@ -23,7 +23,8 @@ export default async function ({ check }) {
   await page.waitFor(`!!document.querySelector('.commit-row[data-hash]')`);
 
   const text = await page.waitFor(`document.querySelector('.status-bar')?.textContent.includes('History: 2') && document.querySelector('.status-bar').textContent`);
-  check('shows branch, changes, fetch time, git, history, memory and edition', /main/.test(text ?? '') && /Changes: 1/.test(text ?? '') && /Fetch:/.test(text ?? '') && /git \d+\.\d+/.test(text ?? '') && /History: 2/.test(text ?? '') && /(?:MB|GB)/.test(text ?? '') && /Communityv0\.4\.1/.test((text ?? '').replace(/\s/g, '')), text);
+  const appVersion = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8')).version;
+  check('shows branch, changes, fetch time, git, history, memory and edition', /main/.test(text ?? '') && /Changes: 1/.test(text ?? '') && /Fetch:/.test(text ?? '') && /git \d+\.\d+/.test(text ?? '') && /History: 2/.test(text ?? '') && /(?:MB|GB)/.test(text ?? '') && (text ?? '').replace(/\s/g, '').includes(`Communityv${appVersion}`), text);
   check('fits a 900 px window without horizontal overflow', await page.evaluate(`document.querySelector('.status-bar').scrollWidth <= innerWidth`));
 
   // Compact graph chooser with real previews changes the live graph.
