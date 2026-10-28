@@ -115,7 +115,14 @@ export class StashService {
   }
 
   private run(root: string, args: string[]): Promise<GitCliResult> {
-    return this.git.exec(['stash', 'apply', ...args], { cwd: root, allowedExitCodes: [1] });
+    return this.git.exec(['stash', 'apply', ...args], { cwd: root, allowedExitCodes: [1] }).catch((error: unknown) => {
+      // Git versions differ here: an untracked-file collision during stash restore exits 1 or 128.
+      // Treat this specific expected failure as an apply result so callers can keep the stash safely.
+      if (error instanceof GitCliError && error.exitCode === 128 && /could not restore untracked files from stash/i.test(error.stderr)) {
+        return { exitCode: 128, stdout: error.stdout, stderr: error.stderr };
+      }
+      throw error;
+    });
   }
 
   private async exec(root: string, args: string[]): Promise<void> {

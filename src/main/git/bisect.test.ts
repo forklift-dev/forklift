@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { directRunner } from '../process/testing';
+import type { Runner } from '../process/types';
 import { GitCli } from './cli';
 import { RepoQueue } from './repoQueue';
 import { BisectService } from './bisect';
@@ -11,9 +12,23 @@ import { BisectService } from './bisect';
 let root: string;
 const env = { ...process.env, GIT_AUTHOR_NAME: 'A', GIT_AUTHOR_EMAIL: 'a@x', GIT_COMMITTER_NAME: 'A', GIT_COMMITTER_EMAIL: 'a@x', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
 const sh = (...args: string[]) => execFileSync('git', args, { cwd: root, env, stdio: 'pipe' }).toString().trim();
-const service = new BisectService(new GitCli(directRunner(env)), new RepoQueue());
+let omitBisectLogSummary = false;
+const nativeRunner = directRunner(env);
+const runner: Runner = {
+  environment: () => nativeRunner.environment(),
+  launch: (command, args, options) => nativeRunner.launch(command, args, options),
+  run: async (command, args, options) => {
+    const result = await nativeRunner.run(command, args, options);
+    if (omitBisectLogSummary && args[0] === 'bisect' && args[1] === 'log') {
+      return { ...result, stdout: result.stdout.replace(/^# first bad commit:.*\n?/m, '') };
+    }
+    return result;
+  },
+};
+const service = new BisectService(new GitCli(runner), new RepoQueue());
 
 beforeEach(() => {
+  omitBisectLogSummary = false;
   root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-bisect-')));
   sh('init', '-q', '--initial-branch=main');
   for (let i = 0; i < 7; i++) {
@@ -48,9 +63,13 @@ it('runs an argv-only test to find the first bad commit', async () => {
   await service.mark(root, 'bad', bad);
   await service.mark(root, 'good', good);
   const activity: string[] = [];
-  await service.run(root, process.execPath, ['-e', "process.exit(Number(require('fs').readFileSync('version.txt','utf8')) >= 3 ? 1 : 0)"], (state) => activity.push(state.running ? 'running' : 'done'));
+  // Older Git builds may omit this line from `git bisect log`; the service must fall back to run output.
+  omitBisectLogSummary = true;
+  await service.run(root, process.execPath, ['-e', "process.exit(Number(require('fs').readFileSync('version.txt','utf8')) >= 3 ? 1 : 0)"], (state) => activity.push(...state.output));
+  expect(activity.join('')).toContain(culprit);
+  expect(activity.join('')).toMatch(/first bad commit/i);
+  expect(activity.join('')).toMatch(new RegExp(`${culprit}\\s+is the first bad commit`, 'i'));
   expect((await service.status(root))?.found).toBe(culprit);
-  expect(activity).toContain('done');
   await service.reset(root);
 });
 

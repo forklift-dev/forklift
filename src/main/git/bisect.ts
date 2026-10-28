@@ -9,6 +9,8 @@ const shaPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i;
 /** Reads Git's bisect refs on every request, so sessions survive application restarts. */
 export class BisectService {
   private readonly running = new Map<string, AbortController>();
+  /** Some supported Git versions omit the final summary from `git bisect log`; keep run output as a fallback. */
+  private readonly completed = new Map<string, string>();
 
   constructor(private readonly git: GitCli, private readonly queue: RepoQueue) {}
 
@@ -29,7 +31,7 @@ export class BisectService {
       else if (name?.startsWith('refs/bisect/good-')) good.push(sha);
       else if (name?.startsWith('refs/bisect/skip-')) skipped.push(sha);
     }
-    const found = /# first bad commit: \[([0-9a-f]{40,64})\]/i.exec(log.stdout)?.[1] ?? null;
+    const found = /# first bad commit: \[([0-9a-f]{40,64})\]/i.exec(log.stdout)?.[1] ?? this.completed.get(root) ?? null;
     let candidates: string[] = [];
     let steps: number | null = null;
     if (bad && good.length) {
@@ -56,6 +58,7 @@ export class BisectService {
         if (dirty.stdout.trim()) throw new Error('Commit or stash changes before starting bisect');
         await this.git.exec(['bisect', 'start'], { cwd: root });
       }
+      this.completed.delete(root);
       await this.git.exec(['bisect', mark, sha], { cwd: root });
     });
   }
@@ -64,6 +67,7 @@ export class BisectService {
     return this.queue.run(root, async () => {
       if (this.running.has(root)) throw new Error('Stop bisect run first');
       await this.git.exec(['bisect', 'reset'], { cwd: root });
+      this.completed.delete(root);
     });
   }
 
@@ -87,6 +91,8 @@ export class BisectService {
       try {
         await this.git.exec(['bisect', 'run', executable, ...args], { cwd: root, signal: controller.signal, onStdoutLine: append, onStderrLine: append, streamOnly: true });
       } finally {
+        const found = /([0-9a-f]{40,64})\s+is the first bad commit\b/i.exec(output.join('\n'))?.[1];
+        if (found) this.completed.set(root, found);
         this.running.delete(root);
         onActivity({ running: false, output: [...output] });
       }

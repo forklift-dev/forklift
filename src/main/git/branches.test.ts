@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { directRunner } from '../process/testing';
+import type { Runner } from '../process/types';
 import { BranchService } from './branches';
 import { GitCli } from './cli';
 
@@ -12,11 +13,33 @@ const env = { ...process.env, GIT_AUTHOR_NAME: 'A', GIT_AUTHOR_EMAIL: 'a@x', GIT
 const sh = (...args: string[]) => execFileSync('git', args, { cwd: root, env }).toString().trim();
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const write = (path: string, text: string) => writeFileSync(join(root, path), text);
-const service = new BranchService(new GitCli(directRunner(env)));
+let forceUntrackedCollisionExit128 = false;
+const nativeRunner = directRunner(env);
+const runner: Runner = {
+  environment: () => nativeRunner.environment(),
+  launch: (command, args, options) => nativeRunner.launch(command, args, options),
+  run: (command, args, options) => {
+    if (forceUntrackedCollisionExit128 && args[0] === 'stash' && args[1] === 'apply') {
+      return Promise.resolve({
+        code: 128,
+        signal: null,
+        stdout: 'Already up to date.\nOn branch feature\nnothing to commit, working tree clean\n',
+        stderr: 'report.txt already exists, no checkout\nerror: could not restore untracked files from stash\n',
+        durationMs: 0,
+        timedOut: false,
+        truncated: false,
+        cancelled: false,
+      });
+    }
+    return nativeRunner.run(command, args, options);
+  },
+};
+const service = new BranchService(new GitCli(runner));
 const stashes = () => sh('stash', 'list');
 const head = () => sh('rev-parse', '--abbrev-ref', 'HEAD');
 
 beforeEach(() => {
+  forceUntrackedCollisionExit128 = false;
   root = realpathSync(mkdtempSync(join(tmpdir(), 'forklift-branches-')));
   sh('init', '-q', '--initial-branch=main');
   write('shared.txt', 'line 1\nline 2\nline 3\n');
@@ -75,6 +98,7 @@ describe('BranchService.checkout with automatic stash', () => {
     sh('commit', '-qm', 'add report');
     sh('switch', '-q', 'main');
     write('report.txt', 'my untracked notes\n');
+    forceUntrackedCollisionExit128 = true;
     const result = await service.checkout(root, { kind: 'branch', name: 'feature' });
     expect(result.stash).toBe('kept');
     expect(result.message).toMatch(/could not be put back .*safe in the stash/);
