@@ -136,7 +136,7 @@
 | [T-086](tasks/stage-5-settings/T-086-translation-catalogs.md) | Каталоги переводов и автоматическая проверка | review |
 | [T-087](tasks/stage-5-settings/T-087-more-languages.md) | Подключение новых языков интерфейса | review |
 | [T-088](tasks/stage-5-settings/T-088-community-translations.md) | Процесс переводов от сообщества | review |
-| [T-089](tasks/stage-5-settings/T-089-stable-message-ids.md) | Устойчивые идентификаторы строк интерфейса | todo |
+| [T-089](tasks/stage-5-settings/T-089-stable-message-ids.md) | Устойчивые идентификаторы строк интерфейса | review |
 | [T-090](tasks/stage-5-settings/T-090-translation-platform.md) | Платформа совместного перевода (при появлении потребности) | draft |
 
 ### Этап 6 — Интеграции с хостингами (после проверки владельцем)

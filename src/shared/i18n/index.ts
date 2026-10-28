@@ -1,7 +1,7 @@
-// Interface languages. English source and Russian translations live in editable JSON catalogs. A UI string's
-// English text remains its key; a missing Russian translation does not compile. Git output is never translated.
+// Catalog entries have stable IDs. Legacy English keys remain accepted while call sites migrate.
 import { EN, RU } from './strings';
 import locales from './locales.json';
+import legacy from './legacy.json';
 
 export const LANGUAGE_REGISTRY = locales;
 export const LANGUAGES = locales.map(({ code }) => code);
@@ -17,16 +17,19 @@ export interface PluralForms {
 
 export type Dictionary = Readonly<Record<string, string | Partial<PluralForms>>>;
 
-/**
- * A UI string: its English text with `{name}` placeholders. The same English meaning different things gets a
- * context prefix, `context|text` (a lowercase word before the bar), shown without it in English.
- */
-export type Message = keyof typeof RU & string;
+/** Stable ID or a legacy English key. New call sites should use stable IDs. */
+export type Message = (keyof typeof RU | keyof typeof legacy) & string;
 export type Params = Readonly<Record<string, string | number>>;
 
 const catalogModules = import.meta.glob<Dictionary>('./catalogs/*.json', { eager: true, import: 'default' });
 const DICTIONARIES: Record<string, Dictionary> = Object.fromEntries(Object.entries(catalogModules).map(([path, catalog]) => [path.slice(path.lastIndexOf('/') + 1, -5), catalog]));
 const CONTEXT = /^[a-z][a-z-]*\|/;
+
+/** Resolves a legacy English key to its permanent ID; IDs pass through unchanged. */
+export function messageId(message: string): string | undefined {
+  const id = (legacy as Record<string, string>)[message] ?? message;
+  return Object.hasOwn(EN, id) ? id : undefined;
+}
 
 let current: Language = 'en';
 
@@ -58,15 +61,20 @@ export function t(message: Message, params?: Params): string {
 
 /** For text known only at run time (setting labels, command titles): translated when a dictionary has it. */
 export function translate(message: string, params?: Params): string {
-  const entry = DICTIONARIES[current]?.[message];
-  const fallback = (EN as Dictionary)[message];
+  const id = messageId(message);
+  const entry = id === undefined ? undefined : DICTIONARIES[current]?.[id];
+  const fallback = id === undefined ? undefined : (EN as Dictionary)[id];
   const text = entry === undefined ? fallback === undefined ? english(message) : typeof fallback === 'string' ? fallback : pluralForm(fallback, params?.count, 'en')
     : typeof entry === 'string' ? entry : pluralForm(entry, params?.count, current, fallback);
   return params ? fill(text, params) : text;
 }
 
 /** The English text of a message (without its context). */
-export const english = (message: string): string => message.replace(CONTEXT, '');
+export const english = (message: string): string => {
+  const id = messageId(message);
+  const source = id === undefined ? undefined : (EN as Dictionary)[id];
+  return source === undefined ? message.replace(CONTEXT, '') : typeof source === 'string' ? source : source.other ?? message;
+};
 
 const pluralRules = new Map<Language, Intl.PluralRules>();
 

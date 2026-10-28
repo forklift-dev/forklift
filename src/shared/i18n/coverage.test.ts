@@ -3,7 +3,7 @@ import { COMMANDS } from '../keybindings';
 import { SETTING_FIELDS, SETTINGS_SECTIONS } from '../settings';
 import { BUILTIN_THEMES } from '../themes';
 import { RU } from './strings';
-import { LANGUAGE_REGISTRY } from './index';
+import { LANGUAGE_REGISTRY, messageId } from './index';
 
 /** Shown by their own name in every language. */
 const LANGUAGE_NAMES = new Set(LANGUAGE_REGISTRY.map(({ name }) => name));
@@ -23,7 +23,10 @@ function schemaTexts(): string[] {
 
 describe('schema texts', () => {
   it('all have a Russian translation', () => {
-    const missing = schemaTexts().filter((text) => !(text in RU));
+    const missing = schemaTexts().filter((text) => {
+      const id = messageId(text);
+      return id === undefined || !(id in RU);
+    });
     expect(missing).toEqual([]);
   });
 });

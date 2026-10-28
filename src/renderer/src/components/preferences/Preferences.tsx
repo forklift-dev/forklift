@@ -134,7 +134,7 @@ export function Preferences({ repo, section: initialSection = 'general', onClose
   return (
     <section
       className="preferences"
-      aria-label={t('Preferences')}
+      aria-label={t('msg.66962f72a0888373')}
       ref={rootRef}
       tabIndex={-1}
       onKeyDown={(event) => {
@@ -145,7 +145,7 @@ export function Preferences({ repo, section: initialSection = 'general', onClose
       }}
     >
       <header className="preferences-header">
-        <h1>{t('Preferences')}</h1>
+        <h1>{t('msg.66962f72a0888373')}</h1>
         <div className="scope-switch" role="tablist" aria-label={t('Settings scope')}>
           <button type="button" role="tab" aria-selected={scope === 'global'} onClick={() => setScope('global')}>
             {t('All repositories')}
@@ -164,8 +164,8 @@ export function Preferences({ repo, section: initialSection = 'general', onClose
         <input
           className="preferences-search"
           type="search"
-          placeholder={t('Search settings')}
-          aria-label={t('Search settings')}
+          placeholder={t('msg.255b076dd8285543')}
+          aria-label={t('msg.255b076dd8285543')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

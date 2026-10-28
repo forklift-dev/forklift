@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { parse, parseExpression } from '@babel/parser';
 
 const root = new URL('../', import.meta.url);
@@ -20,6 +21,7 @@ try {
 const locales = registry.map(({ code }) => code);
 const requiredForms = Object.fromEntries(locales.map((locale) => [locale, new Intl.PluralRules(locale).resolvedOptions().pluralCategories]));
 const context = /^[a-z][a-z-]*\|/;
+const idFor = (key) => `msg.${createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
 // These are selected through a typed runtime value; the plural example is an intentional test fixture.
 const DYNAMIC_MESSAGES = new Set(['operation|cherry-pick', 'operation|merge', 'operation|rebase', 'operation|revert', '{count} files']);
 const failures = [];
@@ -51,6 +53,17 @@ function readCatalog(locale) {
   return data;
 }
 
+function readLegacy() {
+  const file = 'legacy.json';
+  const text = readFileSync(join(catalogDir, '..', file), 'utf8');
+  let data;
+  try { data = JSON.parse(text); } catch (error) { throw new Error(`${file}: ${error.message}`); }
+  checkDuplicates(parseExpression(text), file);
+  if (!data || Array.isArray(data) || typeof data !== 'object') throw new Error(`${file}: expected a JSON object`);
+  if (JSON.stringify(data) !== JSON.stringify(sorted(data))) fail(`${file}: keys are not sorted`);
+  return data;
+}
+
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -67,7 +80,9 @@ function walk(node, visit) {
 }
 
 let catalogs;
+let legacy;
 try {
+  legacy = readLegacy();
   catalogs = Object.fromEntries(locales.map((locale) => [locale, readCatalog(locale)]));
 } catch (error) {
   process.stderr.write(`${error.message}\n`);
@@ -75,28 +90,36 @@ try {
 }
 const en = catalogs.en;
 const ru = catalogs.ru;
+const ids = new Set(Object.values(legacy));
+if (ids.size !== Object.keys(legacy).length) fail('legacy.json: two English keys use the same message ID');
+for (const [key, id] of Object.entries(legacy)) {
+  if (typeof id !== 'string' || id !== idFor(key)) fail(`legacy.json: ${JSON.stringify(key)} has a renamed or invalid ID; keep its original ID`);
+}
+for (const id of new Set([...Object.keys(en), ...Object.keys(ru)])) if (!ids.has(id)) fail(`catalogs: unknown message ID ${JSON.stringify(id)}; add it to legacy.json`);
 
 if (process.argv.includes('--sync')) {
   if (failures.length) {
     for (const failure of failures) process.stderr.write(`${failure}\n`);
     process.exit(1);
   }
-  for (const [key, value] of Object.entries(ru)) if (!(key in en) && typeof value !== 'string') fail(`en.json: add English plural forms for ${JSON.stringify(key)} before syncing`);
+  for (const [id, value] of Object.entries(ru)) if (!(id in en) && typeof value !== 'string') fail(`en.json: add English plural forms for ${JSON.stringify(id)} before syncing`);
   if (failures.length) {
     for (const failure of failures) process.stderr.write(`${failure}\n`);
     process.exit(1);
   }
-  for (const key of Object.keys(ru)) if (!(key in en)) en[key] = key.replace(context, '');
+  const original = Object.fromEntries(Object.entries(legacy).map(([key, id]) => [id, key]));
+  for (const id of Object.keys(ru)) if (!(id in en)) en[id] = original[id]?.replace(context, '') ?? '';
   for (const locale of locales) writeFileSync(join(catalogDir, `${locale}.json`), `${JSON.stringify(sorted(catalogs[locale]), null, 2)}\n`);
 }
 
-for (const key of new Set([...Object.keys(en), ...Object.keys(ru)])) {
+for (const key of new Set([...ids, ...Object.keys(en), ...Object.keys(ru)])) {
+  if (!ids.has(key)) continue;
   if (!(key in en)) { fail(`en.json: missing source for ${JSON.stringify(key)}`); continue; }
   if (!(key in ru)) { fail(`ru.json: missing translation for ${JSON.stringify(key)}`); continue; }
-  const source = key.replace(context, '');
   const english = en[key];
   const russian = ru[key];
-  if (typeof english === 'string' && english !== source) fail(`en.json: ${JSON.stringify(key)} must use its English source as the value`);
+  const source = typeof english === 'string' ? english : english?.other;
+  if (typeof source !== 'string' || !source.trim()) { fail(`en.json: ${JSON.stringify(key)} has no English source`); continue; }
   if (typeof english !== typeof russian) fail(`${JSON.stringify(key)}: source and translation must both be strings or plural objects`);
   for (const locale of locales) {
     const value = catalogs[locale][key];
@@ -117,10 +140,10 @@ for (const key of new Set([...Object.keys(en), ...Object.keys(ru)])) {
       if (typeof text !== 'string' || !text.trim() || placeholders(text) !== placeholders(source)) fail(`${locale}.json: ${JSON.stringify(key)} ${form} is empty or has different placeholders (expected: {${placeholders(source)}})`);
     }
   }
-  if (typeof english === 'object' && english?.other !== source) fail(`en.json: ${JSON.stringify(key)} other form must match its source`);
+  if (typeof english === 'object' && !source.includes('{count}')) fail(`en.json: ${JSON.stringify(key)} plural source needs {count}`);
 }
 for (const locale of locales.filter((name) => name !== 'en' && name !== 'ru')) {
-  for (const key of Object.keys(catalogs[locale])) if (!(key in en)) fail(`${locale}.json: unknown source ${JSON.stringify(key)}`);
+  for (const key of Object.keys(catalogs[locale])) if (!(key in en)) fail(`${locale}.json: unknown message ID ${JSON.stringify(key)}`);
   const missing = Object.keys(en).filter((key) => !(key in catalogs[locale])).length;
   const partial = Object.entries(catalogs[locale]).filter(([key, value]) => key in en && typeof value === 'object' && value !== null && requiredForms[locale].some((form) => !(form in value))).length;
   process.stdout.write(`i18n: ${locale}: ${Object.keys(en).length - missing}/${Object.keys(en).length} entries translated; incomplete plural entries: ${partial}; ${missing} messages use English fallback\n`);
@@ -134,10 +157,10 @@ for (const file of sourceFiles(sourceDir)) {
     if (node.type === 'StringLiteral') literals.add(node.value);
     if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || !['t', 'tx', 'translate'].includes(node.callee.name)) return;
     const argument = node.arguments[0];
-    if (argument?.type === 'StringLiteral' && !(argument.value in en)) fail(`${path}:${argument.loc.start.line}: ${node.callee.name}(${JSON.stringify(argument.value)}) is missing from catalogs`);
+    if (argument?.type === 'StringLiteral' && !(argument.value in en) && !(argument.value in legacy)) fail(`${path}:${argument.loc.start.line}: ${node.callee.name}(${JSON.stringify(argument.value)}) is missing from catalogs`);
   });
 }
-for (const key of Object.keys(en)) if (!literals.has(key) && !DYNAMIC_MESSAGES.has(key)) fail(`catalogs: unused message ${JSON.stringify(key)}`);
+for (const [key, id] of Object.entries(legacy)) if (!literals.has(key) && !literals.has(id) && !DYNAMIC_MESSAGES.has(key)) fail(`catalogs: unused message ID ${JSON.stringify(id)} (${JSON.stringify(key)})`);
 
 if (failures.length) {
   for (const failure of failures) process.stderr.write(`${failure}\n`);

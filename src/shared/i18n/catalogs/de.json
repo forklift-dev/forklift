@@ -1,9 +1,9 @@
 {
-  "Cancel": "Abbrechen",
-  "General": "Allgemein",
-  "Language": "Sprache",
-  "Preferences": "Einstellungen",
-  "{count} files": {
+  "msg.19766ed6ccb2f4a3": "Abbrechen",
+  "msg.63352fdc2cd6bbbf": {
     "one": "{count} Datei"
-  }
+  },
+  "msg.66962f72a0888373": "Einstellungen",
+  "msg.a4fe65264ef7dbb3": "Sprache",
+  "msg.c910d474dcd724bf": "Allgemein"
 }

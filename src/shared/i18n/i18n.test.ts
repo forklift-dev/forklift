@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { english, fill, formatDate, formatNumber, LANGUAGES, resolveLanguage, setLanguage, t, translate, type PluralForms } from './index';
 import { EN, RU } from './strings';
+import legacy from './legacy.json';
 
 afterEach(() => setLanguage('en'));
 
@@ -26,7 +27,7 @@ describe('dictionaries', () => {
       }
       expect(Object.keys(entry).sort(), message).toEqual(expect.arrayContaining(['few', 'many', 'one']));
       expect(en[message], `${message} needs English forms`).toMatchObject({ one: expect.any(String), other: expect.any(String) });
-      expect(placeholders(message), message).toContain('count');
+      expect(placeholders(english(message)), message).toContain('count');
     }
   });
 
@@ -40,6 +41,27 @@ describe('t', () => {
     expect(t('Cancel')).toBe('Cancel');
     setLanguage('ru');
     expect(t('Cancel')).toBe('Отмена');
+  });
+
+  it('keeps the translation when the English source is reworded under the same ID', () => {
+    const id = legacy.Cancel as keyof typeof EN;
+    const previous = EN[id];
+    try {
+      (EN as Record<string, string | PluralForms>)[id] = 'Cancel this action';
+      expect(t('Cancel')).toBe('Cancel this action');
+      setLanguage('ru');
+      expect(t('Cancel')).toBe('Отмена');
+      expect(t(id)).toBe('Отмена');
+    } finally {
+      (EN as Record<string, string | PluralForms>)[id] = previous;
+    }
+  });
+
+  it('keeps contextual messages distinct from the same visible English text', () => {
+    expect(legacy['action|Edit']).not.toBe(legacy.Edit);
+    setLanguage('ru');
+    expect(t('action|Edit')).toBe('Изменить');
+    expect(t('Edit')).toBe('Правка');
   });
 
   it('picks plural forms by count', () => {

@@ -4,13 +4,13 @@ Forklift accepts interface translations through pull requests. You can improve a
 
 ## Choose a string
 
-The English source is [`src/shared/i18n/catalogs/en.json`](../src/shared/i18n/catalogs/en.json). Find the text you see in the app, then find the same key in the target catalog under `src/shared/i18n/catalogs/`. Keys are English source strings; change the **value**, never the key. For example:
+The English source is [`src/shared/i18n/catalogs/en.json`](../src/shared/i18n/catalogs/en.json). Find the text among its **values**, copy the `msg.…` ID beside it, then find that ID in the target catalog under `src/shared/i18n/catalogs/`. Change the **value**, never the ID. For example:
 
 ```json
-"Cancel": "Abbrechen"
+"msg.19766ed6ccb2f4a3": "Abbrechen"
 ```
 
-Some keys have a context prefix, such as `verb|Open` and `state|Open`. It distinguishes meanings and stays in the key; translate the English value according to its context. If the meaning is unclear, mention the key and screen in the PR so a maintainer can help.
+The [legacy key map](../src/shared/i18n/legacy.json) preserves context such as `action|Edit` and plain `Edit`; these have different IDs even when the visible English word is the same. If the meaning is unclear, mention the ID and screen in the PR so a maintainer can help. A wording change keeps its ID; a change of meaning needs a new ID.
 
 ## Edit or add a language
 
@@ -35,7 +35,7 @@ npm run i18n:check
 npm run dev
 ```
 
-`i18n:check` reports the catalog and key for invalid JSON, duplicate or unknown keys, missing English or Russian entries, changed placeholders, and invalid plural forms. Its coverage line counts entries and incomplete plural entries in each additional language. Run `npm run i18n:sync` only when adding a new English source string in application code; it is not needed for translation-only work.
+`i18n:check` reports the catalog and ID for invalid JSON, duplicate or unknown IDs, missing English or Russian entries, changed placeholders, and invalid plural forms. Its coverage line counts entries and incomplete plural entries in each additional language. Run `npm run i18n:sync` only when adding a new English source string in application code; it is not needed for translation-only work.
 
 In the running app, open Preferences with the gear or Ctrl+, and choose the language under **UI → Language**. Switch between your language and English without restarting. Check the screens you translated, especially dialogs, narrow windows, long labels, tooltips, and the language selector. For a new locale, also try the **System** option with that system language. A screenshot helps reviewers inspect layout.
 
