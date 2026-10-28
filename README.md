@@ -107,6 +107,10 @@ bash scripts/build-macos.sh
 The README screenshots come from a disposable Git repository and an isolated app profile. Regenerate them after
 building with `node scripts/capture-readme.mjs` (on headless Linux, use `xvfb-run -a node scripts/capture-readme.mjs`).
 
+### Help translate Forklift
+
+Interface translations are welcome. The [translation guide](docs/translating.md) explains how to edit a catalog, preview a partial language, run checks, and send a pull request. Documentation translations are reviewed separately from interface catalogs.
+
 ### Architecture at a glance
 
 ```text

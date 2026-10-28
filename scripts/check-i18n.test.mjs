@@ -31,10 +31,25 @@ test('partial third locale is counted and validated', (t) => {
   writeFileSync(join(data.catalogs, '..', 'locales.json'), JSON.stringify([{ code: 'en', name: 'English' }, { code: 'ru', name: 'Русский' }, { code: 'de', name: 'Deutsch' }]));
   writeFileSync(join(data.catalogs, 'de.json'), JSON.stringify({ 'Hello {name}': 'Hallo {name}' }));
   const result = data.run();
-  if (result.status !== 0 || !/de has 1\/1 translated messages/.test(result.stdout)) throw new Error(result.stderr || result.stdout);
+  if (result.status !== 0 || !/de: 1\/1 entries translated; incomplete plural entries: 0/.test(result.stdout)) throw new Error(result.stderr || result.stdout);
   writeFileSync(join(data.catalogs, 'de.json'), JSON.stringify({ 'Hello {name}': 'Hallo {wrong}' }));
   const invalid = data.run();
   if (invalid.status === 0 || !/different placeholders/.test(invalid.stderr)) throw new Error(invalid.stderr);
+});
+
+test('an updated translation and a partial plural entry pass with a clear coverage report', (t) => {
+  const data = fixture(t, { 'Hello {name}': 'Hello {name}', '{count} files': { one: '{count} file', other: '{count} files' } }, { 'Hello {name}': 'Здравствуйте, {name}', '{count} files': { one: '{count} файл', few: '{count} файла', many: '{count} файлов', other: '{count} файла' } }, "t('Hello {name}'); t('{count} files')");
+  writeFileSync(join(data.catalogs, '..', 'locales.json'), JSON.stringify([{ code: 'en', name: 'English' }, { code: 'ru', name: 'Русский' }, { code: 'de', name: 'Deutsch' }]));
+  writeFileSync(join(data.catalogs, 'de.json'), JSON.stringify({ 'Hello {name}': 'Hallo {name}', '{count} files': { one: '{count} Datei' } }));
+  const result = data.run();
+  if (result.status !== 0 || !/de: 2\/2 entries translated; incomplete plural entries: 1/.test(result.stdout)) throw new Error(result.stderr || result.stdout);
+});
+
+test('invalid JSON reports the catalog without a stack trace', (t) => {
+  const data = fixture(t);
+  writeFileSync(join(data.catalogs, 'ru.json'), '{broken');
+  const result = data.run();
+  if (result.status === 0 || !/^ru\.json: /m.test(result.stderr) || /at file:/.test(result.stderr)) throw new Error(result.stderr);
 });
 
 test('duplicate keys, bad parameters, new and unused strings fail clearly', (t) => {
