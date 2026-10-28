@@ -124,6 +124,7 @@
 | [T-054](tasks/stage-5-settings/T-054-notifications-log.md) | Уведомления и журнал операций | review |
 | [T-055](tasks/stage-5-settings/T-055-avatars.md) | Аватары авторов | review |
 | [T-056](tasks/stage-5-settings/T-056-auto-update.md) | Автообновление | blocked |
+| [T-096](tasks/stage-5-settings/T-096-update-delivery-plan.md) | Исследовать способ доставки обновлений приложения | todo |
 | [T-057](tasks/stage-5-settings/T-057-toolbar-redesign.md) | Верхняя панель в стиле GitKraken | review |
 | [T-058](tasks/stage-5-settings/T-058-graph-styles.md) | Стили графа коммитов (в т. ч. как в GitKraken) | review |
 | [T-059](tasks/stage-5-settings/T-059-resizable-layout.md) | Изменяемая ширина колонок графа и боковых панелей | review |
