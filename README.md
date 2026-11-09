@@ -57,6 +57,8 @@ Pre-release packages are published on the [Releases page](https://github.com/for
 | Windows x64 | Installer and ZIP |
 | macOS Apple silicon | DMG and ZIP |
 
+The Linux AppImage includes its user-space filesystem runtime; installing `libfuse2` separately is not required.
+
 These beta packages are not yet signed or notarized. Your operating system may ask for confirmation on first launch.
 
 ## Build from source

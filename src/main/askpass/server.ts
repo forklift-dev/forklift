@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import type { AskPrompt } from '../../shared/state';
 import { classifyPrompt, CREDENTIAL_ARG, SOCKET_ENV, TOKEN_ENV, ASKPASS_FLAG, type AskRequest } from './protocol';
 import type { CredentialStore } from './credentials';
@@ -48,6 +48,24 @@ interface Session {
 
 const MAX_REQUEST = 64 * 1024;
 const shQuote = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * Starts askpass through AppRun in an AppImage instead of executing Electron inside its mount directly.
+ * Git receives a sanitized environment without APPDIR/LD_LIBRARY_PATH, so bypassing AppRun can make the helper
+ * fail only in a packaged build. The outer AppImage recreates the complete bundled runtime environment.
+ */
+export function askpassCommand(execPath: string, appPath: string, packaged: boolean, env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): AskpassDeps['command'] {
+  if (!packaged) return { executable: execPath, args: [appPath] };
+  const image = env['APPIMAGE'];
+  const appDir = env['APPDIR'];
+  if (platform === 'linux' && image && appDir && isAbsolute(image) && isAbsolute(appDir)) {
+    const fromAppDir = relative(appDir, execPath);
+    if (fromAppDir !== '..' && !fromAppDir.startsWith(`..${sep}`) && !isAbsolute(fromAppDir)) {
+      return { executable: image, args: [] };
+    }
+  }
+  return { executable: execPath, args: [] };
+}
 
 /** Answers git's and ssh's credential prompts with dialogs in the app (see T-024, «Дизайн askpass-моста»). */
 export class AskpassServer {

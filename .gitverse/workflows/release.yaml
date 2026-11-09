@@ -41,6 +41,9 @@ jobs:
       - name: Check fuses of the packaged app
         run: node scripts/check-fuses.mjs
 
+      - name: Check the static AppImage runtime
+        run: node scripts/check-appimage-runtime.mjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: forklift-${{ matrix.name }}

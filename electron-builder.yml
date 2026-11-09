@@ -5,6 +5,12 @@ directories:
   output: dist
   buildResources: build
 
+# Static-PIE AppImage runtime with libfuse and squashfuse built in. Unlike the legacy
+# runtime it does not dlopen libfuse.so.2 on the user's machine. app-builder-lib pins
+# and verifies the appimage@1.0.3 toolset archive by SHA-256.
+toolsets:
+  appimage: 1.0.3
+
 files:
   - out/**
   - package.json

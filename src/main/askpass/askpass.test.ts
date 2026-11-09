@@ -7,7 +7,7 @@ import type { AskPrompt } from '../../shared/state';
 import { runAskpassClient, runCredentialClient } from './client';
 import { CredentialStore } from './credentials';
 import { classifyPrompt } from './protocol';
-import { AskpassServer } from './server';
+import { askpassCommand, AskpassServer } from './server';
 
 let dir: string;
 let server: AskpassServer;
@@ -58,6 +58,27 @@ describe('classifyPrompt', () => {
     ['Something else: ', 'other'],
   ])('%s → %s', (prompt, kind) => {
     expect(classifyPrompt(prompt)).toBe(kind);
+  });
+});
+
+describe('askpassCommand', () => {
+  it('re-enters a packaged AppImage so AppRun restores its bundled library environment', () => {
+    expect(askpassCommand('/tmp/.mount_Forklift/forklift', '/tmp/.mount_Forklift/resources/app.asar', true, {
+      APPIMAGE: '/home/ada/Applications/Forklift.AppImage',
+      APPDIR: '/tmp/.mount_Forklift',
+    }, 'linux')).toEqual({ executable: '/home/ada/Applications/Forklift.AppImage', args: [] });
+  });
+
+  it('does not trust APPIMAGE unless the executable is inside its APPDIR', () => {
+    expect(askpassCommand('/opt/Forklift/forklift', '/opt/Forklift/resources/app.asar', true, {
+      APPIMAGE: '/tmp/not-forklift.AppImage',
+      APPDIR: '/tmp/.mount_other',
+    }, 'linux')).toEqual({ executable: '/opt/Forklift/forklift', args: [] });
+  });
+
+  it('starts Electron with the app path in development', () => {
+    expect(askpassCommand('/project/node_modules/electron/electron', '/project', false, {}, 'linux'))
+      .toEqual({ executable: '/project/node_modules/electron/electron', args: ['/project'] });
   });
 });
 

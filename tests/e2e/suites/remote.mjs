@@ -51,7 +51,8 @@ export default async function ({ check }) {
   sh(theirs, 'commit', '-q', '--allow-empty', '-m', 'Second, from them');
   await net(theirs, 'push', '-q');
 
-  const { page } = await launchApp();
+  // Explicitly isolate Git configuration too: packaged askpass must work on a clean system without helpers.
+  const { page } = await launchApp({ env: { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' } });
   await page.invoke('repo:open', root);
   await page.waitFor(`${top} === 'First'`);
 

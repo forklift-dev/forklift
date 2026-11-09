@@ -6,6 +6,6 @@ export const logIdOf = (error: unknown): number | null => (error instanceof Erro
 /** Calls a main-process command; resolves after this window's state replica is up to date. */
 export async function invoke<K extends CommandName>(channel: K, ...args: CommandArgs<K>): Promise<CommandResult<K>> {
   const result = await window.forklift.invoke(channel, ...args);
-  if (!result.ok) throw Object.assign(new Error(result.error.message), result.error.logId !== undefined && { logId: result.error.logId });
+  if (!result.ok) throw Object.assign(new Error(result.error.message), result.error.code !== undefined && { code: result.error.code }, result.error.logId !== undefined && { logId: result.error.logId });
   return result.value;
 }

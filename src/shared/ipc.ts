@@ -105,7 +105,7 @@ export interface Commands {
   'remote:pull': { args: [repo: string, rebase: boolean]; result: 'done' | 'conflicts' };
   /**
    * Pushes the current branch to its upstream, or to `remote` (becoming the upstream) when it has none.
-   * A rejected push fails with a message starting "Rejected:"; `force` retries with --force-with-lease.
+   * A rejected push fails with code `push-rejected`; `force` retries with --force-with-lease.
    */
   'remote:push': { args: [repo: string, remote: string | null, force: boolean]; result: void };
   'remote:add': { args: [repo: string, name: string, url: string]; result: void };
@@ -286,11 +286,12 @@ export interface Commands {
 export type CommandName = keyof Commands;
 export type CommandArgs<K extends CommandName> = Commands[K]['args'];
 export type CommandResult<K extends CommandName> = Commands[K]['result'];
+export type IpcErrorCode = 'push-rejected';
 
 export type IpcResult<T> =
   | { ok: true; value: T }
   /** `logId`: the operation log entry with the details (the git commands and their output). */
-  | { ok: false; error: { message: string; logId?: number } };
+  | { ok: false; error: { message: string; code?: IpcErrorCode; logId?: number } };
 
 // A Record keyed by CommandName makes the compiler reject missing or unknown channels.
 const commandChannelSet = {

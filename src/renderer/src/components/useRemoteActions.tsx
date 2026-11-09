@@ -24,15 +24,17 @@ export function useRemoteActions(repo: string | null, data: RepoData | null, run
 
   const push = async (remote: string | null, force: boolean): Promise<void> => {
     if (!repo || !data) return;
+    // This is normal state, not an error. Decide from replicated repository data instead of parsing a
+    // localized backend/Git error (the old English-only check broke this flow in the Russian UI).
+    if (remote === null && !force && data.branch.head && !data.branch.upstream) return choosePushTarget();
     try {
       await invoke('remote:push', repo, remote, force);
     } catch (error) {
       const message = errorText(error);
-      if (/has no upstream branch/.test(message)) return choosePushTarget();
-      if (message.startsWith('Rejected:') && !force) {
+      if ((error as { code?: unknown }).code === 'push-rejected' && !force) {
         const ok = await confirm({
           title: t('The remote has commits that {branch} does not have', { branch: data.branch.head ?? '' }),
-          detail: t('Pull first to bring them in. Or force push (with lease): the remote branch is replaced by yours, unless it moved again since your last fetch.\n\n{message}', { message: message.replace(/^Rejected: /, '') }),
+          detail: t('Pull first to bring them in. Or force push (with lease): the remote branch is replaced by yours, unless it moved again since your last fetch.\n\n{message}', { message }),
           confirmLabel: t('Force push'),
           danger: true,
         });

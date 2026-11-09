@@ -25,7 +25,7 @@ import { CredentialStore, type SecretBox } from './askpass/credentials';
 import { HostingService } from './hosting/service';
 import { TokenStore } from './hosting/tokens';
 import { ASKPASS_FLAG, CREDENTIAL_ARG } from './askpass/protocol';
-import { AskpassServer, type PromptAnswer } from './askpass/server';
+import { askpassCommand, AskpassServer, type PromptAnswer } from './askpass/server';
 import { createGitService } from './git/service';
 import { HistoryService } from './history/service';
 import { HistoryStore } from './history/store';
@@ -197,7 +197,7 @@ async function start() {
   const askpass = new AskpassServer({
     credentials: gitCredentials,
     scriptDir: join(app.getPath('userData'), 'askpass'),
-    command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
+    command: askpassCommand(process.execPath, app.getAppPath(), app.isPackaged),
     ask: (prompt) =>
       new Promise((resolve) => {
         waiting.set(prompt.id, resolve);

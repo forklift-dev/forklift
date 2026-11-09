@@ -45,6 +45,7 @@
 | [T-082](tasks/stage-0-foundation/T-082-crash-reports.md) | Отчёты о падениях (локально) — отложено | draft |
 | [T-083](tasks/stage-0-foundation/T-083-perf-budgets.md) | Замеры производительности в CI — отложено | draft |
 | [T-085](tasks/stage-0-foundation/T-085-prebuilt-native-modules.md) | Готовые сборки nodegit и нативных модулей для CI (идея владельца) | draft |
+| [T-105](tasks/stage-0-foundation/T-105-linux-package-without-libfuse.md) | Статический AppImage runtime без внешней зависимости от libfuse | review |
 
 ### Этап 1 — Процессы и внешние программы
 
@@ -86,6 +87,8 @@
 | [T-098](tasks/stage-2-git-core/T-098-graph-ref-context-menus.md) | Контекстные меню меток графа | review |
 | [T-099](tasks/stage-2-git-core/T-099-dismissible-error-banner.md) | Закрываемая полоса ошибки | review |
 | [T-101](tasks/stage-2-git-core/T-101-branch-cleanup.md) | Центр очистки веток | review |
+| [T-106](tasks/stage-2-git-core/T-106-linux-packaged-askpass.md) | Исправить HTTPS askpass в упакованной Linux-сборке | review |
+| [T-107](tasks/stage-2-git-core/T-107-push-new-branch-upstream.md) | Push новой ветки с созданием upstream из интерфейса | review |
 
 ### Этап 3 — История и операции над коммитами
 

@@ -1,11 +1,19 @@
 import { isAbsolute } from 'node:path';
 import { ipcMain, type WebContents } from 'electron';
-import { COMMAND_CHANNELS, type CommandArgs, type CommandName, type CommandResult, type IpcResult } from '../../shared/ipc';
+import { COMMAND_CHANNELS, type CommandArgs, type CommandName, type CommandResult, type IpcErrorCode, type IpcResult } from '../../shared/ipc';
 import { isTrustedSender } from '../origin';
 import { QUIET_COMMANDS, type OperationLog } from '../log/operationLog';
 
 export interface CommandContext {
   sender: WebContents;
+}
+
+/** An expected command failure the renderer handles by stable code rather than localized message text. */
+export class CommandError extends Error {
+  constructor(message: string, readonly code: IpcErrorCode, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'CommandError';
+  }
 }
 
 export type CommandHandlers = {
@@ -39,7 +47,7 @@ export function registerCommands(handlers: CommandHandlers, { waitForAck, log }:
         result = { ok: true, value };
       } catch (error) {
         console.error(`[ipc] ${channel} failed:`, error);
-        result = { ok: false, error: { message: error instanceof Error ? error.message : String(error), ...(logId !== undefined && { logId }) } };
+        result = { ok: false, error: { message: error instanceof Error ? error.message : String(error), ...(error instanceof CommandError && { code: error.code }), ...(logId !== undefined && { logId }) } };
       }
       await waitForAck(event.sender.id);
       return result;

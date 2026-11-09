@@ -56,7 +56,7 @@ import { bisectActivity, hookActivity, loadRepo, tabActivated, tabClosed, tabMov
 import { listHooks } from '../git/hooks';
 import { COMMIT_HOOKS, PUSH_HOOKS, type HookActivity } from '../../shared/hooks';
 import { settingsProblemsDismissed } from '../store/settingsSlice';
-import type { CommandHandlers } from './registry';
+import { CommandError, type CommandHandlers } from './registry';
 import { MAX_GROUPS, MAX_GROUP_REPOS } from '../../shared/state';
 import { GroupSyncRunner, readGroupStatus } from '../repos/groupSync';
 import { askAi } from '../ai/assist';
@@ -487,7 +487,7 @@ export function createCommandHandlers({ store, checkRelease, git, tools, diffToo
         await thenRefresh(root, () => withHooks(root, 'push', [...PUSH_HOOKS], (onOutput) => network(root, 'push', (run) => remotes.push(root, remote, force, { ...run, onOutput }))));
       } catch (error) {
         // The window offers pulling or a force push for this case.
-        if ((error as { rejected?: boolean }).rejected) throw new Error(t('Rejected: {message}', { message: (error as Error).message }), { cause: error });
+        if ((error as { rejected?: boolean }).rejected) throw new CommandError(t('Rejected: {message}', { message: (error as Error).message }), 'push-rejected', { cause: error });
         throw error;
       }
     },

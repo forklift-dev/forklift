@@ -106,7 +106,9 @@ jobs:
         if: ${{ matrix.os == 'linux' }}
         run: |
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential clang-15 perl libkrb5-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang-15 perl libkrb5-dev fuse3 xvfb xauth \
+            libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 libsecret-1-0 libnotify4
           # Electron 45's V8 headers use an attribute combination that GCC 12 and older cannot parse.
           echo "CC=clang-15" >> "$GITHUB_ENV"
           echo "CXX=clang++-15" >> "$GITHUB_ENV"
@@ -163,6 +165,17 @@ jobs:
 
       - name: Check fuses of the packaged app
         run: node scripts/check-fuses.mjs
+
+      - name: Check the static AppImage runtime
+        if: matrix.os == 'linux'
+        run: node scripts/check-appimage-runtime.mjs
+
+      - name: Smoke-test the packaged AppImage
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          image="$(find "$PWD/dist" -maxdepth 1 -name '*.AppImage' -print -quit)"
+          E2E_BINARY="$image" npm run test:e2e -- remote push-upstream --no-build
 
       - uses: actions/upload-artifact@v4
         with:
