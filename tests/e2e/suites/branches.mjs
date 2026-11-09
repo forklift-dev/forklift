@@ -233,7 +233,8 @@ export default async function ({ check }) {
   await page.click(`document.querySelector('.task-workspace-notes summary')`);
   await page.fill(`document.querySelector('.task-workspace-notes textarea')`, 'Review the failing case.');
   await page.evaluate(`document.querySelector('.task-workspace-notes textarea').blur()`);
-  const savedWorkspaces = await page.invoke('taskWorkspace:list', root);
-  check('task note is persisted', savedWorkspaces.ok && savedWorkspaces.value.some((entry) => entry.name === 'E2E task' && entry.note === 'Review the failing case.'));
+  // onBlur starts an asynchronous IPC call. Under CI load it may not have reached the store when blur returns.
+  const noteSaved = await page.waitFor(`window.forklift.invoke('taskWorkspace:list', ${JSON.stringify(root)}).then((result) => result.ok && result.value.some((entry) => entry.name === 'E2E task' && entry.note === 'Review the failing case.'))`, 15000);
+  check('task note is persisted', noteSaved);
   check('opening a task worktree does not break file watching', await page.waitFor(`!document.querySelector('.notices')?.textContent.includes('Excluded path must be a valid subdirectory')`));
 }

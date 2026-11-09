@@ -86,6 +86,7 @@ export default async function ({ check }) {
   await page.waitFor(`[...document.querySelectorAll('.commit-row[data-hash] .subject')].some((s) => s.textContent === 'Meanwhile')`, 5000);
   await sleep(1100);
   await page.click(toolbarButton('Pop'));
-  const notice = await page.waitFor(`document.querySelector('.notices')?.textContent`);
+  // Applying the indexed stash can need a failed --index attempt and a retry; loaded CI runners exceed 8 s.
+  const notice = await page.waitFor(`/The stash is kept/.test(document.querySelector('.notices')?.textContent ?? '') && document.querySelector('.notices').textContent`, 30000);
   check('conflicting pop reported, stash kept', /with conflicts in a\.txt.*The stash is kept/.test(notice ?? '') && git('stash', 'list').split('\n').length === 1, notice);
 }

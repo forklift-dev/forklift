@@ -72,7 +72,8 @@ export default async function ({ check }) {
   await page.click(`[...document.querySelectorAll('.context-menu button')].find(b => b.textContent === 'Fetch all')`);
   await answer(page, 'Username', 'ada');
   await answer(page, 'Password', 'wrong');
-  const failure = await page.waitFor(`document.querySelector('.error-banner')?.textContent`, 15000);
+  // The askpass Electron helper may emit platform warnings before Git emits its final authentication error.
+  const failure = await page.waitFor(`/Authentication failed|401|denied/i.test(document.querySelector('.error-banner')?.textContent ?? '') && document.querySelector('.error-banner').textContent`, 30000);
   check('a wrong password fails with git’s message', /Authentication failed|401|denied/i.test(failure ?? ''), failure);
 
   // Cancel in the credential dialog: git gives up, the pull ends.
