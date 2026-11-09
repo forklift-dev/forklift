@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EdgeKind } from '../../shared/graph';
 import { HistoryService } from '../history/service';
 import { directRunner } from '../process/testing';
-import { GitCli } from './cli';
+import { GitCli, GitCliError } from './cli';
 import { createGitService } from './service';
 import { StashService } from './stash';
 
@@ -72,6 +72,26 @@ describe('StashService', () => {
     const result = await service.apply(root, sha!, true);
     expect(result).toEqual({ outcome: 'conflicts', detail: 'a.txt' });
     expect(sh('stash', 'list', '--format=%H')).toBe(sha);
+  });
+
+  it('retries an indexed conflict when newer Git exits 128', async () => {
+    const sha = 'a'.repeat(40);
+    const calls: string[][] = [];
+    const fakeGit = {
+      async exec(args: string[]) {
+        calls.push(args);
+        if (args[0] === 'stash' && args[1] === 'list') return { exitCode: 0, stdout: sha, stderr: '' };
+        if (args.includes('--index')) throw new GitCliError('indexed conflict', args, 128, 'error: conflicts in index. Try without --index.\n');
+        return { exitCode: 1, stdout: '', stderr: 'CONFLICT (content): Merge conflict in a.txt\n' };
+      },
+    } as unknown as GitCli;
+
+    expect(await new StashService(fakeGit).apply(root, sha, true)).toEqual({ outcome: 'conflicts', detail: 'a.txt' });
+    expect(calls).toEqual([
+      ['stash', 'list', '--format=%H'],
+      ['stash', 'apply', '--index', sha],
+      ['stash', 'apply', sha],
+    ]);
   });
 
   it('stashes only staged changes on git 2.35+', async () => {

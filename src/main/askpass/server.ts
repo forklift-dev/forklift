@@ -100,12 +100,13 @@ export class AskpassServer {
     if (platform === 'win32') {
       this.script = join(this.deps.scriptDir, 'forklift-askpass.cmd');
       const quoted = [executable, ...args, ASKPASS_FLAG].map((part) => `"${part}"`).join(' ');
-      await writeFile(this.script, `@echo off\r\n${quoted} %*\r\n`);
+      await writeFile(this.script, `@echo off\r\n${quoted} %* 2>nul\r\n`);
       // git for Windows runs "!" helpers through its sh, which takes forward slashes.
       this.helper = `!"${this.script.replaceAll('\\', '/')}" ${CREDENTIAL_ARG}`;
     } else {
       this.script = join(this.deps.scriptDir, 'forklift-askpass.sh');
-      await writeFile(this.script, `#!/bin/sh\nexec ${[executable, ...args, ASKPASS_FLAG].map(shQuote).join(' ')} "$@"\n`, { mode: 0o700 });
+      // Askpass stdout is the credential protocol; hide Chromium platform diagnostics from Git's error output.
+      await writeFile(this.script, `#!/bin/sh\nexec ${[executable, ...args, ASKPASS_FLAG].map(shQuote).join(' ')} "$@" 2>/dev/null\n`, { mode: 0o700 });
       await chmod(this.script, 0o700);
       this.helper = `!${shQuote(this.script)} ${CREDENTIAL_ARG}`;
     }

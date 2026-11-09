@@ -123,6 +123,7 @@ describe.skipIf(process.platform === 'win32')('AskpassServer', () => {
     const script = join(dir, 'forklift-askpass.sh');
     expect(statSync(script).mode & 0o777).toBe(0o700);
     expect(execFileSync(script, ['Password for x: ']).toString()).toBe("it's app dir --forklift-askpass Password for x: \n");
+    expect(readFileSync(script, 'utf8')).toContain('2>/dev/null');
   });
 
   it('works for git itself: git credential fill asks for username and password', async () => {
